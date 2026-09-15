@@ -13,7 +13,8 @@ const MAXIMUM_GIT_OUTPUT_BYTES = 256 * 1_024;
 const GIT_TIMEOUT_MILLISECONDS = 120_000;
 const SHA = /^[0-9a-f]{40}$/u;
 const STABLE_TAG = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
-const TAG_REF = /^refs\/tags\/(v[A-Za-z0-9][A-Za-z0-9._-]{0,126})$/u;
+const SCOPED_STABLE_TAG = /^agentrouter-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+const TAG_REF = /^refs\/tags\/((?:agentrouter-v|v)[A-Za-z0-9][A-Za-z0-9._-]{0,126})$/u;
 
 export type GitCommandResult = Readonly<{
   exitCode: number;
@@ -141,12 +142,21 @@ function validTagRef(ref: string): boolean {
     && !name.endsWith(".lock");
 }
 
-function stableVersion(tag: string): readonly [bigint, bigint, bigint] | undefined {
-  const match = STABLE_TAG.exec(tag);
+type StableVersion = Readonly<{ namespace: string; version: readonly [bigint, bigint, bigint] }>;
+
+/** A release tag carries one governed namespace: "v" for the root package or
+ * "agentrouter-v" for AgentRouter. Newest-tag admission compares only within
+ * the requested tag's own namespace so the two release cadences stay disjoint. */
+function stableVersion(tag: string): StableVersion | undefined {
+  const grammar = tag.startsWith("agentrouter-v") ? SCOPED_STABLE_TAG : STABLE_TAG;
+  const match = grammar.exec(tag);
   if (match === null || match[1] === undefined || match[2] === undefined || match[3] === undefined) {
     return undefined;
   }
-  return Object.freeze([BigInt(match[1]), BigInt(match[2]), BigInt(match[3])]);
+  return Object.freeze({
+    namespace: tag.startsWith("agentrouter-v") ? "agentrouter-v" : "v",
+    version: Object.freeze([BigInt(match[1]), BigInt(match[2]), BigInt(match[3])]) as readonly [bigint, bigint, bigint],
+  });
 }
 
 function compareVersions(
@@ -233,11 +243,11 @@ export function parseRemoteSnapshot(
   for (const entry of parsed.entries) {
     if (!entry.ref.startsWith("refs/tags/")) continue;
     const tag = entry.ref.slice("refs/tags/".length);
-    const version = stableVersion(tag);
-    if (version === undefined) continue;
-    if (newestVersion === undefined || compareVersions(version, newestVersion) > 0) {
+    const stable = stableVersion(tag);
+    if (stable === undefined || stable.namespace !== requestedVersion.namespace) continue;
+    if (newestVersion === undefined || compareVersions(stable.version, newestVersion) > 0) {
       newestTag = tag;
-      newestVersion = version;
+      newestVersion = stable.version;
     }
   }
   if (newestTag !== requestedTag) {
@@ -290,9 +300,10 @@ function readSnapshot(runner: GitCommandRunner, requestedTag: string): GovernedR
     ["ls-remote", "--refs", REPOSITORY_URL, MAIN_REF],
     "Remote main-ref inventory",
   );
+  const namespace = stableVersion(requestedTag)?.namespace ?? fail("Requested release tag is not one canonical stable version.");
   const tags = command(
     runner,
-    ["ls-remote", "--refs", "--tags", REPOSITORY_URL, "refs/tags/v*"],
+    ["ls-remote", "--refs", "--tags", REPOSITORY_URL, `refs/tags/${namespace}*`],
     "Remote tag inventory",
   );
   return parseGovernedRemoteSnapshot(main, tags, requestedTag);

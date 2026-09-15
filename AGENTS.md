@@ -153,8 +153,9 @@ outside the current product scope.
   targets at user or project scope without leaving a partial pair.
 - Follow `docs/publishing.md` for the one-time production controls, stable
   release, and reviewed-`main` recovery procedure. Treat an immutable annotated
-  stable `v*` tag matching every checked version identity at a reviewed commit
-  in current `main` history as a
+  stable tag in the package's own namespace — `v*` for the root package or
+  `agentrouter-v*` for `@hraness/agentrouter` — matching every checked version
+  identity at a reviewed commit in current `main` history as a
   release request. Publish only after the complete root, site, packed-consumer,
   synthetic macOS gate, and exact-tarball macOS/Linux gates pass. Build the
   package once, publish the immutable Latest GitHub Release with that tarball

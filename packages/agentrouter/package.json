@@ -1,10 +1,19 @@
 {
   "name": "@hraness/agentrouter",
   "version": "0.1.0",
-  "private": true,
   "description": "Provider-neutral agent routing, account custody and scoped tool contracts.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hraness/message-like-me.git",
+    "directory": "packages/agentrouter"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org"
+  },
   "engines": {
     "bun": ">=1.3.14",
     "node": ">=22.13"

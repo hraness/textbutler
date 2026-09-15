@@ -1,8 +1,9 @@
 # Agentrouter
 
 Agentrouter is a provider-neutral foundation for applications that give an agent
-a small, explicit tool surface. This first consumer is Textbutler. The package is
-private while its public contract and provider qualification are being developed.
+a small, explicit tool surface. This first consumer is Textbutler. The package's
+public contract and provider qualification are still being developed; see the
+qualification limits below before relying on any provider adapter.
 
 It provides:
 
@@ -36,8 +37,11 @@ pinning is an admission invariant, not a portability gap. The repository gate
 packs the tarball, scans its contents, verifies the manifest contract and
 dependency completeness, installs it into an isolated consumer, and executes
 the public entry — including an account-lease custody round trip — under both
-runtimes. The package remains private: packing and local installation are
-supported, registry publication is not configured or authorized.
+runtimes. Releases are published through the repository's
+`agentrouter-v<version>` tag channel: an immutable GitHub Release tarball is the
+canonical artifact and `@hraness/agentrouter` on npm is an exact-byte mirror
+published with OIDC provenance. See `docs/publishing.md` for the release
+contract.
 
 ## Application-owned capability profiles
 

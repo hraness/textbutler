@@ -4,11 +4,9 @@ import { resolve } from "node:path";
 
 import {
   assertReleaseAssetBytes,
-  parseGitHubRelease,
-  parseNpmRelease,
-  publicPackageName,
   publicRepository,
-  releaseVersionForCurrentAdmission,
+  releaseDistribution,
+  releasePackageForName,
 } from "./release-distribution-policy";
 import { verifyNpmProvenance } from "./npm-provenance-verification";
 import { assertReviewedMainComparison } from "./release-ref-authority";
@@ -92,21 +90,27 @@ const repository = requireEnvironment("GITHUB_REPOSITORY");
 if (repository !== publicRepository) throw new Error(`Public release admission must run in ${publicRepository}.`);
 const token = requireEnvironment("GITHUB_TOKEN");
 const verifiedSha = requireEnvironment("VERIFIED_SHA", /^[0-9a-f]{40}$/u);
-const verifiedTag = requireEnvironment("VERIFIED_TAG", /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u);
-const releaseVersion = releaseVersionForCurrentAdmission(
-  JSON.parse(await readFile(resolve(import.meta.dir, "..", "package.json"), "utf8")),
-  verifiedTag,
+const verifiedTag = requireEnvironment("VERIFIED_TAG", /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u);
+const [manifestArgument, extraArgument] = process.argv.slice(2);
+if (extraArgument !== undefined) throw new Error("Usage: check-public-release.ts [MANIFEST.json]");
+const releaseManifest = JSON.parse(
+  await readFile(resolve(manifestArgument ?? resolve(import.meta.dir, "..", "package.json")), "utf8"),
 );
+const releasePackage = releasePackageForName(
+  (releaseManifest as Readonly<{ name?: unknown }>).name as string,
+);
+const distribution = releaseDistribution(releasePackage);
+const releaseVersion = distribution.releaseVersionForCurrentAdmission(releaseManifest, verifiedTag);
 
-const encodedPackage = encodeURIComponent(publicPackageName);
+const encodedPackage = encodeURIComponent(releasePackage.name);
 const registryBase = `https://registry.npmjs.org/${encodedPackage}`;
 const versionPayload = await fetchJson(
   `${registryBase}/${encodeURIComponent(releaseVersion)}`,
   "npm exact version",
 );
 const latestPayload = await fetchJson(`${registryBase}/latest`, "npm latest version");
-const npmVersion = parseNpmRelease(versionPayload, releaseVersion);
-const npmLatest = parseNpmRelease(latestPayload, releaseVersion);
+const npmVersion = distribution.parseNpmRelease(versionPayload, releaseVersion);
+const npmLatest = distribution.parseNpmRelease(latestPayload, releaseVersion);
 if (npmLatest.integrity !== npmVersion.integrity || npmLatest.shasum !== npmVersion.shasum) {
   throw new Error("npm latest does not resolve to the exact verified version bytes.");
 }
@@ -151,6 +155,7 @@ if (
   || [preNpmState !== undefined, laterRunConstraint, writerConstraint].filter(Boolean).length > 1
 ) throw new Error("Public release admission received conflicting or invalid run constraints.");
 await verifyNpmProvenance(npmTarball, {
+  releasePackage,
   ...(preNpmState === "exact_same_run"
     ? { maximumAttempt: constrainedAttempt as number, requiredRunId: constrainedRunId as string }
     : {}),
@@ -248,7 +253,7 @@ const [releasePayload, githubLatestPayload] = await Promise.all([
 if ((githubLatestPayload as Readonly<{ tag_name?: unknown }>).tag_name !== verifiedTag) {
   throw new Error("Latest GitHub Release does not match the admitted annotated tag.");
 }
-const release = parseGitHubRelease(releasePayload, releaseVersion);
+const release = distribution.parseGitHubRelease(releasePayload, releaseVersion);
 const [githubTarball, githubChecksum] = await Promise.all([
   fetchArtifact(release.tarball.browserDownloadUrl, "GitHub Release tarball"),
   fetchArtifact(release.checksum.browserDownloadUrl, "GitHub Release checksum"),
@@ -263,6 +268,6 @@ if (!Buffer.from(githubTarball).equals(Buffer.from(npmTarball))) {
   throw new Error("npm and GitHub do not expose the same exact release tarball bytes.");
 }
 
-console.log(`Public release admission passed for ${publicPackageName}@${releaseVersion}.`);
+console.log(`Public release admission passed for ${releasePackage.name}@${releaseVersion}.`);
 console.log("- npm latest: exact MIT package, cryptographically verified trusted-publisher provenance, SHA-1 and SHA-512 integrity");
 console.log("- GitHub Release: exact annotated tag, commit, tarball, SHA256SUMS, sizes, and SHA-256 digests");

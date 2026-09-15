@@ -87,6 +87,33 @@ denial, expected-old lease, and provider readback are machine gates. An agent
 may perform the independent review and exact dispatch required for a changed
 workflow-control epoch; that review precedes dispatch.
 
+## AgentRouter package publication
+
+`@hraness/agentrouter` publishes through its own tag namespace and its own
+tag-triggered workflow, `release-agentrouter.yml`, mirroring the root Release
+contract. An annotated `agentrouter-v<version>` tag on a reviewed `main`
+ancestor runs the same verify → exact-artifact → immutable GitHub Release →
+read-only retry admission → OIDC-only npm writer → final public admission
+chain, with the AgentRouter package manifest, tarball name, tag prefix, and
+workflow path bound through the shared closed release-package descriptor. Both
+release workflows share concurrency group `stable-release`, so a root and an
+AgentRouter release can never interleave their GitHub Latest assertions. The
+AgentRouter channel has no site or production-promotion coupling; its releases
+distribute the package only.
+
+Owner-side controls required once before the first AgentRouter tag:
+
+- Extend the immutable-tag ruleset coverage to `refs/tags/agentrouter-v*` with
+  the same update and deletion restrictions and no bypass actors as the
+  existing `refs/tags/v*` scope.
+- Ensure `@hraness/agentrouter` exists publicly under the Hraness npm scope,
+  then configure its sole trusted publisher as GitHub Actions repository
+  `hraness/message-like-me`, workflow file `release-agentrouter.yml`. Require
+  the exact permission set `createPackage` plus npm's provider-imposed
+  `createStagedPackage`, and keep the staged-package inventory exactly empty.
+  Once trusted publishing is proven, disallow traditional token publication
+  for the package.
+
 ## Establish the production controls once
 
 Apply these controls in order. Record the exact readbacks in the change review.

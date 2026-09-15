@@ -235,6 +235,28 @@ describe("bounded remote ref inventory", () => {
     ), "v1.2.3")).toThrow("newest advertised stable tag");
   });
 
+  test("scopes newest-tag admission to the requested tag namespace", () => {
+    const parsed = parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/agentrouter-v0.1.0"],
+      [tag, "refs/tags/agentrouter-v0.2.0-rc.1"],
+    ), "agentrouter-v0.1.0");
+    expect(parsed.requestedTagOid).toBe(tag);
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/agentrouter-v0.1.0"],
+      [tag, "refs/tags/agentrouter-v0.2.0"],
+    ), "agentrouter-v0.1.0")).toThrow("newest advertised stable tag");
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/agentrouter-v0.1.0"],
+    ), "v0.1.0")).toThrow("missing refs/tags/v0.1.0");
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/v0.1.0"],
+    ), "agentrouter-v0.1.0")).toThrow("missing refs/tags/agentrouter-v0.1.0");
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/agentrouter-v0.1.0"],
+      [tag, "refs/tags/v9.9.9"],
+    ), "agentrouter-v0.1.0")).not.toThrow();
+  });
+
   test("bounds the combined main and tag inventory", () => {
     const mainInventory = inventory([main, "refs/heads/main"]);
     const maximumTags = [

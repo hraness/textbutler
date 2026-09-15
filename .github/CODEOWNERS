@@ -1,5 +1,7 @@
 /.github/workflows/** @0thernet
 /.github/CODEOWNERS @0thernet
+/scripts/agentrouter-package-smoke.ts @0thernet
+/scripts/build-agentrouter-dist.ts @0thernet
 /scripts/check-github-release.ts @0thernet
 /scripts/check-npm-retry-state.ts @0thernet
 /scripts/check-npm-trusted-publishing.ts @0thernet
@@ -13,4 +15,5 @@
 /scripts/site-production* @0thernet
 /docs/publishing.md @0thernet
 /package.json @0thernet
+/packages/agentrouter/package.json @0thernet
 /bun.lock @0thernet

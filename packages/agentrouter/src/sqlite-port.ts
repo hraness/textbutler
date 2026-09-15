@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-NonCommercial-NoDerivatives-3.0
 // SQLite port shared by Bun and Node runtimes. bun:sqlite and node:sqlite differ only in
 // statement lookup and empty-result conventions, so the port lazily resolves the runtime's
 // native module and normalizes both to one closed surface. The module load itself stays

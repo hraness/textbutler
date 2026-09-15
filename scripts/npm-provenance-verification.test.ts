@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { parseVerifiedNpmProvenance } from "./npm-provenance-verification";
+import {
+  agentrouterReleasePackage,
+  rootReleasePackage,
+  type ReleasePackage,
+} from "./release-distribution-policy";
 
 const version = "0.8.1";
 const verifiedTag = `v${version}`;
@@ -10,21 +15,23 @@ const sha512 = "a".repeat(128);
 function audit(
   overrides: Readonly<Record<string, unknown>> = {},
   invocation = "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3",
+  releasePackage: ReleasePackage = rootReleasePackage,
 ): unknown {
+  const tag = `${releasePackage.tagPrefix}${version}`;
   const statement = {
     _type: "https://in-toto.io/Statement/v1",
     predicateType: "https://slsa.dev/provenance/v1",
     subject: [{
       digest: { sha512 },
-      name: `pkg:npm/%40hraness/message-like-me@${version}`,
+      name: `pkg:npm/${releasePackage.name.replace(/^@/, "%40")}@${version}`,
     }],
     predicate: {
       buildDefinition: {
         buildType: "https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",
         externalParameters: {
           workflow: {
-            path: ".github/workflows/release.yml",
-            ref: `refs/tags/${verifiedTag}`,
+            path: releasePackage.workflowPath,
+            ref: `refs/tags/${tag}`,
             repository: "https://github.com/hraness/message-like-me",
           },
         },
@@ -36,7 +43,7 @@ function audit(
         },
         resolvedDependencies: [{
           digest: { gitCommit: verifiedSha },
-          uri: `git+https://github.com/hraness/message-like-me@refs/tags/${verifiedTag}`,
+          uri: `git+https://github.com/hraness/message-like-me@refs/tags/${tag}`,
         }],
       },
       runDetails: {
@@ -52,12 +59,12 @@ function audit(
     invalid: [],
     missing: [],
     verified: [{
-      name: "@hraness/message-like-me",
+      name: releasePackage.name,
       version,
-      location: "node_modules/@hraness/message-like-me",
+      location: `node_modules/${releasePackage.name}`,
       registry: "https://registry.npmjs.org/",
       attestations: {
-        url: `https://registry.npmjs.org/-/npm/v1/attestations/@hraness%2fmessage-like-me@${version}`,
+        url: `https://registry.npmjs.org/-/npm/v1/attestations/${releasePackage.name.replaceAll("/", "%2f")}@${version}`,
         provenance: { predicateType: "https://slsa.dev/provenance/v1" },
       },
       attestationBundles: [{
@@ -75,7 +82,13 @@ function audit(
   };
 }
 
-const coordinate = Object.freeze({ sha512, verifiedSha, verifiedTag, version });
+const coordinate = Object.freeze({
+  releasePackage: rootReleasePackage,
+  sha512,
+  verifiedSha,
+  verifiedTag,
+  version,
+});
 
 describe("npm provenance verification policy", () => {
   test("binds npm's verified Sigstore result to the exact workflow, tag, commit, and tarball", () => {
@@ -143,14 +156,61 @@ describe("npm provenance verification policy", () => {
     expect(() => parseVerifiedNpmProvenance(wrongCommit, coordinate)).toThrow("reviewed Git commit");
   });
 
+  test("binds the agentrouter descriptor to its own tag namespace and workflow", () => {
+    const agentrouterCoordinate = Object.freeze({
+      releasePackage: agentrouterReleasePackage,
+      sha512,
+      verifiedSha,
+      verifiedTag: `agentrouter-v${version}`,
+      version,
+    });
+    const agentrouterAudit = audit(
+      {},
+      "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3",
+      agentrouterReleasePackage,
+    );
+    expect(() => parseVerifiedNpmProvenance(agentrouterAudit, agentrouterCoordinate)).not.toThrow();
+    expect(() => parseVerifiedNpmProvenance(agentrouterAudit, coordinate))
+      .toThrow("exactly one provenance-bearing release package");
+    expect(() => parseVerifiedNpmProvenance(audit(), agentrouterCoordinate))
+      .toThrow("exactly one provenance-bearing release package");
+    expect(() => parseVerifiedNpmProvenance(agentrouterAudit, {
+      ...agentrouterCoordinate,
+      verifiedTag,
+    })).toThrow("coordinate is invalid");
+  });
+
   test("rejects missing, invalid, or ambiguous npm verification results", () => {
     expect(() => parseVerifiedNpmProvenance({
       ...(audit() as Record<string, unknown>),
       missing: [{ name: "@hraness/message-like-me" }],
-    }, coordinate)).toThrow("exactly one provenance-bearing package");
+    }, coordinate)).toThrow("exactly one provenance-bearing release package");
     expect(() => parseVerifiedNpmProvenance({
       ...(audit() as Record<string, unknown>),
       verified: [],
-    }, coordinate)).toThrow("exactly one provenance-bearing package");
+    }, coordinate)).toThrow("exactly one provenance-bearing release package");
+    expect(() => parseVerifiedNpmProvenance({
+      ...(audit() as Record<string, unknown>),
+      invalid: [{ name: "zod" }],
+    }, coordinate)).toThrow("invalid package signature");
+    expect(() => parseVerifiedNpmProvenance({
+      ...(audit() as Record<string, unknown>),
+      verified: [
+        ...((audit() as Record<string, unknown>).verified as unknown[]),
+        { name: "@hraness/message-like-me" },
+      ],
+    }, coordinate)).toThrow("exactly one provenance-bearing release package");
+  });
+
+  test("admits dependency attestations alongside the verified release package", () => {
+    const base = audit() as Record<string, unknown>;
+    expect(() => parseVerifiedNpmProvenance({
+      ...base,
+      missing: [{ name: "@anthropic-ai/sdk", version: "0.0.0" }],
+      verified: [
+        ...(base.verified as unknown[]),
+        { name: "zod", version: "4.0.0" },
+      ],
+    }, coordinate)).not.toThrow();
   });
 });
