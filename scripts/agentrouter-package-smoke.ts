@@ -131,17 +131,21 @@ function nodeVersionSupported(version: string): boolean {
   return true;
 }
 
-export async function agentrouterPackageSmoke(): Promise<void> {
+export async function agentrouterPackageSmoke(tarballArgument?: string): Promise<void> {
   const work = await mkdtemp(join(tmpdir(), "agentrouter-package-"));
   try {
-    const archive = join(work, "package.tgz");
+    const archive = tarballArgument === undefined
+      ? join(work, "package.tgz")
+      : resolve(tarballArgument);
     const stage = join(work, "stage");
     const consumer = join(work, "consumer");
     await Promise.all([mkdir(stage), mkdir(consumer, { recursive: true })]);
-    await buildAgentrouterDist();
-    await run([
-      process.execPath, "pm", "pack", "--filename", archive, "--ignore-scripts", "--quiet",
-    ], PACKAGE_DIR);
+    if (tarballArgument === undefined) {
+      await buildAgentrouterDist();
+      await run([
+        process.execPath, "pm", "pack", "--filename", archive, "--ignore-scripts", "--quiet",
+      ], PACKAGE_DIR);
+    }
     await run(["tar", "-xzf", archive, "-C", stage], work);
 
     const packedRoot = await realpath(join(stage, "package"));
@@ -153,9 +157,21 @@ export async function agentrouterPackageSmoke(): Promise<void> {
     );
     const problems: string[] = [];
     if (manifest.name !== PACKAGE_NAME) problems.push(`packed name is ${JSON.stringify(manifest.name)}`);
-    if (manifest.private !== true) problems.push("packed package must stay private until release authority is granted");
+    if (manifest.private !== undefined) problems.push("packed package must not carry a private marker");
     if (manifest.license !== "MIT") problems.push("packed license must be MIT");
     if (manifest.type !== "module") problems.push("packed package must be ESM");
+    const publishConfig = manifest.publishConfig as JsonRecord | undefined;
+    if (
+      publishConfig?.access !== "public"
+      || publishConfig.provenance !== true
+      || publishConfig.registry !== "https://registry.npmjs.org"
+    ) problems.push("packed publishConfig must pin public OIDC provenance to npmjs.org");
+    const repository = manifest.repository as JsonRecord | undefined;
+    if (
+      repository?.type !== "git"
+      || repository.url !== "git+https://github.com/hraness/message-like-me.git"
+      || repository.directory !== "packages/agentrouter"
+    ) problems.push("packed repository must bind this monorepo path for npm provenance");
     const files = manifest.files;
     if (!Array.isArray(files) || files.some((entry) => typeof entry !== "string")) {
       problems.push("packed files allowlist must be an array of paths");
@@ -269,4 +285,8 @@ export async function agentrouterPackageSmoke(): Promise<void> {
   }
 }
 
-if (import.meta.main) await agentrouterPackageSmoke();
+if (import.meta.main) {
+  const [tarballArgument, extra] = process.argv.slice(2);
+  if (extra !== undefined) throw new Error("Usage: agentrouter-package-smoke.ts [TARBALL.tgz]");
+  await agentrouterPackageSmoke(tarballArgument);
+}

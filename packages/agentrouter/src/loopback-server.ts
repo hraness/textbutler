@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-NonCommercial-NoDerivatives-3.0
 // Loopback HTTP server port shared by Bun and Node runtimes. Implemented on node:http so the
 // host relay keeps identical semantics (ephemeral port, transport body bound, idle timeout,
 // in-flight accounting, immediate join) under either runtime; callers keep fetch-style

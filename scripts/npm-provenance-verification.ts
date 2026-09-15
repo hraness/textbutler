@@ -4,8 +4,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { publicReleaseEnvironment } from "./release-process-environment";
+import {
+  type ReleasePackage,
+  releasePackageForName,
+  rootReleasePackage,
+} from "./release-distribution-policy";
 
-const PACKAGE_NAME = "@hraness/message-like-me";
 const REPOSITORY = "hraness/message-like-me";
 const REPOSITORY_ID = "1342143606";
 const REGISTRY = "https://registry.npmjs.org/";
@@ -39,8 +43,8 @@ function text(value: unknown, pattern: RegExp, label: string): string {
   return value;
 }
 
-function exactAttestationUrl(version: string): string {
-  return `${REGISTRY}-/npm/v1/attestations/@hraness%2fmessage-like-me@${version}`;
+function exactAttestationUrl(releasePackage: ReleasePackage, version: string): string {
+  return `${REGISTRY}-/npm/v1/attestations/${releasePackage.name.replaceAll("/", "%2f")}@${version}`;
 }
 
 function decodePayload(value: unknown): JsonRecord {
@@ -59,6 +63,7 @@ function decodePayload(value: unknown): JsonRecord {
 
 export type NpmProvenanceCoordinate = Readonly<{
   maximumAttempt?: number;
+  releasePackage: ReleasePackage;
   requiredAttempt?: number;
   requiredRunId?: string;
   sha512: string;
@@ -80,7 +85,7 @@ export function parseVerifiedNpmProvenance(
     !SEMVER.test(coordinate.version)
     || !SHA512.test(coordinate.sha512)
     || !SHA.test(coordinate.verifiedSha)
-    || coordinate.verifiedTag !== `v${coordinate.version}`
+    || coordinate.verifiedTag !== `${coordinate.releasePackage.tagPrefix}${coordinate.version}`
     || (
       coordinate.requiredRunId !== undefined
       && !/^[1-9][0-9]*$/u.test(coordinate.requiredRunId)
@@ -99,22 +104,36 @@ export function parseVerifiedNpmProvenance(
   const missing = array(audit.missing, "npm audit signatures missing");
   const invalid = array(audit.invalid, "npm audit signatures invalid");
   const verified = array(audit.verified, "npm audit signatures verified");
-  if (missing.length !== 0 || invalid.length !== 0 || verified.length !== 1) {
-    throw new Error("npm did not cryptographically verify exactly one provenance-bearing package.");
+  // npm audits the whole installed tree: dependencies may carry their own
+  // attestations or none. The release package itself must be verified exactly
+  // once and no audited package may carry an invalid signature.
+  if (invalid.length !== 0) {
+    throw new Error("npm reported a cryptographically invalid package signature.");
+  }
+  const releaseVerified = verified.filter((entry) => {
+    const candidate = record(entry, "npm verified package");
+    return candidate.name === coordinate.releasePackage.name;
+  });
+  const releaseMissing = missing.some((entry) => {
+    const candidate = record(entry, "npm audit signatures missing package");
+    return candidate.name === coordinate.releasePackage.name;
+  });
+  if (releaseVerified.length !== 1 || releaseMissing) {
+    throw new Error("npm did not cryptographically verify exactly one provenance-bearing release package.");
   }
 
-  const packageResult = record(verified[0], "npm verified package");
+  const packageResult = record(releaseVerified[0], "npm verified package");
   if (
-    packageResult.name !== PACKAGE_NAME
+    packageResult.name !== coordinate.releasePackage.name
     || packageResult.version !== coordinate.version
-    || packageResult.location !== "node_modules/@hraness/message-like-me"
+    || packageResult.location !== `node_modules/${coordinate.releasePackage.name}`
     || packageResult.registry !== REGISTRY
   ) throw new Error("npm verified the wrong package coordinate.");
 
   const attestations = record(packageResult.attestations, "npm verified package attestations");
   const provenance = record(attestations.provenance, "npm verified package provenance");
   if (
-    attestations.url !== exactAttestationUrl(coordinate.version)
+    attestations.url !== exactAttestationUrl(coordinate.releasePackage, coordinate.version)
     || provenance.predicateType !== SLSA_PREDICATE
   ) throw new Error("npm verified package provenance metadata is not exact.");
 
@@ -145,7 +164,7 @@ export function parseVerifiedNpmProvenance(
   const subjectRecord = record(subject[0], "npm provenance subject");
   const subjectDigest = record(subjectRecord.digest, "npm provenance subject digest");
   if (
-    subjectRecord.name !== `pkg:npm/%40hraness/message-like-me@${coordinate.version}`
+    subjectRecord.name !== `pkg:npm/${coordinate.releasePackage.name.replace(/^@/, "%40")}@${coordinate.version}`
     || subjectDigest.sha512 !== coordinate.sha512
   ) throw new Error("npm provenance subject does not bind the exact package tarball.");
 
@@ -157,7 +176,7 @@ export function parseVerifiedNpmProvenance(
     buildDefinition.buildType !== WORKFLOW_BUILD_TYPE
     || workflow.ref !== `refs/tags/${coordinate.verifiedTag}`
     || workflow.repository !== `https://github.com/${REPOSITORY}`
-    || workflow.path !== ".github/workflows/release.yml"
+    || workflow.path !== coordinate.releasePackage.workflowPath
   ) throw new Error("npm provenance does not bind the exact release workflow and tag.");
 
   const internal = record(buildDefinition.internalParameters, "npm provenance internal parameters");
@@ -235,7 +254,7 @@ async function runNpm(command: string[], cwd: string, environment: Record<string
   const timer = setTimeout(() => {
     timedOut = true;
     kill();
-  }, 90_000);
+  }, 300_000);
   try {
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
@@ -257,7 +276,7 @@ async function runNpm(command: string[], cwd: string, environment: Record<string
 
 async function verifyReleaseSigner(
   bundle: JsonRecord,
-  input: Readonly<{ invocation: string; verifiedSha: string; verifiedTag: string }>,
+  input: Readonly<{ invocation: string; verifiedSha: string; verifiedTag: string; workflowPath: string }>,
   tufCachePath: string,
 ): Promise<void> {
   const serialized = JSON.stringify(bundle);
@@ -272,6 +291,7 @@ async function verifyReleaseSigner(
     input.verifiedSha,
     input.invocation,
     tufCachePath,
+    input.workflowPath,
   ], {
     env: environment,
     stderr: "pipe",
@@ -305,6 +325,7 @@ export async function verifyNpmProvenance(
   tarballBytes: Uint8Array,
   input: Readonly<{
     maximumAttempt?: number;
+    releasePackage?: ReleasePackage;
     requiredAttempt?: number;
     requiredRunId?: string;
     verifiedSha: string;
@@ -312,6 +333,12 @@ export async function verifyNpmProvenance(
     version: string;
   }>,
 ): Promise<void> {
+  const releasePackage = input.releasePackage === undefined
+    ? rootReleasePackage
+    : releasePackageForName(input.releasePackage.name);
+  if (!SEMVER.test(input.version)) {
+    throw new Error("npm provenance verification coordinate is invalid.");
+  }
   const directory = await mkdtemp(join(tmpdir(), "message-like-me-npm-provenance-"));
   try {
     const npmrc = join(directory, ".npmrc");
@@ -321,7 +348,7 @@ export async function verifyNpmProvenance(
       writeFile(npmrc, `registry=${REGISTRY}\naudit=false\nfund=false\n`, { mode: 0o600 }),
       writeFile(globalNpmrc, "", { mode: 0o600 }),
       writeFile(join(directory, "package.json"), `${JSON.stringify({
-        dependencies: { [PACKAGE_NAME]: input.version },
+        dependencies: { [releasePackage.name]: input.version },
         private: true,
         type: "module",
       }, null, 2)}\n`, { mode: 0o600 }),
@@ -339,7 +366,7 @@ export async function verifyNpmProvenance(
       "--no-audit",
       "--no-fund",
       "--save-exact",
-      `${PACKAGE_NAME}@${input.version}`,
+      `${releasePackage.name}@${input.version}`,
     ], directory, environment);
     const auditOutput = await runNpm([
       "audit",
@@ -358,6 +385,7 @@ export async function verifyNpmProvenance(
     }
     const provenance = parseVerifiedNpmProvenance(audit, {
       ...(input.maximumAttempt === undefined ? {} : { maximumAttempt: input.maximumAttempt }),
+      releasePackage,
       ...(input.requiredAttempt === undefined ? {} : { requiredAttempt: input.requiredAttempt }),
       ...(input.requiredRunId === undefined ? {} : { requiredRunId: input.requiredRunId }),
       sha512: createHash("sha512").update(tarballBytes).digest("hex"),
@@ -369,6 +397,7 @@ export async function verifyNpmProvenance(
       invocation: provenance.invocation,
       verifiedSha: input.verifiedSha,
       verifiedTag: input.verifiedTag,
+      workflowPath: releasePackage.workflowPath,
     }, join(cache, "_tuf"));
   } finally {
     await rm(directory, { force: true, recursive: true });

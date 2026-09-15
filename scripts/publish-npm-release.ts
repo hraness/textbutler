@@ -16,9 +16,8 @@ import {
 } from "./npm-release-policy.ts";
 import {
   type NpmReleaseCoordinate,
-  parseNpmRelease,
-  publicPackageName,
-  releaseArchiveName,
+  releaseDistribution,
+  releasePackageForName,
 } from "./release-distribution-policy.ts";
 import { trustedPublishingEnvironment } from "./release-process-environment.ts";
 
@@ -62,8 +61,9 @@ export function chooseNpmWriterTransition(
 
 async function main(): Promise<void> {
   const tarballArgument = process.argv[2];
-  if (tarballArgument === undefined) {
-    throw new Error("Usage: publish-npm-release.ts ARTIFACT.tgz");
+  const manifestArgument = process.argv[3];
+  if (tarballArgument === undefined || process.argv.length > 4) {
+    throw new Error("Usage: publish-npm-release.ts ARTIFACT.tgz [MANIFEST.json]");
   }
   const tarball = resolve(tarballArgument);
   const information = await stat(tarball);
@@ -120,17 +120,20 @@ async function main(): Promise<void> {
   }
 
   const manifest = JSON.parse(
-    await Bun.file(resolve(import.meta.dir, "..", "package.json")).text(),
+    await Bun.file(
+      resolve(manifestArgument ?? resolve(import.meta.dir, "..", "package.json")),
+    ).text(),
   ) as Readonly<{
     license?: unknown;
     name?: unknown;
     publishConfig?: Readonly<
       { access?: unknown; provenance?: unknown; registry?: unknown }
     >;
+    repository?: Readonly<{ type?: unknown; url?: unknown }>;
     version?: unknown;
   }>;
   if (
-    manifest.name !== publicPackageName ||
+    typeof manifest.name !== "string" ||
     manifest.license !== "MIT" ||
     typeof manifest.version !== "string" ||
     manifest.publishConfig?.access !== "public" ||
@@ -141,12 +144,22 @@ async function main(): Promise<void> {
       "The public CLI package identity or publication policy is invalid.",
     );
   }
-  if (verifiedTag !== `v${manifest.version}`) {
+  const releasePackage = releasePackageForName(manifest.name);
+  // npm rejects a published manifest whose repository.url does not match the
+  // repository its provenance was generated from.
+  if (
+    manifest.repository?.type !== "git" ||
+    manifest.repository.url !== `git+https://github.com/${releasePackage.repository}.git`
+  ) {
+    throw new Error("The public package repository does not bind the provenance repository.");
+  }
+  const distribution = releaseDistribution(releasePackage);
+  if (verifiedTag !== `${releasePackage.tagPrefix}${manifest.version}`) {
     throw new Error(
-      `npm publication requires verified tag v${manifest.version}.`,
+      `npm publication requires verified tag ${releasePackage.tagPrefix}${manifest.version}.`,
     );
   }
-  if (basename(tarball) !== releaseArchiveName(manifest.version)) {
+  if (basename(tarball) !== distribution.releaseArchiveName(manifest.version)) {
     throw new Error(
       "npm publication tarball name does not match the package coordinate.",
     );
@@ -190,8 +203,8 @@ async function main(): Promise<void> {
       throw new Error(`${coordinate} exists but npm latest is missing.`);
     }
     return Object.freeze({
-      latest: parseNpmRelease(latestPayload, manifest.version as string),
-      version: parseNpmRelease(versionPayload, manifest.version as string),
+      latest: distribution.parseNpmRelease(latestPayload, manifest.version as string),
+      version: distribution.parseNpmRelease(versionPayload, manifest.version as string),
     });
   }
 
