@@ -215,7 +215,10 @@ apps, signing, and notarization are outside the current product scope.
   provider outcome gate to finish.
   Already-exact recovery must not enter the key environment. Recovery may
   revalidate only an existing immutable, artifact-complete Latest Release and
-  exact npm version and must never create either one. A later positive attempt
+  exact npm version and must never create either one. It may accept the
+  exact-SHA Production deployment that an earlier consumed site-route authority
+  created on that commit, never one that predates that authority's admitted
+  success. A later positive attempt
   may finish the same exact tag, commit, and tarball only when Sigstore binds
   the actual run ID and an allowed positive attempt. Keep Vercel Production
   Branch on `website-production`; `main` and pull requests are preview sources.
