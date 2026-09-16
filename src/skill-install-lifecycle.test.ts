@@ -207,7 +207,7 @@ describe("paired native skill installation", () => {
       release.resolve();
       await interrupt;
     } finally { release.resolve(); await Effect.runPromise(Fiber.await(fiber)); }
-    expect(calls).toBe(21);
+    expect(calls).toBe(22);
     await installed(root);
     expect((await fs.readdir(join(root, ".agents", "skills"))).sort()).toEqual(["ensoul", "message-like-me"]);
   });

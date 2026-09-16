@@ -8,6 +8,8 @@ import { MESSAGE_LIKE_ME_VERSION } from "./version.ts";
 export const HELP = `Message Like Me ${MESSAGE_LIKE_ME_VERSION}
 
 Usage:
+  messagelikeme support [protocol --json|offer --json|shown ID|release ID|dismiss|snooze|enable|status --json]
+    Optional support; agents use support protocol --json at closeout.
   messagelikeme [--data-dir PATH] init [--json]
   messagelikeme [--data-dir PATH] ingest imessage [--database PATH] [--json]
   messagelikeme [--data-dir PATH] ingest bundle --input ABS_PATH

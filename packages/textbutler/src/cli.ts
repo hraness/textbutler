@@ -1,3 +1,4 @@
+import { runProductSupportCommand } from "../../../src/support.ts";
 import { fileURLToPath } from "node:url";
 
 import { initializeOwnerState, TEXTBUTLER_CONTROL_PROTOCOL } from "./control-service.ts";
@@ -6,9 +7,10 @@ import { createLaunchAgentLifecycle, type LaunchAgentLifecycle } from "./launch-
 import { runMenuBarCommand } from "./menubar.ts";
 import type { ClaudeApiAdapterOptions } from "../../agentrouter/src/claude-api.ts";
 
-export const CLI_USAGE = "textbutler init|doctor|providers list|providers check ACCOUNT|daemon run|daemon install|daemon uninstall|daemon status|menubar [start|stop|status|doctor|install|uninstall] [--data-dir /physical/private/path]";
+export const CLI_USAGE = "textbutler support [protocol --json|offer --json|shown ID|release ID|dismiss|snooze|enable|status --json] | init|doctor|providers list|providers check ACCOUNT|daemon run|daemon install|daemon uninstall|daemon status|menubar [start|stop|status|doctor|install|uninstall] [--data-dir /physical/private/path]";
 export async function runTextbutlerCli(argv: readonly string[], output: { write(text: string): unknown } = process.stdout, options: { launchAgent?: LaunchAgentLifecycle;
-  providerArtifact?: ClaudeApiAdapterOptions["runtimeArtifact"] } = {}): Promise<number> {
+  providerArtifact?: ClaudeApiAdapterOptions["runtimeArtifact"]; supportEnv?: Readonly<Record<string, string | undefined>> } = {}): Promise<number> {
+  if (argv[0] === "support") return await runProductSupportCommand(argv.slice(1), { stdout: text => output.write(text), stderr: text => process.stderr.write(text) }, { command: ["textbutler"], ...(options.supportEnv === undefined ? {} : { env: options.supportEnv }) });
   if (argv.length === 0 || argv.length === 1 && ["--help", "help", "-h"].includes(argv[0]!)) { output.write(`${CLI_USAGE}\n`); return 0; }
   const args = [...argv]; let dataDir = defaultDataDirectory();
   const option = args.indexOf("--data-dir");
@@ -80,6 +82,7 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
   return 0;
 }
 if (import.meta.main) {
-  try { process.exitCode = await runTextbutlerCli(process.argv.slice(2)); }
+  const supportEnv = { ...process.env };
+  try { process.exitCode = await runTextbutlerCli(process.argv.slice(2), process.stdout, { supportEnv }); }
   catch (error) { process.stderr.write(`${error instanceof Error && error.message === CLI_USAGE ? CLI_USAGE : "Textbutler could not start. Check the physical private data directory, existing socket ownership, and current runtime."}\n`); process.exitCode = 1; }
 }

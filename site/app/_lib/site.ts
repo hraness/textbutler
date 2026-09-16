@@ -7,7 +7,7 @@ export const SITE_DESCRIPTION =
 export const GITHUB_URL = 'https://github.com/hraness/message-like-me';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 // The immutable legacy release coordinate; not a Textbutler app version.
-export const SOFTWARE_VERSION = '0.8.10';
+export const SOFTWARE_VERSION = '0.8.11';
 export const RELEASE_URL = `${GITHUB_URL}/releases/tag/v${SOFTWARE_VERSION}`;
 
 export const CANONICAL_PAGE_PATHS = [

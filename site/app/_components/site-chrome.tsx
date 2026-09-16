@@ -1,3 +1,4 @@
+import { HranessSiteFooter } from '@hraness/site-footer/react';
 import { MarketingSiteHeader } from '@hraness/design-kit/react/server';
 import { AskAiAboutThis } from '@hraness/ui';
 import Link from 'next/link';
@@ -39,7 +40,7 @@ export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
           url={absoluteUrl(path)}
         />
       )}
-      <footer className="site-footer">
+      <div className="site-footer">
         <Link className="wordmark" href="/">Textbutler</Link>
         <p>Built for Mac · MIT source · in development</p>
         <nav aria-label="Footer navigation">
@@ -48,7 +49,8 @@ export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
           <Link href="/docs">Docs</Link>
           <a href={GITHUB_URL}>GitHub</a>
         </nav>
-      </footer>
+      </div>
+      <HranessSiteFooter mailingList={{ kind: "none" }} support={{"id": "message-like-me", "name": "Textbutler", "valueProposition": "Support ongoing development of local tools for your messaging workflows.", "updates": false}} />
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { assertSupportFoundationInputs } from "./support-runtime-policy.ts";
 import { mkdir } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -41,6 +42,7 @@ async function run(command: readonly string[]): Promise<void> {
 }
 
 export async function buildDist(argv: readonly string[]): Promise<void> {
+  await assertSupportFoundationInputs(PACKAGE_ROOT);
   const outdir = outputDirectory(argv);
   await mkdir(outdir, { recursive: true });
   await run([
@@ -67,9 +69,26 @@ export async function buildDist(argv: readonly string[]): Promise<void> {
   // protocol entry and shared protocol chunk. Immutable installs need no
   // separately resolved runtime package.
   await run([
-    process.execPath, "build", "src/cli.ts", "--outdir", outdir,
+    process.execPath, "build", "src/support-runtime.ts", "--outdir", outdir,
     "--root", "src", "--target", "bun", "--format", "esm",
   ]);
+  const cli = await Bun.build({
+    entrypoints: [join(PACKAGE_ROOT, "src/cli.ts")],
+    outdir,
+    root: join(PACKAGE_ROOT, "src"),
+    target: "bun",
+    format: "esm",
+    plugins: [{
+      name: "checked-support-runtime",
+      setup(builder) {
+        builder.onResolve({ filter: /^\.\/support-runtime\.js$/u }, args => {
+          if (args.importer !== join(PACKAGE_ROOT, "src/support.ts")) throw new Error("Unexpected support runtime importer");
+          return { path: "./support-runtime.js", external: true };
+        });
+      },
+    }],
+  });
+  if (!cli.success) throw new AggregateError(cli.logs, "CLI build failed");
   await run([
     process.execPath,
     TYPESCRIPT_CLI,

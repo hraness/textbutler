@@ -18,6 +18,7 @@ test("public R1 CLI uses exact coordinates, incarnation before/after, and never 
   let calls = (await readFile(join(stateHome, "calls.jsonl"), "utf8")).trim().split("\n").map(value => JSON.parse(value));
   expect(calls).toHaveLength(6);
   expect(calls.every(call => call.runtimeArgs.includes("--no-env-file"))).toBe(true);
+  expect(calls.every(call => call.supportAudience === "off" && call.supportEmail === "off")).toBe(true);
   expect(calls.every(call => !call.args.includes("messaging.read") && !call.args.includes("messaging.send"))).toBe(true);
   expect(calls[3].input).toEqual({ chat_guid: "synthetic-chat", observed_chat_row_id: 42, service: "iMessage" });
   const history = await port.read(binding, true, signal);
