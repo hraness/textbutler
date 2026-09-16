@@ -224,6 +224,37 @@ function providerProductionStatus<State extends "error" | "success">(
 
 const providerAttestationStatus = providerProductionStatus("success", 9_001);
 
+const providerAuthorityActor: ProviderJson = {
+  id: 123,
+  login: "mlm-prod-ref-writer-1342143606[bot]",
+  node_id: "MDM6Qm90MTIz",
+  type: "Bot",
+};
+
+function providerAuthorityStatus(
+  status: ReturnType<typeof providerProductionStatus>,
+  overrides: Readonly<Record<string, ProviderJson>> = {},
+): ProviderJson {
+  return {
+    context: status.context,
+    created_at: status.createdAt,
+    creator: {
+      id: status.creator.id,
+      login: status.creator.login,
+      node_id: status.creator.nodeId,
+      type: "Bot",
+    },
+    description: status.description,
+    id: status.statusId,
+    node_id: status.statusNodeId,
+    state: status.state,
+    target_url: null,
+    updated_at: status.createdAt,
+    url: status.statusUrl,
+    ...overrides,
+  };
+}
+
 function providerProductionCombinedStatus(status: ReturnType<typeof providerProductionStatus> = providerAttestationStatus): ProviderJson {
   return {
     commit_url: `https://api.github.com/repos/${providerRepository}/commits/${providerVerifiedSha}`,
@@ -701,6 +732,9 @@ class ProviderApiFixture {
   readonly refValues: readonly ProviderJson[];
   readonly releaseSnapshots: readonly ProviderJson[];
   readonly tagSnapshots: readonly string[];
+  readonly authorityStatuses: readonly ProviderJson[];
+  readonly combinedStatus: ProviderJson | undefined;
+  readonly appActor: ProviderJson;
   latest: ProviderJson = providerLatest();
   release: ProviderJson = providerRelease();
 
@@ -721,6 +755,9 @@ class ProviderApiFixture {
   #tagRead = 0;
 
   constructor({
+    appActor = providerAuthorityActor,
+    authorityStatuses = [],
+    combinedStatus,
     deploymentDetails = [],
     defaultBranchSnapshots = [],
     defaultBranchShaSnapshots = [],
@@ -737,6 +774,9 @@ class ProviderApiFixture {
     statuses = new Map<number, ProviderJson[][]>(),
     tagSnapshots = [],
   }: Readonly<{
+    appActor?: ProviderJson;
+    authorityStatuses?: readonly ProviderJson[];
+    combinedStatus?: ProviderJson;
     deploymentDetails?: readonly ProviderJson[];
     defaultBranchSnapshots?: readonly string[];
     defaultBranchShaSnapshots?: readonly string[];
@@ -753,6 +793,9 @@ class ProviderApiFixture {
     statuses?: Map<number, ProviderJson[][]>;
     tagSnapshots?: readonly string[];
   }> = {}) {
+    this.appActor = appActor;
+    this.authorityStatuses = authorityStatuses;
+    this.combinedStatus = combinedStatus;
     this.deploymentDetailSnapshots = deploymentDetails;
     this.defaultBranchSnapshots = defaultBranchSnapshots;
     this.defaultBranchShaSnapshots = defaultBranchShaSnapshots;
@@ -935,7 +978,16 @@ class ProviderApiFixture {
       `/repos/${providerRepository}/commits/${providerVerifiedSha}/status?per_page=100`
     ) {
       this.calls.push("GET PRODUCTION AUTHORITY STATUS");
-      return providerProductionCombinedStatus();
+      return this.combinedStatus ?? providerProductionCombinedStatus();
+    }
+    if (
+      endpoint ===
+      `/repos/${providerRepository}/commits/${providerVerifiedSha}/statuses?per_page=100`
+    ) {
+      return [...this.authorityStatuses];
+    }
+    if (endpoint === "/users/mlm-prod-ref-writer-1342143606%5Bbot%5D") {
+      return this.appActor;
     }
     throw new Error(`Unexpected provider GET ${endpoint}`);
   }
@@ -1654,14 +1706,15 @@ esac
     expect(helper).not.toContain('["--method", "POST"');
     expect(releaseRestRequestBudget).toEqual({
       githubTokenLimit: 1_000,
-      headroom: 789,
+      headroom: 786,
       maxPolls: 15,
       pollIntervalMilliseconds: 60_000,
       providerBaseline: 2,
       providerOutcome: 164,
       providerPromotion: 30,
+      providerRecovery: 3,
       surroundingRelease: 15,
-      total: 211,
+      total: 214,
     });
     expect(releaseGraphqlRequestBudget).toEqual({
       githubPointLimit: 1_000,
@@ -3354,6 +3407,171 @@ esac
       })).rejects.toThrow("authoritative release inputs");
       expect(api.calls).toHaveLength(0);
     }
+  });
+
+  test("already-exact release recovery accepts only the deployment a consumed site-route authority created", async () => {
+    const siteAdmitted = providerProductionStatus("success", 9_101, "2026-08-29T13:57:00Z");
+    const siteConsumed = providerProductionStatus("error", 9_102, "2026-08-29T13:57:30Z");
+    const consumedAuthority = Object.freeze({
+      authorityStatuses: [
+        providerAuthorityStatus(siteConsumed),
+        providerAuthorityStatus(siteAdmitted),
+      ],
+      combinedStatus: providerProductionCombinedStatus(siteConsumed),
+    });
+    const recoveryReceipts = async (
+      deployments: ProviderJson[],
+      statuses: Map<number, ProviderJson[][]>,
+    ): Promise<Readonly<{ baseline: ProviderJson; promotion: ProviderJson }>> => {
+      const baseline = await createProviderBaseline({
+        api: new ProviderApiFixture({
+          deployments: [deployments],
+          refSha: providerVerifiedSha,
+          serverDates: [providerBaselineServerDate, providerBaselineServerDate],
+          statuses,
+        }),
+        repository: providerRepository,
+        verifiedSha: providerVerifiedSha,
+      }) as ProviderJson;
+      const promotion = await promoteWebsiteProduction({
+        api: new ProviderApiFixture({
+          deployments: [deployments],
+          refSha: providerVerifiedSha,
+          serverDates: [providerPromotionServerDate],
+          statuses,
+        }),
+        baselineReceipt: baseline,
+        repository: providerRepository,
+        verifiedSha: providerVerifiedSha,
+        verifiedTag: providerTag,
+      }) as ProviderJson;
+      return Object.freeze({ baseline, promotion });
+    };
+    const waitWith = async (
+      api: ProviderApiFixture,
+      receipts: Readonly<{ baseline: ProviderJson; promotion: ProviderJson }>,
+    ) => waitForProviderOutcome({
+      api,
+      baselineReceipt: receipts.baseline,
+      maxPolls: 1,
+      pollIntervalMilliseconds: 0,
+      promotionReceipt: receipts.promotion,
+      sleep: async () => {},
+    });
+    const authorityHistoryCall =
+      `GET /repos/${providerRepository}/commits/${providerVerifiedSha}/statuses?per_page=100`;
+    const actorCall = "GET /users/mlm-prod-ref-writer-1342143606%5Bbot%5D";
+
+    // The site route pushed the exact commit at 13:57 and Vercel deployed it at
+    // 13:58, both before the immutable Release at 14:00.
+    const sitePromoted = providerDeployment(10, "2026-08-29T13:58:00Z");
+    const siteStatuses = terminalBaselineStatus(10, "2026-08-29T13:59:00Z");
+    const receipts = await recoveryReceipts([sitePromoted], siteStatuses);
+    const accepted = new ProviderApiFixture({
+      ...consumedAuthority,
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    });
+    await expect(waitWith(accepted, receipts)).resolves.toEqual({ deploymentId: 10, statusId: 100 });
+    expect(accepted.calls).toContain("GET PRODUCTION AUTHORITY STATUS");
+    expect(accepted.calls).toContain(authorityHistoryCall);
+    expect(accepted.calls).toContain(actorCall);
+    expect(accepted.calls.filter((call) => call === actorCall)).toHaveLength(1);
+
+    // Without a consumed site authority the Release publication stays the boundary.
+    const unconsumed = new ProviderApiFixture({
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    });
+    await expect(waitWith(unconsumed, receipts)).rejects.toThrow("does not postdate the immutable Release");
+    expect(unconsumed.calls).toContain("GET PRODUCTION AUTHORITY STATUS");
+    expect(unconsumed.calls).not.toContain(authorityHistoryCall);
+    expect(unconsumed.calls).not.toContain(actorCall);
+
+    // A deployment created before the admitted success was not created by that push.
+    const beforeAdmission = providerDeployment(10, "2026-08-29T13:56:00Z");
+    const beforeStatuses = terminalBaselineStatus(10, "2026-08-29T13:56:30Z");
+    const beforeReceipts = await recoveryReceipts([beforeAdmission], beforeStatuses);
+    await expect(waitWith(new ProviderApiFixture({
+      ...consumedAuthority,
+      deployments: [[beforeAdmission]],
+      refSha: providerVerifiedSha,
+      statuses: beforeStatuses,
+    }), beforeReceipts)).rejects.toThrow("does not postdate the immutable Release");
+
+    // Statuses that the exact status App did not author leave the boundary alone.
+    const foreignCreator = { id: 999, login: "someone-else", node_id: "U_999", type: "User" };
+    await expect(waitWith(new ProviderApiFixture({
+      authorityStatuses: [
+        providerAuthorityStatus(siteConsumed, { creator: foreignCreator }),
+        providerAuthorityStatus(siteAdmitted, { creator: foreignCreator }),
+      ],
+      combinedStatus: consumedAuthority.combinedStatus,
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    }), receipts)).rejects.toThrow("does not postdate the immutable Release");
+
+    // A success that is not older than its terminal error is not a consumed authority.
+    await expect(waitWith(new ProviderApiFixture({
+      authorityStatuses: [
+        providerAuthorityStatus(siteConsumed, { created_at: "2026-08-29T13:56:00Z" }),
+        providerAuthorityStatus(siteAdmitted),
+      ],
+      combinedStatus: consumedAuthority.combinedStatus,
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    }), receipts)).rejects.toThrow("does not postdate the immutable Release");
+
+    // A history whose newest authority entry is not the combined current one is ignored.
+    await expect(waitWith(new ProviderApiFixture({
+      authorityStatuses: [
+        providerAuthorityStatus(siteAdmitted),
+        providerAuthorityStatus(siteConsumed),
+      ],
+      combinedStatus: consumedAuthority.combinedStatus,
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    }), receipts)).rejects.toThrow("does not postdate the immutable Release");
+
+    // The App actor lookup must resolve to the exact status App.
+    await expect(waitWith(new ProviderApiFixture({
+      ...consumedAuthority,
+      appActor: { id: 123, login: "other-app[bot]", node_id: "MDM6Qm90MTIz", type: "Bot" },
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    }), receipts)).rejects.toThrow("production authority App actor is not the exact status App");
+
+    // A combined status that does not bind this repository and commit fails closed.
+    await expect(waitWith(new ProviderApiFixture({
+      ...consumedAuthority,
+      combinedStatus: {
+        ...(consumedAuthority.combinedStatus as Readonly<Record<string, ProviderJson>>),
+        repository: { full_name: providerRepository, id: 1 },
+      },
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    }), receipts)).rejects.toThrow("does not bind the exact release commit");
+
+    // A consumed authority admitted after the Release changes nothing.
+    const lateAdmitted = providerProductionStatus("success", 9_103, "2026-08-29T14:01:00Z");
+    const lateConsumed = providerProductionStatus("error", 9_104, "2026-08-29T14:01:30Z");
+    await expect(waitWith(new ProviderApiFixture({
+      authorityStatuses: [
+        providerAuthorityStatus(lateConsumed),
+        providerAuthorityStatus(lateAdmitted),
+      ],
+      combinedStatus: providerProductionCombinedStatus(lateConsumed),
+      deployments: [[sitePromoted]],
+      refSha: providerVerifiedSha,
+      statuses: siteStatuses,
+    }), receipts)).rejects.toThrow("does not postdate the immutable Release");
   });
 
   test("fails recovery closed on stale success, latest ties, exact-SHA retry failures, or newer deployments", async () => {

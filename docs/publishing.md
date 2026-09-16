@@ -877,8 +877,14 @@ admission both succeeded, so a skipped tail cannot make the workflow green.
 If the ref is already exact, the baseline marks advancement false, skips the
 entire `production-ref-writer-key` job, and mints no App token. A separate
 read-only job accepts only the unique latest exact-SHA Production deployment in
-the stable baseline that postdates the immutable Release. That newest attempt
-itself must be provider-accepted. A newer terminal failure, error, or inactive
+the stable baseline that postdates the immutable Release, or, when the
+separately admitted site route already advanced the ref to that exact commit
+before the Release was published, that postdates the status App's admitted
+`success` of the consumed site authority on that commit. That consumed
+authority must already carry the App's terminal `error`; any other authority
+shape, actor, or ordering keeps the Release publication as the boundary, so
+this route can only admit a deployment that an admitted site promotion
+created. That newest attempt itself must be provider-accepted. A newer terminal failure, error, or inactive
 attempt blocks recovery instead of allowing an older success to be reused.
 Recovery then repeats the terminal authority readbacks. A missing ref is a hard
 failure and must not be recreated by the workflow. If the desired transition

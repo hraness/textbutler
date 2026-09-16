@@ -38,6 +38,14 @@ const PAGINATED_READ_REQUESTS = MAX_ITEMS / PAGE_SIZE + 1;
 const GITHUB_TOKEN_REST_REQUEST_LIMIT = 1_000;
 const VERCEL_CREATOR = Object.freeze({ id: 35613825, login: "vercel[bot]", type: "Bot" });
 const VERCEL_GRAPHQL_CREATOR = Object.freeze({ id: 35613825, login: "vercel", type: "Bot" });
+const EXPECTED_REPOSITORY_ID = 1342143606;
+const PRODUCTION_AUTHORITY_CONTEXT = "message-like-me/website-production-authority";
+const PRODUCTION_AUTHORITY_APP_LOGIN = "mlm-prod-ref-writer-1342143606[bot]";
+const PRODUCTION_AUTHORITY_APP_ENDPOINT = "/users/mlm-prod-ref-writer-1342143606%5Bbot%5D";
+const ADMITTED_AUTHORITY_DESCRIPTION =
+  "Exact release authority admitted for one production-ref attempt";
+const CONSUMED_AUTHORITY_DESCRIPTION =
+  "Release authority consumed after the production-ref attempt";
 const GRAPHQL_PAGE_SIZE = 100;
 const MAX_GRAPHQL_DEPLOYMENT_PAGES = 5;
 const MAX_GRAPHQL_COST_PER_REQUEST = 2;
@@ -159,6 +167,9 @@ const OUTCOME_REST_REQUESTS =
   PAGINATED_READ_REQUESTS +
   7 +
   OUTCOME_ANNOTATED_TAG_OBJECT_REQUESTS;
+// Already-exact release recovery reads the combined status, the status history
+// and the status App actor of the release commit once before observing.
+const OUTCOME_SITE_AUTHORITY_REQUESTS = 3;
 const SURROUNDING_RELEASE_REST_REQUESTS =
   1 +
   1 +
@@ -179,17 +190,20 @@ export const releaseRestRequestBudget = Object.freeze({
     BASELINE_REST_REQUESTS -
     PROMOTION_REST_REQUESTS -
     OUTCOME_REST_REQUESTS -
+    OUTCOME_SITE_AUTHORITY_REQUESTS -
     SURROUNDING_RELEASE_REST_REQUESTS,
   maxPolls: MAX_PROVIDER_POLLS,
   pollIntervalMilliseconds: PROVIDER_POLL_INTERVAL_MILLISECONDS,
   providerBaseline: BASELINE_REST_REQUESTS,
   providerOutcome: OUTCOME_REST_REQUESTS,
   providerPromotion: PROMOTION_REST_REQUESTS,
+  providerRecovery: OUTCOME_SITE_AUTHORITY_REQUESTS,
   surroundingRelease: SURROUNDING_RELEASE_REST_REQUESTS,
   total:
     BASELINE_REST_REQUESTS +
     PROMOTION_REST_REQUESTS +
     OUTCOME_REST_REQUESTS +
+    OUTCOME_SITE_AUTHORITY_REQUESTS +
     SURROUNDING_RELEASE_REST_REQUESTS,
 });
 
@@ -2174,15 +2188,137 @@ export async function waitForProviderOutcome({
   if (release.publishedAt !== promotion.releasePublishedAt) fail("immutable Release publication time changed");
   await readLatestRelease(api, promotion.repository, promotion.verifiedTag);
   await revalidateWorkflowSource(api, promotion.repository, workflowSource);
+  const admitted = promotion.mode === "already-exact"
+    ? await admitConsumedSiteAuthority(api, promotion)
+    : promotion;
 
-  return waitForAdmittedProviderOutcome({ api, baseline, promotion, workflowSource, maxPolls, sleep,
+  return waitForAdmittedProviderOutcome({ api, baseline, promotion: admitted, workflowSource, maxPolls, sleep,
     pollIntervalMilliseconds, revalidateSubject: revalidatePublishedSubject });
 }
 
+// The separately admitted site route may already have fast-forwarded
+// website-production to the exact release commit before the immutable Release
+// existed. Its consumed production authority on that commit — the status App's
+// exact-SHA success posted before the leased push and the App's terminal error
+// posted after it — dates the Production deployment that push created. An
+// already-exact release recovery therefore accepts that deployment when it
+// postdates the admitted success instead of the later Release publication.
+// Anything other than one fully App-bound success-then-error pair leaves the
+// Release boundary alone, so this path can only admit a deployment that an
+// earlier admitted site promotion already created.
+async function readConsumedSiteAuthority(api, repository, verifiedSha) {
+  const endpoint = `/repos/${repository}/commits/${verifiedSha}`;
+  const combined = expectRecord(
+    await api.get(`${endpoint}/status?per_page=${String(PAGE_SIZE)}`),
+    "production authority combined status",
+  );
+  if (
+    combined.sha !== verifiedSha ||
+    !isRecord(combined.repository) ||
+    combined.repository.id !== EXPECTED_REPOSITORY_ID ||
+    combined.repository.full_name !== repository ||
+    !Array.isArray(combined.statuses) ||
+    combined.total_count !== combined.statuses.length ||
+    combined.total_count > PAGE_SIZE
+  ) {
+    fail("production authority combined status does not bind the exact release commit");
+  }
+  const current = combined.statuses.filter(
+    (status) => isRecord(status) && status.context === PRODUCTION_AUTHORITY_CONTEXT,
+  );
+  if (
+    current.length !== 1 ||
+    current[0].state !== "error" ||
+    current[0].description !== CONSUMED_AUTHORITY_DESCRIPTION
+  ) {
+    return null;
+  }
+  const history = expectArray(
+    await api.get(`${endpoint}/statuses?per_page=${String(PAGE_SIZE)}`),
+    "production authority statuses",
+  );
+  const actor = expectRecord(
+    await api.get(PRODUCTION_AUTHORITY_APP_ENDPOINT),
+    "production authority App actor",
+  );
+  if (
+    actor.login !== PRODUCTION_AUTHORITY_APP_LOGIN ||
+    actor.type !== "Bot" ||
+    !Number.isSafeInteger(actor.id) ||
+    actor.id < 1 ||
+    typeof actor.node_id !== "string" ||
+    actor.node_id.length === 0
+  ) {
+    fail("production authority App actor is not the exact status App");
+  }
+  const appAuthored = (status) =>
+    isRecord(status) &&
+    isRecord(status.creator) &&
+    status.creator.id === actor.id &&
+    status.creator.login === actor.login &&
+    status.creator.node_id === actor.node_id &&
+    status.creator.type === "Bot";
+  const matching = history.filter(
+    (status) => isRecord(status) && status.context === PRODUCTION_AUTHORITY_CONTEXT,
+  );
+  const [consumed] = matching;
+  if (
+    consumed === undefined ||
+    consumed.id !== current[0].id ||
+    consumed.node_id !== current[0].node_id ||
+    consumed.state !== "error" ||
+    consumed.description !== CONSUMED_AUTHORITY_DESCRIPTION ||
+    !appAuthored(consumed)
+  ) {
+    return null;
+  }
+  const admitted = matching.find((status) => isRecord(status) && status.state === "success");
+  if (
+    admitted === undefined ||
+    admitted.description !== ADMITTED_AUTHORITY_DESCRIPTION ||
+    !appAuthored(admitted)
+  ) {
+    return null;
+  }
+  const admittedAt = parseSecondTimestamp(admitted.created_at, "admitted site authority created_at");
+  const consumedAt = parseSecondTimestamp(consumed.created_at, "consumed site authority created_at");
+  if (admittedAt.milliseconds >= consumedAt.milliseconds) return null;
+  return Object.freeze({
+    admittedAt: admittedAt.timestamp,
+    admittedMilliseconds: admittedAt.milliseconds,
+    consumedAt: consumedAt.timestamp,
+    consumedMilliseconds: consumedAt.milliseconds,
+  });
+}
+
+async function admitConsumedSiteAuthority(api, promotion) {
+  const siteAuthority = await readConsumedSiteAuthority(
+    api,
+    promotion.repository,
+    promotion.verifiedSha,
+  );
+  if (
+    siteAuthority === null ||
+    siteAuthority.admittedMilliseconds >= promotion.releasePublishedMilliseconds
+  ) {
+    return promotion;
+  }
+  return Object.freeze({
+    ...promotion,
+    recoveryBoundaryMilliseconds: siteAuthority.admittedMilliseconds,
+    siteAuthority,
+  });
+}
+
 function subjectBoundaryMilliseconds(promotion) {
-  return promotion.subject?.kind === "site"
-    ? Date.parse(promotion.mode === "already-exact" ? promotion.subject.sourceQualifiedAt : promotion.subject.buildCompletedAt)
-    : promotion.releasePublishedMilliseconds;
+  if (promotion.subject?.kind === "site") {
+    return Date.parse(
+      promotion.mode === "already-exact"
+        ? promotion.subject.sourceQualifiedAt
+        : promotion.subject.buildCompletedAt,
+    );
+  }
+  return promotion.recoveryBoundaryMilliseconds ?? promotion.releasePublishedMilliseconds;
 }
 
 // Internal shared observation engine. Callers must first admit their closed
