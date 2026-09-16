@@ -18,6 +18,9 @@ export async function publicGraphProblems(directory: string): Promise<string[]> 
     if (source.includes("node_modules/effect/") || source.includes("EffectPrimitive")) {
       problems.push(`${file} embeds the command runtime in a public protocol graph`);
     }
+    if (source.includes("support-foundation") || source.includes("runSupportCommand") || source.includes("account.hraness.com")) {
+      problems.push(`${file} embeds optional CLI support in a public protocol graph`);
+    }
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
     function dependency(specifier: string): void {
       if (specifier === "effect" || specifier.startsWith("effect/")) problems.push(`${file} exposes an Effect dependency`);

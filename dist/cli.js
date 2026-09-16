@@ -14,6 +14,162 @@ var __export = (target, all) => {
       set: __exportSetter.bind(all, name)
     });
 };
+
+// src/errors.ts
+var EXIT_CODES = {
+  usage: 2,
+  "not-found": 3,
+  conflict: 4,
+  permission: 5,
+  "unsafe-path": 6,
+  "invalid-data": 7,
+  internal: 1
+};
+
+class CliError extends Error {
+  exitCode;
+  kind;
+  constructor(kind, message, options) {
+    super(message, options);
+    this.name = "CliError";
+    this.kind = kind;
+    this.exitCode = EXIT_CODES[kind];
+  }
+}
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+function exitCodeFor(error) {
+  return error instanceof CliError ? error.exitCode : 1;
+}
+
+// src/args.ts
+var VALUE_OPTIONS = new Set([
+  "addressbook",
+  "after",
+  "before",
+  "burst-gap",
+  "data-dir",
+  "database",
+  "input",
+  "limit",
+  "min-outgoing",
+  "output",
+  "overlap-source",
+  "prompt-output",
+  "project",
+  "reference-output",
+  "request",
+  "scope",
+  "session-gap",
+  "subject",
+  "target",
+  "draft",
+  "ghostget-context",
+  "ghostget-receipt"
+]);
+var FLAG_OPTIONS = new Set(["force", "help", "json", "private", "version"]);
+var LEGACY_OPTION_ALIASES = new Map([
+  ["wrench-context", "ghostget-context"],
+  ["wrench-receipt", "ghostget-receipt"]
+]);
+function parseArguments(argv) {
+  const positionals = [];
+  const options = new Map;
+  const flags = new Set;
+  let positionalOnly = false;
+  for (let index = 0;index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === undefined)
+      continue;
+    if (positionalOnly || !argument.startsWith("--")) {
+      positionals.push(argument);
+      continue;
+    }
+    if (argument === "--") {
+      positionalOnly = true;
+      continue;
+    }
+    const separator = argument.indexOf("=");
+    const suppliedKey = argument.slice(2, separator < 0 ? undefined : separator);
+    const key = LEGACY_OPTION_ALIASES.get(suppliedKey) ?? suppliedKey;
+    if (key.length === 0)
+      throw new CliError("usage", "Empty option name");
+    if (VALUE_OPTIONS.has(key)) {
+      if (options.has(key))
+        throw new CliError("usage", `--${key} may be provided only once`);
+      const inline = separator < 0 ? undefined : argument.slice(separator + 1);
+      const next = inline ?? argv[index + 1];
+      if (next === undefined || next.startsWith("--") || next.length === 0) {
+        throw new CliError("usage", `--${key} requires a value`);
+      }
+      options.set(key, next);
+      if (inline === undefined)
+        index += 1;
+      continue;
+    }
+    if (FLAG_OPTIONS.has(key) && separator < 0) {
+      if (flags.has(key))
+        throw new CliError("usage", `--${key} may be provided only once`);
+      flags.add(key);
+      continue;
+    }
+    throw new CliError("usage", `Unknown option --${key}`);
+  }
+  return { positionals, options, flags };
+}
+function integerOption(parsed, key, fallback, minimum, maximum) {
+  const value = parsed.options.get(key);
+  if (value === undefined)
+    return fallback;
+  if (!/^(?:0|[1-9][0-9]*)$/u.test(value)) {
+    throw new CliError("usage", `--${key} must be an integer`);
+  }
+  const result = Number(value);
+  if (!Number.isSafeInteger(result) || result < minimum || result > maximum) {
+    throw new CliError("usage", `--${key} must be between ${minimum} and ${maximum}`);
+  }
+  return result;
+}
+function rejectUnused(parsed, allowedOptions, allowedFlags) {
+  const options = new Set(allowedOptions);
+  const flags = new Set(allowedFlags);
+  for (const key of parsed.options.keys()) {
+    if (!options.has(key))
+      throw new CliError("usage", `--${key} is not valid for this command`);
+  }
+  for (const key of parsed.flags) {
+    if (!flags.has(key))
+      throw new CliError("usage", `--${key} is not valid for this command`);
+  }
+}
+
+// src/support.ts
+import { maybeShowSupportInvitation, runSupportCommand } from "./support-runtime.js";
+var supportProfile = {
+  id: "message-like-me",
+  name: "Textbutler",
+  valueProposition: "Support ongoing development of local tools for your messaging workflows.",
+  updates: false
+};
+function standaloneSupportEnvironment() {
+  const env = { ...process.env };
+  process.env.HRANESS_SUPPORT_AUDIENCE = "off";
+  return env;
+}
+async function runProductSupportCommand(args, output, options = {}) {
+  const result = await runSupportCommand(supportProfile, args, { command: ["messagelikeme"], gitEmail: false, ...options });
+  if (result.stdout !== "")
+    output.stdout(result.stdout);
+  if (result.stderr !== "")
+    output.stderr(result.stderr);
+  return result.exitCode;
+}
+async function showProductSupportInvitation(options = {}) {
+  try {
+    await maybeShowSupportInvitation(supportProfile, { usefulResult: true, command: ["messagelikeme"], gitEmail: false, ...options });
+  } catch {}
+}
 // node_modules/effect/dist/esm/Cause.js
 var exports_Cause = {};
 __export(exports_Cause, {
@@ -15290,34 +15446,6 @@ function agentMessageRouteCandidateId(sourceId, conversationId) {
   }))}`;
 }
 
-// src/errors.ts
-var EXIT_CODES = {
-  usage: 2,
-  "not-found": 3,
-  conflict: 4,
-  permission: 5,
-  "unsafe-path": 6,
-  "invalid-data": 7,
-  internal: 1
-};
-
-class CliError extends Error {
-  exitCode;
-  kind;
-  constructor(kind, message, options) {
-    super(message, options);
-    this.name = "CliError";
-    this.kind = kind;
-    this.exitCode = EXIT_CODES[kind];
-  }
-}
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-function exitCodeFor(error) {
-  return error instanceof CliError ? error.exitCode : 1;
-}
-
 // src/command-failure.ts
 function commandFailure(cause3) {
   return cause3 instanceof CliError ? { _tag: "CommandFailure", cause: cause3 } : { _tag: "ForeignFailure", cause: cause3 };
@@ -24645,117 +24773,18 @@ function commandPlatformLive(io, cleanupFailure) {
   });
 }
 
-// src/args.ts
-var VALUE_OPTIONS = new Set([
-  "addressbook",
-  "after",
-  "before",
-  "burst-gap",
-  "data-dir",
-  "database",
-  "input",
-  "limit",
-  "min-outgoing",
-  "output",
-  "overlap-source",
-  "prompt-output",
-  "project",
-  "reference-output",
-  "request",
-  "scope",
-  "session-gap",
-  "subject",
-  "target",
-  "draft",
-  "ghostget-context",
-  "ghostget-receipt"
-]);
-var FLAG_OPTIONS = new Set(["force", "help", "json", "private", "version"]);
-var LEGACY_OPTION_ALIASES = new Map([
-  ["wrench-context", "ghostget-context"],
-  ["wrench-receipt", "ghostget-receipt"]
-]);
-function parseArguments(argv) {
-  const positionals = [];
-  const options = new Map;
-  const flags = new Set;
-  let positionalOnly = false;
-  for (let index = 0;index < argv.length; index += 1) {
-    const argument = argv[index];
-    if (argument === undefined)
-      continue;
-    if (positionalOnly || !argument.startsWith("--")) {
-      positionals.push(argument);
-      continue;
-    }
-    if (argument === "--") {
-      positionalOnly = true;
-      continue;
-    }
-    const separator = argument.indexOf("=");
-    const suppliedKey = argument.slice(2, separator < 0 ? undefined : separator);
-    const key = LEGACY_OPTION_ALIASES.get(suppliedKey) ?? suppliedKey;
-    if (key.length === 0)
-      throw new CliError("usage", "Empty option name");
-    if (VALUE_OPTIONS.has(key)) {
-      if (options.has(key))
-        throw new CliError("usage", `--${key} may be provided only once`);
-      const inline = separator < 0 ? undefined : argument.slice(separator + 1);
-      const next = inline ?? argv[index + 1];
-      if (next === undefined || next.startsWith("--") || next.length === 0) {
-        throw new CliError("usage", `--${key} requires a value`);
-      }
-      options.set(key, next);
-      if (inline === undefined)
-        index += 1;
-      continue;
-    }
-    if (FLAG_OPTIONS.has(key) && separator < 0) {
-      if (flags.has(key))
-        throw new CliError("usage", `--${key} may be provided only once`);
-      flags.add(key);
-      continue;
-    }
-    throw new CliError("usage", `Unknown option --${key}`);
-  }
-  return { positionals, options, flags };
-}
-function integerOption(parsed, key, fallback, minimum, maximum) {
-  const value = parsed.options.get(key);
-  if (value === undefined)
-    return fallback;
-  if (!/^(?:0|[1-9][0-9]*)$/u.test(value)) {
-    throw new CliError("usage", `--${key} must be an integer`);
-  }
-  const result = Number(value);
-  if (!Number.isSafeInteger(result) || result < minimum || result > maximum) {
-    throw new CliError("usage", `--${key} must be between ${minimum} and ${maximum}`);
-  }
-  return result;
-}
-function rejectUnused(parsed, allowedOptions, allowedFlags) {
-  const options = new Set(allowedOptions);
-  const flags = new Set(allowedFlags);
-  for (const key of parsed.options.keys()) {
-    if (!options.has(key))
-      throw new CliError("usage", `--${key} is not valid for this command`);
-  }
-  for (const key of parsed.flags) {
-    if (!flags.has(key))
-      throw new CliError("usage", `--${key} is not valid for this command`);
-  }
-}
-
 // src/command-input.ts
 import { isAbsolute as isAbsolute6, resolve as resolve8 } from "path";
 
 // src/version.ts
-var MESSAGE_LIKE_ME_VERSION = "0.8.10";
+var MESSAGE_LIKE_ME_VERSION = "0.8.11";
 
 // src/command-input.ts
 var HELP = `Message Like Me ${MESSAGE_LIKE_ME_VERSION}
 
 Usage:
+  messagelikeme support [protocol --json|offer --json|shown ID|release ID|dismiss|snooze|enable|status --json]
+    Optional support; agents use support protocol --json at closeout.
   messagelikeme [--data-dir PATH] init [--json]
   messagelikeme [--data-dir PATH] ingest imessage [--database PATH] [--json]
   messagelikeme [--data-dir PATH] ingest bundle --input ABS_PATH
@@ -27525,8 +27554,21 @@ var processIo = {
 };
 
 // src/cli.ts
-async function main(argv, io = processIo) {
+function isUsefulSupportResult(argv) {
   try {
+    const parsed = parseArguments(argv);
+    if (parsed.flags.has("help") || parsed.flags.has("version"))
+      return false;
+    const [command, action] = parsed.positionals;
+    return command === "context" || ["sources list", "sources show", "contacts list", "contacts show", "contacts resolve", "inspect tempo", "inspect sessions", "study prepare", "ensoul prepare", "evaluate prepare", "profile apply", "profile show", "profile export", "routes list", "handoff prepare"].includes(`${command} ${action}`);
+  } catch {
+    return false;
+  }
+}
+async function main(argv, io = processIo, supportEnv) {
+  try {
+    if (argv[0] === "support")
+      return await runProductSupportCommand(argv.slice(1), io, supportEnv === undefined ? {} : { env: supportEnv });
     const rootHelp = argv.length === 0 || argv.length === 1 && argv[0] === "--help";
     const output = rootHelp && io === processIo ? {
       ...io,
@@ -27541,8 +27583,14 @@ async function main(argv, io = processIo) {
   }
 }
 if (import.meta.main) {
-  process.exitCode = await main(process.argv.slice(2));
+  const supportEnv = standaloneSupportEnvironment();
+  const args2 = process.argv.slice(2);
+  const exitCode = await main(args2, processIo, supportEnv);
+  process.exitCode = exitCode;
+  if (exitCode === 0 && isUsefulSupportResult(args2))
+    await showProductSupportInvitation({ env: supportEnv });
 }
 export {
-  main
+  main,
+  isUsefulSupportResult
 };

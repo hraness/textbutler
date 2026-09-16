@@ -5,6 +5,7 @@ import { CONTROL_PROTOCOL, disconnectedSnapshot, type DesktopSnapshot } from "..
 import { requestDaemon } from "./daemon.ts";
 
 const WEBSITE = "https://textbutler.app/";
+const SUPPORT = "https://account.hraness.com/support?product=message-like-me&source=desktop#support";
 
 /** Presentation never lets daemon text add lines, bidi overrides or unbounded menus. */
 export function menuLabel(text: string, limit = 72): string {
@@ -70,7 +71,7 @@ function activityItems(activity: DesktopSnapshot["activity"]): MenuItem[] {
 }
 
 /** Map one owner daemon snapshot onto the shared menu contract. The daemon
- * stays the authority; rows are display-only except the three actions. */
+ * stays the authority; product browser actions require explicit menu clicks. */
 export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeSeconds: number | null; fresh: boolean }): MenuItem[] {
   const connected = snapshot.connection === "connected";
   const paused = snapshot.settings.paused;
@@ -96,6 +97,7 @@ export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeS
     { kind: "label", label: menuLabel(updated) },
     { kind: "action", id: "refresh", label: "Refresh status" },
     { kind: "action", id: "open-website", label: "Open Textbutler…" },
+    { kind: "action", id: "product.support", label: "Support Textbutler development (optional paid)…" },
     { kind: "separator" },
     { kind: "quit", label: "Quit Textbutler" },
   ];
@@ -104,7 +106,7 @@ export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeS
 /** The Textbutler menu companion is a disposable client of the owner daemon.
  * All state reads and mutations use the existing owner-only control socket;
  * the shared runner renders them and enforces revision-checked dispatch. */
-export function companionOptions(dataDir: string): CompanionOptions {
+export function companionOptions(dataDir: string, open: typeof openBrowser = openBrowser): CompanionOptions {
   let lastSnapshot: DesktopSnapshot | null = null;
   let confirmedAt: number | null = null;
   return {
@@ -136,7 +138,8 @@ export function companionOptions(dataDir: string): CompanionOptions {
       return snapshotItems(snapshot, { confirmedAgeSeconds: confirmedAt === null ? null : Math.max(0, Math.floor((Date.now() - confirmedAt) / 1000)), fresh });
     },
     onAction: async id => {
-      if (id === "open-website") { await openBrowser(WEBSITE); return; }
+      if (id === "open-website") { await open(WEBSITE); return; }
+      if (id === "product.support") { await open(SUPPORT); return; }
       if (id === "refresh") return; // the runner re-reads state after every action
       if (id === "toggle-pause") {
         const current = lastSnapshot;

@@ -1,3 +1,4 @@
+import { assertSupportFoundationInputs, isReviewedSupportRuntime } from "./support-runtime-policy.ts";
 import {
   lstat,
   open,
@@ -429,6 +430,7 @@ export function standaloneSourceProblems(path: string, source: string): string[]
 }
 
 export async function standaloneProblems(): Promise<string[]> {
+  await assertSupportFoundationInputs(PACKAGE_ROOT);
   const roots = [
     ...SCANNED_DIRECTORIES.map((path) => join(PACKAGE_ROOT, path)),
     ...SCANNED_ROOT_FILES.map((path) => join(PACKAGE_ROOT, path)),
@@ -474,7 +476,12 @@ export async function standaloneProblems(): Promise<string[]> {
     if (!TEXT_EXTENSIONS.has(extension) && basename(file) !== "LICENSE") continue;
     const source = await readFile(file, "utf8");
     if (!SELF_SCANNERS.has(path)) problems.push(...standaloneSourceProblems(path, source));
-    if (path.startsWith("src/") || path.startsWith("dist/")) {
+    if (path === "dist/support-runtime.js") {
+      // Only the exact reviewed shared CLI bundle may contain its bounded local
+      // Git-config reader and public Accounts links. Every other runtime keeps
+      // the broad network/auth/process bans.
+      if (!isReviewedSupportRuntime(path, source)) problems.push("The reviewed CLI support runtime bytes drifted");
+    } else if (path.startsWith("src/") || path.startsWith("dist/")) {
       problems.push(...checkRuntimeSource(path, source));
     }
   }

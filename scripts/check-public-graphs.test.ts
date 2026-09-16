@@ -17,6 +17,9 @@ test("checks transitive public JS and declaration dependencies with positive con
     expect((await publicGraphProblems(root)).some((problem) => problem.includes("exposes an Effect dependency"))).toBe(true);
     await writeFile(join(root, "shared.js"), '// node_modules/effect/dist/esm/internal/core.js\nexport const value=1;');
     expect((await publicGraphProblems(root)).some((problem) => problem.includes("embeds the command runtime"))).toBe(true);
+    await writeFile(join(root, "shared.js"), 'export {runSupportCommand} from "./support-runtime.js";');
+    await writeFile(join(root, "support-runtime.js"), "export const runSupportCommand=()=>{};");
+    expect((await publicGraphProblems(root)).some((problem) => problem.includes("embeds optional CLI support"))).toBe(true);
     await writeFile(join(root, "shared.js"), "export const value=1;");
     await writeFile(join(root, "index.d.ts"), 'export declare const value: import("effect").Effect.Effect<void>;');
     expect((await publicGraphProblems(root)).some((problem) => problem.includes("exposes an Effect dependency"))).toBe(true);

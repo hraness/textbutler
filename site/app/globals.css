@@ -3,6 +3,7 @@
 /* The complete Design Kit export includes compiled React slot recipes and
  * the marketing foundation. The raw HTML grammar alone omits those atoms. */
 @import '@hraness/design-kit/styles.css';
+@import '@hraness/site-footer/styles.css';
 @import '../styles/vendor/hraness-paper/paper-theme.css';
 @import '../styles/vendor/hraness-marketing/product-marketing-preset.css';
 @import '../styles/vendor/hraness-lantern/lantern-material.css';

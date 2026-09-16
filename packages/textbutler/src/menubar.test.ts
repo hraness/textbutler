@@ -58,6 +58,8 @@ describe("snapshot menu mapping", () => {
       expect(toggle.enabled).toBe(enabled);
       expect(actions.get("toggle-pause")).toBe(enabled);
       expect(action(items, "refresh").enabled).not.toBe(false);
+      expect(actions.get("product.support")).toBe(true);
+      expect(actions.has("product.updates")).toBe(false);
       expect(items.at(-1)).toMatchObject({ kind: "quit", label: "Quit Textbutler" });
     }
   });
@@ -102,6 +104,20 @@ describe("snapshot menu mapping", () => {
 });
 
 describe("daemon-backed companion options", () => {
+  test("support stays available offline and opens only after an explicit action", async () => {
+    const dataDir = await root();
+    const destinations: string[] = [];
+    const options = companionOptions(dataDir, async address => { destinations.push(address); });
+    const signal = new AbortController().signal;
+    const items = await options.snapshot(signal);
+    expect(wire(items).get("product.support")).toBe(true);
+    expect(destinations).toEqual([]);
+    await options.onAction("unknown.action", signal);
+    expect(destinations).toEqual([]);
+    await options.onAction("product.support", signal);
+    expect(destinations).toEqual(["https://account.hraness.com/support?product=message-like-me&source=desktop#support"]);
+    expect(items.some(item => item.kind === "action" && item.id === "product.updates")).toBe(false);
+  });
   test("snapshot maps a live owner daemon response and marks it fresh", async () => {
     const dataDir = await root();
     const daemon = await start(dataDir);
