@@ -31,3 +31,13 @@ export type { CodexProcessHandle, CodexProcessReceipt, CodexProcessLauncher } fr
 export type { BoundedProviderProcess, BoundedProviderProcessInput, BoundedProviderProcessFactory } from "./provider-process.ts";
 export { codexManagedStaticCatalog, CODEX_MANAGED_CATALOG_LIMITS } from "./codex-managed-catalog.ts";
 export type { CodexManagedStaticCatalog, CodexManagedCatalogJson, CodexManagedCatalogObject } from "./codex-managed-catalog.ts";
+export { createDevinAcpAdapter } from "./devin-adapter.ts";
+export type { DevinAcpAdapterOptions } from "./devin-adapter.ts";
+export { DevinAcpClient } from "./devin-client.ts";
+export type { DevinAcpClientOptions } from "./devin-client.ts";
+export { DEVIN_ACP_PROTOCOL_VERSION, DEVIN_ACP_MAX_FRAME_BYTES, DEVIN_ACP_MAX_PROMPT_BYTES,
+  devinAcpFraming, parseAcpInbound, denyPermissionOutcome, validatePermissionOutcome } from "./devin-acp.ts";
+export type { DevinFact, DevinPromptResult, DevinPermissionRequest, DevinPermissionOutcome,
+  DevinStopReason } from "./devin-acp.ts";
+export { startDevinToolRelay, DEVIN_MCP_BRIDGE_SOURCE } from "./devin-mcp.ts";
+export type { DevinToolRelay, DevinToolRelayOptions } from "./devin-mcp.ts";

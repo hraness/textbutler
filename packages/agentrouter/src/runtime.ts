@@ -54,6 +54,7 @@ export interface AgentAdapter {
 export const UNQUALIFIED_PROVIDER_REASONS = Object.freeze({
   codex: "Codex 0.153.4 has a restricted experimental driver; native confinement, adversarial custody and account transport qualification remain incomplete.",
   claude: "Claude tool selection is documented; isolated configuration and contact-only read confinement require exact-runtime adversarial qualification.",
+  devin: "Devin ACP exposes session and usage facts; exact-runtime custody, tool-inventory and read/write confinement qualification remain incomplete.",
 });
 
 /** Installed adapters explicitly advertise blocked status until their host evidence exists. */
@@ -151,6 +152,13 @@ export function createProviderLaunchPlan(binding: AccountBinding, workspaceId: s
       observedRuntime: "0.153.4",
       unresolvedControls: Object.freeze(["native adversarial qualification", "direct filesystem and process confinement",
         "inherited descriptor isolation", "failure custody", "account transport and model admission"]),
+    } : p === "devin" ? {
+      transport: "acp", commandTools: false, inheritedConfig: false, dynamicTools: "broker-only",
+      readPolicy: "contact-only", writePolicy: "contact-only", approvalPolicy: "never",
+      clientCapabilities: Object.freeze({ fs: false, terminal: false }),
+      mcpServers: "host-bridge-only",
+      unresolvedControls: Object.freeze(["native adversarial qualification", "effective tool inventory",
+        "stdio bridge custody", "failure custody", "account transport and model admission"]),
     } : {
       transport: "agent-sdk", tools: Object.freeze([]), settingSources: Object.freeze([]),
       permissionMode: "dontAsk", mcpServers: "broker-only", allowedTools: "exact-broker-manifest",

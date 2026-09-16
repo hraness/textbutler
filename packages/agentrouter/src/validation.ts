@@ -22,8 +22,8 @@ export function safeInteger(value: unknown, min: number, max: number): number {
   return value;
 }
 
-export type AgentProvider = "codex" | "claude";
+export type AgentProvider = "codex" | "claude" | "devin";
 export function provider(value: unknown): AgentProvider {
-  if (value !== "codex" && value !== "claude") throw new Error("UNSUPPORTED_PROVIDER");
+  if (value !== "codex" && value !== "claude" && value !== "devin") throw new Error("UNSUPPORTED_PROVIDER");
   return value;
 }
