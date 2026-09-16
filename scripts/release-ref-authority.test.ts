@@ -14,7 +14,7 @@ import {
   verifyReleaseRefAuthority,
 } from "./release-ref-authority";
 
-const repositoryUrl = "https://github.com/hraness/message-like-me.git";
+const repositoryUrl = "https://github.com/hraness/textbutler.git";
 const temporaryRoots: string[] = [];
 
 afterEach(() => {

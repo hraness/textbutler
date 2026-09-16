@@ -1,13 +1,13 @@
 import { pathToFileURL } from "node:url";
 
-const PACKAGE_REPOSITORY = "hraness/message-like-me";
+const PACKAGE_REPOSITORY = "hraness/textbutler";
 const REPOSITORY_ID = "1342143606";
 const GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com";
 const SHA = /^[0-9a-f]{40}$/u;
 const STABLE_TAG = /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
 const WORKFLOW_PATH = /^\.github\/workflows\/[a-z0-9][a-z0-9-]{0,63}\.yml$/u;
 const RUN_INVOCATION =
-  /^https:\/\/github\.com\/hraness\/message-like-me\/actions\/runs\/[1-9][0-9]*\/attempts\/[1-9][0-9]*$/u;
+  /^https:\/\/github\.com\/hraness\/textbutler\/actions\/runs\/[1-9][0-9]*\/attempts\/[1-9][0-9]*$/u;
 const OWNER_ID = "307125679";
 const MAXIMUM_BUNDLE_BYTES = 4 * 1_024 * 1_024;
 
@@ -59,7 +59,7 @@ export function releaseSignerIdentity(tag, sha, invocation, workflowPath) {
         "1.3.6.1.4.1.57264.1.21": derUtf8String(invocation),
         "1.3.6.1.4.1.57264.1.22": derUtf8String("public"),
         "1.3.6.1.4.1.57264.1.24": derUtf8String(
-          `repo:hraness@${OWNER_ID}/message-like-me@${REPOSITORY_ID}:ref:${ref}`,
+          `repo:hraness@${OWNER_ID}/textbutler@${REPOSITORY_ID}:ref:${ref}`,
         ),
       }),
       ctLogThreshold: 1,

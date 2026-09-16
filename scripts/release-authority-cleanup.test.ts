@@ -17,7 +17,7 @@ import {
   type CleanupEnvironment,
 } from "./release-authority-cleanup.mjs";
 
-const repository = "hraness/message-like-me";
+const repository = "hraness/textbutler";
 const repositoryId = 1_342_143_606;
 const appId = 4_830_612;
 const appSlug = "mlm-prod-ref-writer-1342143606";
@@ -200,7 +200,7 @@ function combinedStatus(statuses: readonly unknown[]) {
     repository: {
       full_name: repository,
       id: repositoryId,
-      name: "message-like-me",
+      name: "textbutler",
       owner: { login: "hraness", type: "Organization" },
     },
     sha: targetSha,
@@ -361,7 +361,7 @@ function createHarness(options: HarnessOptions = {}) {
         repositories: [{
           full_name: repository,
           id: repositoryId,
-          name: "message-like-me",
+          name: "textbutler",
           owner: { login: "hraness" },
         }],
         repository_selection: "selected",

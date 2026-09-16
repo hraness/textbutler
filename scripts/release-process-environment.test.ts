@@ -10,7 +10,7 @@ const trustedSource = Object.freeze({
   ACTIONS_ID_TOKEN_REQUEST_URL: "https://actions.example.test/oidc",
   GH_TOKEN: "github-token",
   GITHUB_REF: "refs/tags/v0.8.1",
-  GITHUB_REPOSITORY: "hraness/message-like-me",
+  GITHUB_REPOSITORY: "hraness/textbutler",
   GITHUB_REPOSITORY_ID: "1342143606",
   GITHUB_RUN_ATTEMPT: "2",
   GITHUB_RUN_ID: "123",
@@ -18,7 +18,7 @@ const trustedSource = Object.freeze({
   GITHUB_SHA: "a".repeat(40),
   GITHUB_TOKEN: "github-token-alias",
   GITHUB_WORKFLOW_REF:
-    "hraness/message-like-me/.github/workflows/release.yml@refs/tags/v0.8.1",
+    "hraness/textbutler/.github/workflows/release.yml@refs/tags/v0.8.1",
   HOME: "/tmp/home",
   NODE_AUTH_TOKEN: "traditional-npm-token",
   NPM_CONFIG_OTP: "123456",

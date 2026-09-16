@@ -10,7 +10,7 @@ const PRODUCTION_REF = "refs/heads/website-production";
 const CANARY_REF = "refs/heads/website-production-writer-canary";
 const PRODUCTION_RECEIPT_SCHEMA = "message-like-me-workflow-range-v1";
 const CANARY_RECEIPT_SCHEMA = "message-like-me-canary-workflow-range-v1";
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 const EXPECTED_REPOSITORY_ID = 1_342_143_606;
 const MAIN_REF = "refs/heads/main";
 const PRODUCTION_CONTROL_EPOCH_DOMAIN = "message-like-me/control-epoch/production/v2";
@@ -948,7 +948,7 @@ function main() {
     fail("Usage: release-workflow-range.mjs PREVIOUS_SHA VERIFIED_SHA [--canary|--admit-production|--admit-canary]");
   }
   if (process.env.GITHUB_REPOSITORY !== EXPECTED_REPOSITORY) {
-    fail("Workflow range must run for exact repository hraness/message-like-me.");
+    fail("Workflow range must run for exact repository hraness/textbutler.");
   }
   if (
     mode !== undefined

@@ -26,7 +26,7 @@ export interface WriterCanaryPreflightReceipt {
   readonly mainServerDate: string;
   readonly productionRef: "refs/heads/website-production-writer-canary";
   readonly range: CanaryWorkflowAdmissionReceipt;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly rules: WriterCanaryRulesReceipt;
   readonly rulesBodySha256: Readonly<{ authority: string; effective: string; lifecycle: string }>;
@@ -47,7 +47,7 @@ interface WriterCanaryPhaseBase<Phase extends string, Schema extends string> {
   readonly preflightSemanticSha256: string;
   readonly preflightSha256: string;
   readonly productionRef: "refs/heads/website-production-writer-canary";
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly runAttempt: 1;
   readonly runId: number;
@@ -76,7 +76,7 @@ export interface WriterCanaryStatusEvidence<
   readonly creator: Readonly<{ id: number; login: string; nodeId: string }>;
   readonly description: string;
   readonly installationId: number;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly serverDate: string;
   readonly state: State;
@@ -242,7 +242,7 @@ export interface WriterCanaryFinalReceipt {
   readonly preflightSemanticSha256: string;
   readonly preflightSha256: string;
   readonly productionRef: "refs/heads/website-production-writer-canary";
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly runAttempt: 1;
   readonly runId: number;
@@ -265,7 +265,7 @@ export class WriterCanaryWorkflowDeltaError extends Error {
 }
 
 export function parseWriterCanaryRules(value: unknown): Readonly<WriterCanaryRulesReceipt>;
-export function parseWriterCanaryEnvironment(environment: Readonly<Record<string, unknown>>): Readonly<{ apiUrl: URL; controlEpochDigest?: string; repository: "hraness/message-like-me"; repositoryId: 1342143606; runAttempt: 1; runId: number; workflowSha: string }>;
+export function parseWriterCanaryEnvironment(environment: Readonly<Record<string, unknown>>): Readonly<{ apiUrl: URL; controlEpochDigest?: string; repository: "hraness/textbutler"; repositoryId: 1342143606; runAttempt: 1; runId: number; workflowSha: string }>;
 export function parseWriterCanaryRef(value: unknown, expectedRef: string): string;
 export function parseWriterCanaryRun(value: unknown, expected: Readonly<{ runId: number; workflowSha: string }>): Readonly<{ runAttempt: 1; runId: number; workflowId: number }>;
 
@@ -278,7 +278,7 @@ type VerifyRange = (input: Readonly<{
   githubActions: "true";
   previousSha: string;
   protectedRef: "refs/heads/website-production-writer-canary";
-  repository: "hraness/message-like-me";
+  repository: "hraness/textbutler";
   repositoryId: 1342143606;
   runAttempt: 1;
   targetSha: string;

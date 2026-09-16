@@ -13,7 +13,7 @@ import {
   withReleaseAuthorityTerminalStatusFromEnvironment,
 } from "./release-status-attester.mjs";
 
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 const EXPECTED_REPOSITORY_ID = 1_342_143_606;
 const EXPECTED_APP_ID = 4_830_612;
 const EXPECTED_APP_SLUG = "mlm-prod-ref-writer-1342143606";
@@ -400,7 +400,7 @@ function parseCombinedRepository(value) {
   if (
     repository.id !== EXPECTED_REPOSITORY_ID ||
     repository.full_name !== EXPECTED_REPOSITORY ||
-    repository.name !== "message-like-me" ||
+    repository.name !== "textbutler" ||
     owner.login !== "hraness" ||
     owner.type !== "Organization"
   ) {

@@ -50,16 +50,16 @@ function statusResponse(
     state,
     target_url: null,
     updated_at: timestamp,
-    url: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+    url: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
     ...overrides,
   };
 }
 
 function repository() {
   return {
-    full_name: "hraness/message-like-me",
+    full_name: "hraness/textbutler",
     id: 1_342_143_606,
-    name: "message-like-me",
+    name: "textbutler",
     owner: { login: "hraness", type: "Organization" },
   };
 }
@@ -69,13 +69,13 @@ function combinedResponse(
   overrides: Readonly<Record<string, unknown>> = {},
 ) {
   return {
-    commit_url: `https://api.github.com/repos/hraness/message-like-me/commits/${targetSha}`,
+    commit_url: `https://api.github.com/repos/hraness/textbutler/commits/${targetSha}`,
     repository: repository(),
     sha: targetSha,
     state: "failure",
     statuses: [status],
     total_count: 1,
-    url: `https://api.github.com/repos/hraness/message-like-me/commits/${targetSha}/status`,
+    url: `https://api.github.com/repos/hraness/textbutler/commits/${targetSha}/status`,
     ...overrides,
   };
 }
@@ -145,8 +145,8 @@ describe("release authority commit-status lifecycle", () => {
         state: "success",
         target_url: null,
       },
-      endpoint: `/repos/hraness/message-like-me/statuses/${targetSha}`,
-      repository: "hraness/message-like-me",
+      endpoint: `/repos/hraness/textbutler/statuses/${targetSha}`,
+      repository: "hraness/textbutler",
       repositoryId: 1_342_143_606,
       targetSha,
     });
@@ -188,13 +188,13 @@ describe("release authority commit-status lifecycle", () => {
       },
       description: descriptions.success,
       installationId: 159_058_102,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       repositoryId: 1_342_143_606,
       serverDate: "2026-09-05T01:00:10.000Z",
       state: "success",
       statusId: 101,
       statusNodeId: "SC_kwDOstatus101",
-      statusUrl: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+      statusUrl: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
       targetSha,
     });
   });
@@ -347,7 +347,7 @@ describe("release authority commit-status lifecycle", () => {
     const installationToken = "exact-status-only-installation-token";
     const environment = Object.freeze({
       GITHUB_API_URL: "https://api.github.com",
-      GITHUB_REPOSITORY: "hraness/message-like-me",
+      GITHUB_REPOSITORY: "hraness/textbutler",
       GITHUB_REPOSITORY_ID: "1342143606",
       GITHUB_REPOSITORY_OWNER: "hraness",
       MLM_RELEASE_APP_CLIENT_ID: app.clientId,
@@ -406,9 +406,9 @@ describe("release authority commit-status lifecycle", () => {
             expires_at: "2026-09-05T02:00:00Z",
             permissions: exactPermissions,
             repositories: [{
-              full_name: "hraness/message-like-me",
+              full_name: "hraness/textbutler",
               id: 1_342_143_606,
-              name: "message-like-me",
+              name: "textbutler",
               owner: { login: "hraness" },
             }],
             repository_selection: "selected",
@@ -418,7 +418,7 @@ describe("release authority commit-status lifecycle", () => {
             status: 201,
           });
         }
-        if (url.pathname === `/repos/hraness/message-like-me/statuses/${targetSha}`) {
+        if (url.pathname === `/repos/hraness/textbutler/statuses/${targetSha}`) {
           expect(method).toBe("POST");
           expect(headers).toEqual({
             Accept: "application/vnd.github+json",
@@ -434,12 +434,12 @@ describe("release authority commit-status lifecycle", () => {
               Date: body.state === "success"
                 ? "Sat, 05 Sep 2026 01:00:10 GMT"
                 : "Sat, 05 Sep 2026 01:00:11 GMT",
-              Location: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+              Location: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
             },
             status: 201,
           });
         }
-        if (url.pathname === `/repos/hraness/message-like-me/commits/${targetSha}/status`) {
+        if (url.pathname === `/repos/hraness/textbutler/commits/${targetSha}/status`) {
           expect(method).toBe("GET");
           expect(url.search).toBe("?per_page=100");
           expect(headers).toEqual({
@@ -500,7 +500,7 @@ describe("release authority commit-status lifecycle", () => {
       `GET /app/installations/${String(app.installationId)}`,
       `POST /app/installations/${String(app.installationId)}/access_tokens`,
       "mask",
-      `POST /repos/hraness/message-like-me/statuses/${targetSha}`,
+      `POST /repos/hraness/textbutler/statuses/${targetSha}`,
       "DELETE /installation/token",
       "GET /installation/repositories",
       "GET /installation/repositories",
@@ -509,8 +509,8 @@ describe("release authority commit-status lifecycle", () => {
       `GET /app/installations/${String(app.installationId)}`,
       `POST /app/installations/${String(app.installationId)}/access_tokens`,
       "mask",
-      `POST /repos/hraness/message-like-me/statuses/${targetSha}`,
-      `GET /repos/hraness/message-like-me/commits/${targetSha}/status?per_page=100`,
+      `POST /repos/hraness/textbutler/statuses/${targetSha}`,
+      `GET /repos/hraness/textbutler/commits/${targetSha}/status?per_page=100`,
       "DELETE /installation/token",
       "GET /installation/repositories",
       "GET /installation/repositories",

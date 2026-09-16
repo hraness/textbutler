@@ -26,7 +26,7 @@ import {
   writeControlEpochReview,
 } from "./release-workflow-range.mjs";
 
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 const EXPECTED_REPOSITORY_ID = 1_342_143_606;
 const EXPECTED_APP_ID = 4_830_612;
 const EXPECTED_APP_SLUG = "mlm-prod-ref-writer-1342143606";

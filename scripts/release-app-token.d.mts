@@ -46,7 +46,7 @@ export function parseReleaseAppConfiguration(environment: ReleaseAppTokenEnviron
   clientId: string;
   installationId: number;
   privateKey: string;
-  repository: "hraness/message-like-me";
+  repository: "hraness/textbutler";
   repositoryId: 1342143606;
 }>;
 

@@ -3,7 +3,7 @@ import { existsSync, lstatSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 
-const REPOSITORY_URL = "https://github.com/hraness/message-like-me.git";
+const REPOSITORY_URL = "https://github.com/hraness/textbutler.git";
 const MAIN_BRANCH = "main";
 const MAIN_REF = `refs/heads/${MAIN_BRANCH}`;
 const LOCAL_MAIN_REF = `refs/remotes/origin/${MAIN_BRANCH}`;
@@ -573,8 +573,8 @@ function main(): void {
       "Usage: release-ref-authority.ts release TAG | promotion TAG WORKFLOW_SHA [EXPECTED_RELEASE_SHA]",
     );
   }
-  if (process.env.GITHUB_REPOSITORY !== "hraness/message-like-me" || process.env.DEFAULT_BRANCH !== MAIN_BRANCH) {
-    fail("Release-ref authority must run for hraness/message-like-me on exact default branch main.");
+  if (process.env.GITHUB_REPOSITORY !== "hraness/textbutler" || process.env.DEFAULT_BRANCH !== MAIN_BRANCH) {
+    fail("Release-ref authority must run for hraness/textbutler on exact default branch main.");
   }
   const authority = verifyReleaseRefAuthority({
     mode,

@@ -64,11 +64,11 @@ function requiredStatusError(
 ) {
   return new Error([
     `${writerLabel} failed: remote: error: GH013: Repository rule violations found for ${protectedRef}.${gitDisplaySuffix}`,
-    `remote: Review all repository rules at https://github.com/hraness/message-like-me/rules?ref=refs%2Fheads%2Fmain${gitDisplaySuffix}`,
+    `remote: Review all repository rules at https://github.com/hraness/textbutler/rules?ref=refs%2Fheads%2Fmain${gitDisplaySuffix}`,
     "remote:",
     `remote: - Required status check "${context}" is ${state}${gitDisplaySuffix}`,
     "remote:",
-    "error: failed to push some refs to 'https://github.com/hraness/message-like-me.git'",
+    "error: failed to push some refs to 'https://github.com/hraness/textbutler.git'",
   ].join("\n"));
 }
 
@@ -79,7 +79,7 @@ function alternateTransportRequiredStatusError(protectedRef: string, context: st
     `git transport: remote: error: GH013: Repository rule violations found for ${protectedRef}.`,
     "remote: diagnostic transport trailer",
     `remote: - Required status check "${context}" is errored.`,
-    "error: failed to push some refs to 'https://github.com/hraness/message-like-me.git'",
+    "error: failed to push some refs to 'https://github.com/hraness/textbutler.git'",
   ].join("\n"));
 }
 
@@ -239,7 +239,7 @@ describe("website-production Git writer", () => {
       advanceWebsiteProductionRef({
         environment: { MLM_RELEASE_REF_TOKEN: token },
         expectedOldSha: previousSha,
-        repository: "hraness/message-like-me",
+        repository: "hraness/textbutler",
         spawnImplementation() {
           calls += 1;
           const bootstrap = sterileBootstrapResult(calls);
@@ -275,7 +275,7 @@ describe("website-production Git writer", () => {
       advanceWebsiteProductionRef({
         environment: { MLM_RELEASE_REF_TOKEN: token },
         expectedOldSha: previousSha,
-        repository: "hraness/message-like-me",
+        repository: "hraness/textbutler",
         spawnImplementation() {
           calls += 1;
           const bootstrap = sterileBootstrapResult(calls);
@@ -323,7 +323,7 @@ describe("website-production Git writer", () => {
       "--no-signed",
       "--no-verify",
       "--recurse-submodules=no",
-      "https://github.com/hraness/message-like-me.git",
+      "https://github.com/hraness/textbutler.git",
       `${verifiedSha}:refs/heads/website-production`,
     ]);
     expect(arguments_.filter((value) => value.startsWith("--force-with-lease="))).toHaveLength(1);
@@ -352,7 +352,7 @@ describe("website-production Git writer", () => {
       "--no-tags",
       "--no-recurse-submodules",
       "--depth=251",
-      "https://github.com/hraness/message-like-me.git",
+      "https://github.com/hraness/textbutler.git",
       "refs/tags/v0.8.0",
     ]);
     for (const value of ["", "0.8.0", "v01.2.3", "v1.2", "v1.2.3\nmain"] as const) {
@@ -386,7 +386,7 @@ describe("website-production Git writer", () => {
         MLM_RELEASE_REF_TOKEN: token,
       },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation(command, arguments_, options) {
         expect(command).toBe("/usr/bin/git");
         expect(arguments_.join(" ")).not.toContain(token);
@@ -415,7 +415,7 @@ describe("website-production Git writer", () => {
         if (calls.length === 4) return gitResult(`${verifiedSha}\n`);
         if (calls.length === 5) return gitResult();
         return gitResult(
-          `To https://github.com/hraness/message-like-me.git\n \t${verifiedSha}:refs/heads/website-production\t${previousSha.slice(0, 7)}..${verifiedSha.slice(0, 7)}\nDone\n`,
+          `To https://github.com/hraness/textbutler.git\n \t${verifiedSha}:refs/heads/website-production\t${previousSha.slice(0, 7)}..${verifiedSha.slice(0, 7)}\nDone\n`,
         );
       },
       verifiedSha,
@@ -511,7 +511,7 @@ describe("website-production Git writer", () => {
       const receipt = advanceWebsiteProductionRef({
         environment: { MLM_RELEASE_REF_TOKEN: token },
         expectedOldSha: previousSha,
-        repository: "hraness/message-like-me",
+        repository: "hraness/textbutler",
         spawnImplementation() {
           calls += 1;
           if (calls === 1) return gitResult();
@@ -519,7 +519,7 @@ describe("website-production Git writer", () => {
           if (calls === 4) return gitResult(`${verifiedSha}\n`);
           if (calls === 5) return gitResult();
           return gitResult(
-            `To https://github.com/hraness/message-like-me.git\n \t${verifiedSha}:refs/heads/website-production\t${previousSha.slice(0, 7)}..${verifiedSha.slice(0, 7)}\nDone\n`,
+            `To https://github.com/hraness/textbutler.git\n \t${verifiedSha}:refs/heads/website-production\t${previousSha.slice(0, 7)}..${verifiedSha.slice(0, 7)}\nDone\n`,
           );
         },
         verifiedSha,
@@ -539,7 +539,7 @@ describe("website-production Git writer", () => {
       expect(() => advanceWebsiteProductionRef({
         environment: { MLM_RELEASE_REF_TOKEN: token },
         expectedOldSha: previousSha,
-        repository: "hraness/message-like-me",
+        repository: "hraness/textbutler",
         spawnImplementation() {
           calls += 1;
           return calls === 1 ? gitResult() : gitResult(config);
@@ -557,7 +557,7 @@ describe("website-production Git writer", () => {
     const receipt = advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation(command, arguments_, options) {
         calls += 1;
         if (calls <= 2) {
@@ -568,7 +568,7 @@ describe("website-production Git writer", () => {
         if (calls === 4) return gitResult(`${verifiedSha}\n`);
         if (calls === 3 || calls === 5) return gitResult();
         return gitResult(
-            `To https://github.com/hraness/message-like-me.git\n \t${verifiedSha}:refs/heads/website-production\t${previousSha.slice(0, 7)}..${verifiedSha.slice(0, 7)}\nDone\n`,
+            `To https://github.com/hraness/textbutler.git\n \t${verifiedSha}:refs/heads/website-production\t${previousSha.slice(0, 7)}..${verifiedSha.slice(0, 7)}\nDone\n`,
         );
       },
       verifiedSha,
@@ -585,7 +585,7 @@ describe("website-production Git writer", () => {
     expect(() => advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation() {
         calls += 1;
         return calls === 1
@@ -606,7 +606,7 @@ describe("website-production Git writer", () => {
     expect(() => advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation(_command, arguments_) {
         calls += 1;
         if (calls === 1) return gitResult();
@@ -628,7 +628,7 @@ describe("website-production Git writer", () => {
     expect(() => advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation() {
         calls += 1;
         const bootstrap = sterileBootstrapResult(calls);
@@ -638,7 +638,7 @@ describe("website-production Git writer", () => {
         if (calls === 5) return gitResult();
         if (calls === 6) {
           return gitResult(
-            `To https://github.com/hraness/message-like-me.git\n=\t${verifiedSha}:refs/heads/website-production\t[up to date]\nDone\n`,
+            `To https://github.com/hraness/textbutler.git\n=\t${verifiedSha}:refs/heads/website-production\t[up to date]\nDone\n`,
           );
         }
         return gitResult();
@@ -668,7 +668,7 @@ describe("website-production Git writer", () => {
     expect(() => advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation() {
         calls += 1;
         const bootstrap = sterileBootstrapResult(calls);
@@ -686,7 +686,7 @@ describe("website-production Git writer", () => {
     expect(() => advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation(_command, arguments_) {
         calls += 1;
         const bootstrap = sterileBootstrapResult(calls);
@@ -708,7 +708,7 @@ describe("website-production Git writer", () => {
     expect(() => advanceWebsiteProductionRef({
       environment: { MLM_RELEASE_REF_TOKEN: token },
       expectedOldSha: previousSha,
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation(_command, _arguments, options) {
         calls += 1;
         if (calls === 1) askpassPath = join(String(options.cwd), "askpass.sh");
@@ -734,7 +734,7 @@ describe("website-production canary stale lease", () => {
     const receipt = proveWebsiteProductionCanaryStaleLease({
       currentSha,
       environment: { MLM_RELEASE_REF_TOKEN: token },
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       spawnImplementation(_command, arguments_) {
         calls += 1;
         const bootstrap = sterileBootstrapResult(calls);
@@ -744,9 +744,9 @@ describe("website-production canary stale lease", () => {
         if (calls === 10) {
           expect(arguments_).toContain("--porcelain");
           return gitResult(
-            `To https://github.com/hraness/message-like-me.git\n!\t${previousSha}:refs/heads/website-production-writer-canary\t[rejected] (stale info)\nDone\n`,
+            `To https://github.com/hraness/textbutler.git\n!\t${previousSha}:refs/heads/website-production-writer-canary\t[rejected] (stale info)\nDone\n`,
             1,
-            "error: failed to push some refs to 'https://github.com/hraness/message-like-me.git'\n",
+            "error: failed to push some refs to 'https://github.com/hraness/textbutler.git'\n",
           );
         }
         return gitResult();
@@ -796,7 +796,7 @@ describe("explicit lease integration", () => {
       checked(["commit", "-am", "two"]);
       const second = checked(["rev-parse", "HEAD"]);
       const firstArguments = websiteProductionPushArguments(first, second).map((value) =>
-        value === "https://github.com/hraness/message-like-me.git" ? remote : value
+        value === "https://github.com/hraness/textbutler.git" ? remote : value
       );
       checked(firstArguments);
       expect(checked(["--git-dir", remote, "rev-parse", "refs/heads/website-production"], directory))
@@ -806,7 +806,7 @@ describe("explicit lease integration", () => {
       checked(["commit", "-am", "three"]);
       const third = checked(["rev-parse", "HEAD"]);
       const staleArguments = websiteProductionPushArguments(first, third).map((value) =>
-        value === "https://github.com/hraness/message-like-me.git" ? remote : value
+        value === "https://github.com/hraness/textbutler.git" ? remote : value
       );
       const stale = run(staleArguments);
       expect(stale.exitCode).not.toBe(0);
@@ -865,7 +865,7 @@ describe("exact release tag fetch integration", () => {
       expect(checked(["rev-parse", "HEAD"], checkout)).toBe(workflowSha);
 
       const fetchArguments = verifiedReleaseFetchArguments(verifiedTag).map((value) =>
-        value === "https://github.com/hraness/message-like-me.git" ? `file://${remote}` : value
+        value === "https://github.com/hraness/textbutler.git" ? `file://${remote}` : value
       );
       checked(fetchArguments, checkout);
       expect(checked(["rev-parse", "HEAD"], checkout)).toBe(workflowSha);
@@ -882,7 +882,7 @@ describe("exact release tag fetch integration", () => {
     const remote = join(directory, "remote.git");
     const remoteUrl = `file://${remote}`;
     const source = join(directory, "source");
-    const fixedRemote = "https://github.com/hraness/message-like-me.git";
+    const fixedRemote = "https://github.com/hraness/textbutler.git";
     const run = (arguments_: readonly string[], cwd: string) => {
       const result = Bun.spawnSync(["git", ...arguments_], { cwd, stderr: "pipe", stdout: "pipe" });
       return Object.freeze({
@@ -921,7 +921,7 @@ describe("exact release tag fetch integration", () => {
       const receipt = advanceWebsiteProductionRef({
         environment: { MLM_RELEASE_REF_TOKEN: token },
         expectedOldSha,
-        repository: "hraness/message-like-me",
+        repository: "hraness/textbutler",
         spawnImplementation(command, arguments_, options) {
           const mappedArguments = arguments_.map((value) => value === fixedRemote ? remoteUrl : value);
           const result = spawnSync(command, mappedArguments, {
