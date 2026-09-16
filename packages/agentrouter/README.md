@@ -7,7 +7,7 @@ qualification limits below before relying on any provider adapter.
 
 It provides:
 
-- A Codex/Claude/Devin adapter interface with explicit runtime qualification.
+- A Codex/Claude adapter interface with explicit runtime qualification.
 - Shared SQLite account custody, generation fencing and process-aware recovery.
 - A tool broker bound to one workspace and run, with closed file, public-web and
   messaging operations. There is no shell, executable or arbitrary RPC operation.
@@ -335,41 +335,6 @@ The [permissions documentation](https://code.claude.com/docs/en/agent-sdk/permis
 explains why `allowedTools` alone only pre-approves calls. A production qualification
 must also establish that managed host policy has not introduced configuration,
 hooks or other authority that cannot be disabled by application settings.
-
-`createDevinAcpAdapter()` implements the Agent Client Protocol against
-`devin acp`, Devin CLI's stdio JSON-RPC server (protocol version 1, observed on
-CLI 3000.10.x). Each run spawns one bounded child through the application's
-`BoundedProviderProcessFactory`, initializes with `fs` and `terminal` client
-capabilities unimplemented, opens one session with the host-selected workspace
-cwd, applies the pinned mode and model through `session/set_mode` and
-`session/set_config_option`, and completes a single `session/prompt`. The
-framing codec bounds every line to 1 MiB and validates JSON-RPC envelopes,
-identifiers and control characters before dispatch; prompts are bounded to
-256 KiB; pending requests are capped and every write is serialized.
-
-Devin advertises `mcpCapabilities: {http: false, sse: false}` — only stdio MCP
-transports exist. Profile tools therefore reach the agent through
-`startDevinToolRelay()`, a host-owned loopback endpoint admitted by a random
-path and bearer token, plus a spawned inline bridge process
-(`DEVIN_MCP_BRIDGE_SOURCE`) that answers `tools/list` and `tools/call` over
-stdio. The bridge is a transport adapter only: the broker still enforces the
-exact profile manifest, input bounds, workspace scoping and revocation.
-Inbound `session/request_permission` calls are answered by the host's
-permission callback; without one, the first reject option wins. `session/delete`
-is never invoked by this adapter; provider sessions may persist for host
-`session/load` recovery.
-
-Custody mirrors the other task adapters: `stopAndJoin()` proves process-group
-exit before account release, an unproven join fails close and retains the
-lease, and protocol cleanup is never treated as termination evidence. Usage is
-reduced from `usage_update` facts and the prompt result into the neutral
-`AgentTaskUsage` shape; no billing or quota claim is made. `AgentProvider`
-accepts `"devin"` and `createProviderLaunchPlan()` emits the Devin
-configuration, but the provider remains unqualified: exact-runtime adversarial
-qualification, effective tool inventory, stdio bridge custody, failure custody
-and account transport/model admission are all unresolved. `test/devin-acp.test.ts`
-and `test/devin-adapter.test.ts` exercise the codec, client, relay and spawned
-bridge against synthetic peers only; they establish no live provider evidence.
 
 ## Ownership boundaries
 

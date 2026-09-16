@@ -257,3 +257,12 @@ apps, signing, and notarization are outside the current product scope.
 - Preserve `check:effect`, `check:public-graphs`, and every existing full gate.
   Review policy and checker changes independently; do not weaken enforcement to
   silence a new implementation failure.
+
+- `costs.json` at the repository root is the checked registry of every product data surface: store, kind (`authoritative` | `derived` | `telemetry` | `served`), retention class (`ephemeral` | `ttl:<ISO-8601>` | `account` | `tombstone` | `persistent`), owner module, and budget. A new table, bucket, stream, dynamic route, blob, or provider meter fails `check:cost-surfaces` until it registers.
+- Bound every input before storage or provider I/O: request bytes, row counts, page sizes, batch sizes, retry counts, and event payloads. Unbounded input is a contract violation.
+- No writes on read paths. Reads may cache; they never mutate.
+- Derived state is rebuildable and lives in the cheapest tier that can serve it. Only authoritative state pays for transactional storage.
+- Every mutation carries an idempotency key; a retried write never double-charges storage, quota, or provider spend.
+- Analytics and metering events come from a checked allowlist with a byte ceiling per event.
+- Content bytes live in the content store; the control plane keeps references and metadata only.
+- Run `bun run check:cost-surfaces` before handoff whenever a data surface changes.
