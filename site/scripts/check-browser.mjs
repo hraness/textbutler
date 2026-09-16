@@ -308,6 +308,9 @@ try {
       if (sample.path === '/') {
         item.textures = await assertWallAssets(context, metrics.fieldBackground, origin);
         await applyMedia('reduce');
+        await page.waitForFunction(() => matchMedia('(prefers-reduced-transparency: reduce)').matches
+          && getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter === 'none'
+          && getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage === 'none');
         item.reducedTransparency = await deadline(page.evaluate(() => ({
           matches: matchMedia('(prefers-reduced-transparency: reduce)').matches,
           headerBackdrop: getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter,
@@ -315,6 +318,10 @@ try {
         })), 'Reduced transparency metrics');
         assert.deepEqual(item.reducedTransparency, { matches: true, headerBackdrop: 'none', fieldBackground: 'none' });
         await applyMedia('no-preference');
+        await page.waitForFunction((expected) => !matchMedia('(prefers-reduced-transparency: reduce)').matches
+          && getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter === expected.headerBackdrop
+          && getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage === expected.fieldBackground,
+        { headerBackdrop: metrics.headerBackdrop, fieldBackground: metrics.fieldBackground });
         const restored = await deadline(page.evaluate(() => ({
           matches: matchMedia('(prefers-reduced-transparency: reduce)').matches,
           headerBackdrop: getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter,
