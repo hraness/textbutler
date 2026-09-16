@@ -1,6 +1,4 @@
 node_modules/
-/.build/
-/.swiftpm/
 coverage/
 packages/agentrouter/dist/
 site/.browser-artifacts/

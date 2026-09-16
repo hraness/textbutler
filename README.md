@@ -22,16 +22,15 @@ automation grants, and the provider's contact-only execution, are qualified.
 Codex execution and native rich actions are also unavailable. The website is
 informational; it has no connection to private messages or contact folders.
 
-From a source checkout, build the companion explicitly with
-`bun run --cwd apps/macos menubar:build`, then run the prebuilt binary with
-`bun run --cwd apps/macos menubar`. Installed CLI packages should ship that
-companion so `textbutler menubar` can launch it directly; the command never compiles Swift or starts a windowed application.
+The menu-bar companion uses the shared, unsigned desktop-foundation runner. The
+`textbutler menubar` commands download and verify a pinned release binary on
+first start; nothing compiles source or opens a windowed application.
 
 Start with the [architecture and capability status](docs/textbutler/architecture.md),
 [Textbutler runtime](packages/textbutler/README.md),
 [Agentrouter](packages/agentrouter/README.md),
-[transport adapter](packages/transport/README.md), or
-[menu-bar companion](apps/macos/README.md).
+[transport adapter](packages/transport/README.md), or the
+[menu companion adapter](packages/textbutler/src/menubar.ts).
 
 ```sh
 bun install --frozen-lockfile --ignore-scripts
@@ -46,26 +45,28 @@ consumers; they are not Textbutler runtime components.
 
 ## Run the Textbutler menu companion
 
-After explicitly building the source-checkout companion, select its physical
-absolute path to launch it in the foreground:
+Start the companion in the background; it stays running until `menubar stop` or
+its menu-bar **Quit** action:
 
 ```sh
-TEXTBUTLER_MENUBAR_DEV_BINARY=/absolute/checkout/apps/macos/out/textbutler-menubar bun run textbutler menubar
+bun run textbutler menubar
+bun run textbutler menubar status
+bun run textbutler menubar stop
 ```
 
-The command is a singleton and stays running until you choose **Quit** from the
-menu. It never compiles source. To start it automatically when you sign in,
-install the per-user LaunchAgent:
+One companion runs per user and data directory. To start it automatically when
+you sign in, register login startup (a per-user LaunchAgent on macOS):
 
 ```sh
-TEXTBUTLER_MENUBAR_DEV_BINARY=/absolute/checkout/apps/macos/out/textbutler-menubar bun run textbutler menubar install
-bun run textbutler menubar status
+bun run textbutler menubar install
 bun run textbutler menubar uninstall
 ```
 
-The companion shows daemon state, contact and account readiness, capabilities,
-and recent activity. It controls global pause and opens the informational
-Textbutler website. It does not provide contact enrollment or account setup.
+`menubar doctor` reports the runner artifact, platform capability, and any
+operating-system approval step needed on an unsigned binary. The companion
+shows daemon state, contact and account readiness, capabilities, and recent
+activity. It controls global pause and opens the informational Textbutler
+website. It does not provide contact enrollment or account setup.
 
 ## Legacy Message Like Me history tools
 

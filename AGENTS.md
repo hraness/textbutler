@@ -5,9 +5,9 @@ Textbutler, a macOS message-butler daemon and menu companion at `textbutler.app`
 `PRODUCT.md` and `docs/textbutler/architecture.md` define the new product.
 The historical constraints below continue to govern the legacy `src/`, `dist/`,
 published message contracts, and their existing release machinery. They do not
-prohibit the explicitly requested new runtime in `packages/` and the unbundled
-menu companion in `apps/macos/`. Desktop apps, signing, and notarization are
-outside the current product scope.
+prohibit the explicitly requested new runtime in `packages/` and the menu
+companion adapter that drives the shared desktop-foundation runner. Desktop
+apps, signing, and notarization are outside the current product scope.
 
 - New agents receive only one contact's brokered files, bounded public web
   requests, and recipient-bound proposed messaging actions. Never enable shell,
@@ -23,8 +23,8 @@ outside the current product scope.
 - Unqualified provider restrictions and unsupported transport operations must
   remain unavailable. Synthetic tests do not prove live delivery or sandboxing.
 - Run `bun run check:textbutler` for the new source packages as well as the
-  existing required aggregate. The menu companion build and synthetic native
-  protocol tests are additional macOS-only gates.
+  existing required aggregate. Native menu-companion builds are gated by the
+  shared desktop-foundation release, not this repository.
 - Repository/package rename and website deployment must use a reviewed identity
   migration that preserves the existing release and production protections.
 - Informational site changes may use the explicit site-source promotion path in

@@ -71,18 +71,20 @@ bun run textbutler doctor
 
 Use `bun run textbutler --help` for the current command syntax. For foreground
 development, run `bun run textbutler daemon run`; closing that terminal stops
-the process. To launch the prebuilt menu companion in the foreground, use:
+the process. The menu companion is the shared desktop-foundation runner,
+fetched and verified as a pinned release binary on first start:
 
 ```sh
-TEXTBUTLER_MENUBAR_DEV_BINARY=/absolute/checkout/apps/macos/out/textbutler-menubar bun run textbutler menubar
+bun run textbutler menubar
+bun run textbutler menubar status
+bun run textbutler menubar stop
 ```
 
-The menu command never compiles source and enforces one running companion per
-user. Install its per-user LaunchAgent only when login startup is wanted:
+The command never compiles source and enforces one running companion per
+user. Register login startup only when it is wanted:
 
 ```sh
-TEXTBUTLER_MENUBAR_DEV_BINARY=/absolute/checkout/apps/macos/out/textbutler-menubar bun run textbutler menubar install
-bun run textbutler menubar status
+bun run textbutler menubar install
 bun run textbutler menubar uninstall
 ```
 
