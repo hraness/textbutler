@@ -5,6 +5,7 @@ import { validateSnapshot, type MenuItem, type Snapshot } from "@hraness/desktop
 import { runTextbutlerCli } from "./cli.ts";
 import { startDaemon, type RunningDaemon } from "./daemon.ts";
 import { companionOptions, menuLabel, snapshotItems } from "./menubar.ts";
+import { TRAY_ICON } from "./menubar-icon.ts";
 import { disconnectedSnapshot, type DesktopSnapshot } from "../../control/src/index.ts";
 
 const roots: string[] = [], daemons: RunningDaemon[] = [];
@@ -14,7 +15,7 @@ async function start(dataDir: string): Promise<RunningDaemon> { const daemon = a
 
 /** The produced items must satisfy the shared runner's wire contract. */
 function wire(items: readonly MenuItem[]): ReadonlyMap<string, boolean> {
-  return validateSnapshot({ version: 1, type: "snapshot", appId: "textbutler", name: "Textbutler", title: "Tb", revision: 1, items } satisfies Snapshot);
+  return validateSnapshot({ version: 1, type: "snapshot", appId: "textbutler", name: "Textbutler", title: "\u{1f916}", icon: TRAY_ICON, revision: 1, items } satisfies Snapshot);
 }
 function labels(items: readonly MenuItem[]): string[] {
   return items.flatMap(item => item.kind === "separator" ? [] : item.kind === "submenu" ? [item.label, ...labels(item.items)] : [item.label]);
@@ -39,6 +40,17 @@ describe("menu label presentation", () => {
     expect([...result].length).toBe(72);
     expect(result.endsWith("…")).toBe(true);
     expect(menuLabel("emoji 😀 ".repeat(30), 10)).toBe("emoji 😀 e…");
+  });
+});
+
+describe("companion identity", () => {
+  test("carries the robot status mark and bundled 32x32 tray art", () => {
+    const options = companionOptions(join(roots[0] ?? "/tmp/tb-menubar-test", "data"), () => Promise.resolve());
+    expect(options.title).toBe("\u{1f916}");
+    expect(options.icon).toBe(TRAY_ICON);
+    expect(TRAY_ICON.width).toBe(32);
+    expect(TRAY_ICON.height).toBe(32);
+    expect(Buffer.from(TRAY_ICON.rgba, "base64").length).toBe(32 * 32 * 4);
   });
 });
 

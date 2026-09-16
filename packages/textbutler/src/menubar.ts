@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { handleCompanionCommand, openBrowser, type CompanionOptions, type MenuItem } from "@hraness/desktop-foundation";
 import { CONTROL_PROTOCOL, disconnectedSnapshot, type DesktopSnapshot } from "../../control/src/index.ts";
 import { requestDaemon } from "./daemon.ts";
+import { TRAY_ICON } from "./menubar-icon.ts";
 
 const WEBSITE = "https://textbutler.app/";
 const SUPPORT = "https://account.hraness.com/support?product=message-like-me&source=desktop#support";
@@ -112,7 +113,8 @@ export function companionOptions(dataDir: string, open: typeof openBrowser = ope
   return {
     appId: "textbutler",
     name: "Textbutler",
-    title: "Tb",
+    title: "\u{1f916}",
+    icon: TRAY_ICON,
     tooltip: "Textbutler status and controls",
     stateDir: join(dataDir, "menubar"),
     refreshMs: 15_000,
