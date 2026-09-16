@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           git -c credential.helper= -c http.extraHeader= -c core.hooksPath=/dev/null \
             fetch --no-tags --no-recurse-submodules --unshallow \
-            https://github.com/hraness/message-like-me.git refs/heads/main
+            https://github.com/hraness/textbutler.git refs/heads/main
           test "$(git rev-parse --verify 'HEAD^{commit}')" = "$GITHUB_SHA"
           test "$(git rev-parse --is-shallow-repository)" = "false"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -98,7 +98,7 @@ jobs:
           test -z "$(git config --local --get-all credential.helper || true)"
           git -c credential.helper= -c http.extraHeader= -c core.hooksPath=/dev/null \
             fetch --no-tags --no-recurse-submodules --unshallow \
-            https://github.com/hraness/message-like-me.git refs/heads/main
+            https://github.com/hraness/textbutler.git refs/heads/main
           test "$(git rev-parse --verify 'HEAD^{commit}')" = "$GITHUB_SHA"
           test "$(git rev-parse --is-shallow-repository)" = "false"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -107,11 +107,11 @@ jobs:
       - name: Pin every canary authority helper to reviewed bytes
         id: pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -130,11 +130,11 @@ jobs:
       - name: Re-pin the complete TCB before the App-only terminal phase
         id: pre_terminalize_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -157,11 +157,11 @@ jobs:
       - name: Re-pin the complete TCB after the App-only terminal phase
         id: post_terminalize_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -181,11 +181,11 @@ jobs:
       - name: Re-pin the complete TCB before the App-only attestation
         id: pre_attest_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -208,11 +208,11 @@ jobs:
       - name: Re-pin the complete TCB after the App-only attestation phase
         id: post_attest_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -234,11 +234,11 @@ jobs:
         id: cleanup_pin
         if: ${{ always() && steps.pin.outcome == 'success' && steps.revalidate.outcome == 'success' && steps.pre_terminalize_pin.outcome == 'success' && steps.terminalize.outcome != 'skipped' }}
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -281,11 +281,11 @@ jobs:
           node-version: "24.19.0"
       - name: Pin every finalizer dependency after protected execution
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CANARY_SHA256: cc8951b3c3264d951431a4a5d9858e4339d76cffd80558eff850324de243a524
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CANARY_SHA256: e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"

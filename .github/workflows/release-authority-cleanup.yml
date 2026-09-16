@@ -56,8 +56,8 @@ jobs:
           node-version: "24.19.0"
       - name: Pin the cleanup admission helper to reviewed bytes
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CLEANUP_SHA256: b55a84c97faf88ee55e9b5066c1113f716ebf7985916e58f3c5e628cd251bc96
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CLEANUP_SHA256: 5ce01aeb6c6fc84f7642b56dc925e9f9afb8d6588e9618a0dfab6da894a7f61a
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -102,8 +102,8 @@ jobs:
           node-version: "24.19.0"
       - name: Pin the cleanup helper before post-approval revalidation
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CLEANUP_SHA256: b55a84c97faf88ee55e9b5066c1113f716ebf7985916e58f3c5e628cd251bc96
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CLEANUP_SHA256: 5ce01aeb6c6fc84f7642b56dc925e9f9afb8d6588e9618a0dfab6da894a7f61a
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -126,8 +126,8 @@ jobs:
       - name: Re-pin the complete App-only TCB immediately before key access
         id: app_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CLEANUP_SHA256: b55a84c97faf88ee55e9b5066c1113f716ebf7985916e58f3c5e628cd251bc96
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CLEANUP_SHA256: 5ce01aeb6c6fc84f7642b56dc925e9f9afb8d6588e9618a0dfab6da894a7f61a
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -176,8 +176,8 @@ jobs:
         id: pin
         if: ${{ always() }}
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          CLEANUP_SHA256: b55a84c97faf88ee55e9b5066c1113f716ebf7985916e58f3c5e628cd251bc96
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          CLEANUP_SHA256: 5ce01aeb6c6fc84f7642b56dc925e9f9afb8d6588e9618a0dfab6da894a7f61a
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"

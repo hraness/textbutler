@@ -169,7 +169,7 @@ export async function agentrouterPackageSmoke(tarballArgument?: string): Promise
     const repository = manifest.repository as JsonRecord | undefined;
     if (
       repository?.type !== "git"
-      || repository.url !== "git+https://github.com/hraness/message-like-me.git"
+      || repository.url !== "git+https://github.com/hraness/textbutler.git"
       || repository.directory !== "packages/agentrouter"
     ) problems.push("packed repository must bind this monorepo path for npm provenance");
     const files = manifest.files;

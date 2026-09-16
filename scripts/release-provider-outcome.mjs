@@ -26,7 +26,7 @@ import {
 
 const BASELINE_SCHEMA = "message-like-me-provider-baseline-v1";
 const PROMOTION_SCHEMA = "message-like-me-provider-promotion-v2";
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 const PRODUCTION_REF = "refs/heads/website-production";
 const PAGE_SIZE = 100;
 const MAX_ITEMS = 500;
@@ -1263,7 +1263,7 @@ export function exactPublishedRelease(value, tag, label = "published Release") {
       || item.id <= 0
       || !Number.isSafeInteger(item.size)
       || item.size <= 0
-      || item.browser_download_url !== `https://github.com/hraness/message-like-me/releases/download/${stableTag}/${name}`
+      || item.browser_download_url !== `https://github.com/hraness/textbutler/releases/download/${stableTag}/${name}`
     ) {
       fail(`Release ${stableTag} asset ${name} is not one exact uploaded immutable artifact`);
     }

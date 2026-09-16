@@ -6,8 +6,8 @@ The following explicit site-subject route supersedes the package-publication
 prerequisite below for the informational Textbutler website only. It grants no
 package publication, native app release, provider qualification, or live message
 authority. The legacy tagged package route and its exact-byte/npm checks remain
-unchanged. Source repository identity remains `hraness/message-like-me` until
-the separately reviewed repository-name migration is applied.
+unchanged. Source repository identity is the canonical `hraness/textbutler`
+with unchanged numeric repository ID `1342143606`.
 
 Use the existing `Promote website production` workflow with `site_sha` set to
 the exact reviewed current `main` commit, `site_ci_run_id` and
@@ -65,6 +65,33 @@ deployment, truthful development status, canonical metadata and legacy links.
 The current Vercel project/production branch remain the target; domain or
 repository renaming is a separate inspected provider mutation.
 
+## Repository identity migration
+
+The repository rename keeps numeric GitHub repository ID `1342143606` and the
+existing GitHub Apps, rulesets, protected refs, status contexts, environment
+reviewers, workflow IDs, Vercel project, and production branch unchanged. The
+canonical source identity for new release and promotion runs is
+`hraness/textbutler`; an old-name redirect is not authority for a new run.
+The npm names `@hraness/message-like-me` and `@hraness/agentrouter`, their tag
+namespaces, the `messagelikeme` command, wire schemas, and historical release
+receipts remain unchanged. Do not rewrite an existing tag, npm version, or
+provenance statement.
+
+Merge this version-neutral control migration independently before the next
+product/version change. Refresh the complete administrative controls census
+and independently review the exact helper/workflow changes. Before tagging,
+read back each applicable npm trusted publisher and require canonical repository
+`hraness/textbutler`, its existing exact workflow filename and permission set.
+An old publisher identity blocks publication; do not fall back to a personal
+token or weaken its policy. Any needed provider reconciliation is a separate
+inspected operation. Historical versions retain their original provenance and
+are not evidence for a new canonical-repository publication.
+
+Before production promotion, follow the existing no-digest preflight and exact
+reviewed control-epoch transition below. Preserve the actual key-environment
+review and satisfy it through GitHub's normal interface. Neither the rename nor
+this source migration permits an out-of-band ref move or a protection change.
+
 ## Legacy package publication
 
 Message Like Me builds one exact public package tarball, validates those bytes
@@ -108,7 +135,7 @@ Owner-side controls required once before the first AgentRouter tag:
   existing `refs/tags/v*` scope.
 - Ensure `@hraness/agentrouter` exists publicly under the Hraness npm scope,
   then configure its sole trusted publisher as GitHub Actions repository
-  `hraness/message-like-me`, workflow file `release-agentrouter.yml`. Require
+  `hraness/textbutler`, workflow file `release-agentrouter.yml`. Require
   the exact permission set `createPackage` plus npm's provider-imposed
   `createStagedPackage`, and keep the staged-package inventory exactly empty.
   Once trusted publishing is proven, disallow traditional token publication
@@ -153,7 +180,7 @@ for this rollout and do not create a replacement Sites project.
    production authorization. Give the App exactly repository permissions
    `Commit statuses: Read and write` and implicit `Metadata: Read`, with no
    organization permission. Install it on `hraness` with selected-repository
-   access to exactly `hraness/message-like-me`. Record its numeric App ID,
+   access to exactly `hraness/textbutler`. Record its numeric App ID,
    client ID, numeric installation ID, App slug, and the repository's numeric
    ID `1342143606`. These are distinct identities. Read the repository ID from
    GitHub's authenticated repository API and do not substitute a name at the
@@ -201,7 +228,7 @@ for this rollout and do not create a replacement Sites project.
    published Release reports `immutable=true` before npm can run.
 10. Ensure `@hraness/message-like-me` exists publicly under the Hraness npm
    scope, then configure its sole trusted publisher as GitHub Actions repository
-   `hraness/message-like-me`, workflow file `release.yml`. Require its exact
+   `hraness/textbutler`, workflow file `release.yml`. Require its exact
    permission set to be `createPackage` plus npm's provider-imposed
    `createStagedPackage`. The checked Release workflow uses only its reviewed
    direct `npm publish` path, never `npm stage` or `stage publish`, and release
@@ -250,7 +277,7 @@ assertions together:
   `hraness`, exactly `statuses:write` plus `metadata:read`, no `contents` or
   `workflows` authority, and an exhaustive
   `/installation/repositories` set of exactly
-  `{hraness/message-like-me}` with repository ID `1342143606`;
+  `{hraness/textbutler}` with repository ID `1342143606`;
 - `production-ref-writer-key` admits only `main`, has no required reviewers,
   wait timer, or custom deployment-protection rules, disables administrator
   bypass, and exposes only the expected key and checked variables;
@@ -367,7 +394,7 @@ When an established protected ref predates reviewed workflow-control changes:
        mode: process.env.MODE,
        previousSha: process.env.PREVIOUS_SHA,
        protectedRef: process.env.PROTECTED_REF,
-       repository: "hraness/message-like-me",
+       repository: "hraness/textbutler",
        repositoryId: 1342143606,
        tag: process.env.VERIFIED_TAG,
        targetSha: process.env.TARGET_SHA,
@@ -416,7 +443,7 @@ When an established protected ref predates reviewed workflow-control changes:
    treat that target's `.github/workflows` tree OID as the baseline for the next
    routine range. Re-read the permanent App's exact `statuses:write` plus
    `metadata:read` permissions, absence of `contents` and `workflows` authority,
-   singleton `{hraness/message-like-me}` repository selection, and the terminal
+   singleton `{hraness/textbutler}` repository selection, and the terminal
    non-success status. A completed epoch requires no key rotation because it
    created or replaced no credential and every short-lived App token was revoked;
    an interrupted run still follows the separate quarantine and cleanup
@@ -723,7 +750,7 @@ missed slot is skipped rather than retried or shifted, and request, body, and
 sleep latency all consume the same window. App identity, installation, mint,
 DELETE, and observation bodies are streamed under a 1 MiB cap and scrubbed
 after parsing. Every HTTP 200 must still describe the exact singleton selected
-`hraness/message-like-me` repository with ID `1342143606`. Acceptance requires
+`hraness/textbutler` repository with ID `1342143606`. Acceptance requires
 two distinct scheduled HTTP 401 authorization-denial reads. An HTTP 403 is
 indeterminate because GitHub can use it for rate limiting or policy denial; it
 never proves revocation. A 200 after either denial, only one denial, any other

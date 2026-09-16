@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hraness/message-like-me.git",
+    "url": "git+https://github.com/hraness/textbutler.git",
     "directory": "packages/agentrouter"
   },
   "publishConfig": {

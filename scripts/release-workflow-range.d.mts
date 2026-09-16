@@ -46,7 +46,7 @@ type ControlEpochReceiptFields = Readonly<{
   digest: string;
   inventory: readonly ControlEpochInventoryEntry[];
   previousSha: string;
-  repository: "hraness/message-like-me";
+  repository: "hraness/textbutler";
   repositoryId: 1342143606;
   tag: string;
   targetSha: string;
@@ -115,7 +115,7 @@ export function decodeWorkflowRangeReceipt(value: unknown): WorkflowRangeReceipt
 type ControlEpochDescriptionFields = Readonly<{
   currentMainSha: string;
   previousSha: string;
-  repository: "hraness/message-like-me";
+  repository: "hraness/textbutler";
   repositoryId: number | string;
   runner?: WorkflowRangeGitRunner;
   targetSha?: string;
@@ -145,7 +145,7 @@ type ControlEpochAdmissionBoundary = Readonly<{
   githubActions?: string;
   previousSha: string;
   protectedRef?: "refs/heads/website-production" | "refs/heads/website-production-writer-canary";
-  repository: "hraness/message-like-me";
+  repository: "hraness/textbutler";
   repositoryId: number | string;
   runAttempt?: number | string;
   runner?: WorkflowRangeGitRunner;

@@ -14,7 +14,7 @@ const sha512 = "a".repeat(128);
 
 function audit(
   overrides: Readonly<Record<string, unknown>> = {},
-  invocation = "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3",
+  invocation = "https://github.com/hraness/textbutler/actions/runs/123/attempts/3",
   releasePackage: ReleasePackage = rootReleasePackage,
 ): unknown {
   const tag = `${releasePackage.tagPrefix}${version}`;
@@ -32,7 +32,7 @@ function audit(
           workflow: {
             path: releasePackage.workflowPath,
             ref: `refs/tags/${tag}`,
-            repository: "https://github.com/hraness/message-like-me",
+            repository: "https://github.com/hraness/textbutler",
           },
         },
         internalParameters: {
@@ -43,7 +43,7 @@ function audit(
         },
         resolvedDependencies: [{
           digest: { gitCommit: verifiedSha },
-          uri: `git+https://github.com/hraness/message-like-me@refs/tags/${tag}`,
+          uri: `git+https://github.com/hraness/textbutler@refs/tags/${tag}`,
         }],
       },
       runDetails: {
@@ -91,6 +91,12 @@ const coordinate = Object.freeze({
 });
 
 describe("npm provenance verification policy", () => {
+  test("rejects an old-name invocation as authority for a new canonical repository release", () => {
+    expect(() => parseVerifiedNpmProvenance(audit(
+      {}, "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3",
+    ), coordinate)).toThrow("invocation");
+  });
+
   test("binds npm's verified Sigstore result to the exact workflow, tag, commit, and tarball", () => {
     expect(() => parseVerifiedNpmProvenance(audit(), coordinate)).not.toThrow();
     expect(() => parseVerifiedNpmProvenance(audit(), {
@@ -122,7 +128,7 @@ describe("npm provenance verification policy", () => {
       requiredRunId: "123",
     })).toThrow("allowed workflow run attempt");
     expect(() => parseVerifiedNpmProvenance(
-      audit({}, "https://github.com/hraness/message-like-me/actions/runs/123/attempts/0"),
+      audit({}, "https://github.com/hraness/textbutler/actions/runs/123/attempts/0"),
       coordinate,
     )).toThrow("invocation");
   });
@@ -136,19 +142,19 @@ describe("npm provenance verification policy", () => {
             workflow: {
               path: ".github/workflows/release.yml",
               ref: `refs/tags/${verifiedTag}`,
-              repository: "https://github.com/hraness/message-like-me",
+              repository: "https://github.com/hraness/textbutler",
             },
           },
           internalParameters: { github: { event_name: "push", repository_id: "1342143606" } },
           resolvedDependencies: [{
             digest: { gitCommit: "c".repeat(40) },
-            uri: `git+https://github.com/hraness/message-like-me@refs/tags/${verifiedTag}`,
+            uri: `git+https://github.com/hraness/textbutler@refs/tags/${verifiedTag}`,
           }],
         },
         runDetails: {
           builder: { id: "https://github.com/actions/runner/github-hosted" },
           metadata: {
-            invocationId: "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3",
+            invocationId: "https://github.com/hraness/textbutler/actions/runs/123/attempts/3",
           },
         },
       },
@@ -166,7 +172,7 @@ describe("npm provenance verification policy", () => {
     });
     const agentrouterAudit = audit(
       {},
-      "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3",
+      "https://github.com/hraness/textbutler/actions/runs/123/attempts/3",
       agentrouterReleasePackage,
     );
     expect(() => parseVerifiedNpmProvenance(agentrouterAudit, agentrouterCoordinate)).not.toThrow();

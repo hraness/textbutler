@@ -4,7 +4,7 @@ import { createPrivateKey, sign } from "node:crypto";
 import { performance } from "node:perf_hooks";
 
 const EXPECTED_OWNER = "hraness";
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 export const MESSAGE_LIKE_ME_REPOSITORY_ID = 1_342_143_606;
 const MAX_PRIVATE_KEY_BYTES = 64 * 1024;
 const MAX_TOKEN_BYTES = 4096;
@@ -344,7 +344,7 @@ function parseInstallationRepositories(value) {
   const owner = expectRecord(repository.owner, "release App token repository read owner");
   if (
     repository.id !== MESSAGE_LIKE_ME_REPOSITORY_ID ||
-    repository.name !== "message-like-me" ||
+    repository.name !== "textbutler" ||
     repository.full_name !== EXPECTED_REPOSITORY ||
     owner.login !== EXPECTED_OWNER
   ) {
@@ -386,7 +386,7 @@ export function parseReleaseAppTokenResponse(value, serverDate) {
   const owner = expectRecord(repository.owner, "release App token repository owner");
   if (
     repository.id !== MESSAGE_LIKE_ME_REPOSITORY_ID ||
-    repository.name !== "message-like-me" ||
+    repository.name !== "textbutler" ||
     repository.full_name !== EXPECTED_REPOSITORY ||
     owner.login !== EXPECTED_OWNER
   ) {

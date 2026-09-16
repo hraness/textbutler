@@ -31,7 +31,7 @@ function release(overrides: Readonly<Record<string, unknown>> = {}) {
   return {
     assets: [
       {
-        browser_download_url: `https://github.com/hraness/message-like-me/releases/download/v${version}/${releaseArchiveName(version)}`,
+        browser_download_url: `https://github.com/hraness/textbutler/releases/download/v${version}/${releaseArchiveName(version)}`,
         digest: `sha256:${tarballDigest}`,
         id: 1,
         name: releaseArchiveName(version),
@@ -39,7 +39,7 @@ function release(overrides: Readonly<Record<string, unknown>> = {}) {
         state: "uploaded",
       },
       {
-        browser_download_url: `https://github.com/hraness/message-like-me/releases/download/v${version}/SHA256SUMS`,
+        browser_download_url: `https://github.com/hraness/textbutler/releases/download/v${version}/SHA256SUMS`,
         digest: `sha256:${checksumDigest}`,
         id: 2,
         name: "SHA256SUMS",

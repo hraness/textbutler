@@ -89,7 +89,7 @@ async function runProviderCommand(
   return Object.freeze({ exitCode, stderr, stdout });
 }
 
-const providerRepository = "hraness/message-like-me";
+const providerRepository = "hraness/textbutler";
 const providerPreviousSha = "1".repeat(40);
 const providerTag = "v0.8.0";
 const tagResolutionFixture = JSON.parse(await readFile(
@@ -104,6 +104,16 @@ const tagResolutionFixture = JSON.parse(await readFile(
 }>;
 const providerVerifiedSha = tagResolutionFixture.resolvedCommit.sha;
 const providerTagObjectSha = tagResolutionFixture.tagRef.object.sha;
+// Preserve the archived pre-rename receipt and model the canonical API response
+// separately with unchanged immutable tag-object identity.
+const canonicalTagRef = {
+  ...tagResolutionFixture.tagRef,
+  url: `https://api.github.com/repos/${providerRepository}/git/refs/tags/${providerTag}`,
+  object: {
+    ...tagResolutionFixture.tagRef.object,
+    url: `https://api.github.com/repos/${providerRepository}/git/tags/${providerTagObjectSha}`,
+  },
+};
 const providerReleasePublishedAt = "2026-08-29T14:00:00Z";
 const providerBaselineServerDate = "2026-08-29T15:00:00.000Z";
 const providerPromotionServerDate = "2026-08-29T15:01:00.000Z";
@@ -201,7 +211,7 @@ function providerProductionStatus<State extends "error" | "success">(
       ? "Exact release authority admitted for one production-ref attempt"
       : "Release authority consumed after the production-ref attempt",
     installationId: 159_058_102 as const,
-    repository: providerRepository as "hraness/message-like-me",
+    repository: providerRepository as "hraness/textbutler",
     repositoryId: 1_342_143_606 as const,
     serverDate: createdAt.replace("Z", ".000Z"),
     state,
@@ -220,7 +230,7 @@ function providerProductionCombinedStatus(status: ReturnType<typeof providerProd
     repository: {
       full_name: providerRepository,
       id: 1_342_143_606,
-      name: "message-like-me",
+      name: "textbutler",
       owner: { login: "hraness", type: "Organization" },
     },
     sha: providerVerifiedSha,
@@ -767,7 +777,7 @@ class ProviderApiFixture {
     query: string;
   }>): Promise<ProviderJson> {
     expect(input.owner).toBe("hraness");
-    expect(input.name).toBe("message-like-me");
+    expect(input.name).toBe("textbutler");
     expect(input.query).toContain("query MessageLikeMeProductionDeployments");
     this.graphqlCalls.push(`after=${input.after ?? ""}`);
     const response = this.graphqlResponses[
@@ -848,7 +858,7 @@ class ProviderApiFixture {
       return snapshot ?? this.latest;
     }
     if (endpoint === `/repos/${providerRepository}/git/ref/tags/${providerTag}`) {
-      return tagResolutionFixture.tagRef as ProviderJson;
+      return canonicalTagRef as ProviderJson;
     }
     if (endpoint === `/repos/${providerRepository}/git/tags/${providerTagObjectSha}`) {
       const snapshot = this.tagSnapshots[Math.min(this.#tagRead, this.tagSnapshots.length - 1)];
@@ -1197,8 +1207,8 @@ describe("release-bound site control", () => {
 set -eu
 if [ "$1" != "api" ]; then exit 90; fi
 case "$2|$4" in
-  "/repos/hraness/message-like-me|.default_branch") printf '%s\\n' "$STUB_DEFAULT_BRANCH" ;;
-  "/repos/hraness/message-like-me/git/ref/heads/main|.object.sha") printf '%s\\n' "$STUB_MAIN_SHA" ;;
+  "/repos/hraness/textbutler|.default_branch") printf '%s\\n' "$STUB_DEFAULT_BRANCH" ;;
+  "/repos/hraness/textbutler/git/ref/heads/main|.object.sha") printf '%s\\n' "$STUB_MAIN_SHA" ;;
   *) exit 91 ;;
 esac
 `, "utf8");

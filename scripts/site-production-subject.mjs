@@ -1,7 +1,7 @@
 import { parseSiteSubject } from "./release-production-authority.mjs";
 import { createHash } from "node:crypto";
 
-export const SITE_REPOSITORY = "hraness/message-like-me";
+export const SITE_REPOSITORY = "hraness/textbutler";
 export const SITE_REPOSITORY_ID = 1342143606;
 export const SITE_WORKFLOW_PATH = ".github/workflows/website-production.yml";
 export const SITE_ARTIFACT_NAME = "textbutler-site-build";

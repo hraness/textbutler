@@ -7,8 +7,8 @@ const sha = "a".repeat(40);
 const workflow = ".github/workflows/release.yml";
 const ref = `refs/tags/${tag}`;
 const identity =
-  `https://github.com/hraness/message-like-me/${workflow}@${ref}`;
-const invocation = "https://github.com/hraness/message-like-me/actions/runs/123/attempts/3";
+  `https://github.com/hraness/textbutler/${workflow}@${ref}`;
+const invocation = "https://github.com/hraness/textbutler/actions/runs/123/attempts/3";
 const derUtf8String = (value) => Buffer.concat([Buffer.from([0x0c, Buffer.byteLength(value, "utf8")]), Buffer.from(value, "utf8")]);
 
 describe("npm Sigstore release signer policy", () => {
@@ -21,10 +21,10 @@ describe("npm Sigstore release signer policy", () => {
     expect(policy.options.certificateOIDs).toEqual({
       "1.3.6.1.4.1.57264.1.2": "push",
       "1.3.6.1.4.1.57264.1.3": sha,
-      "1.3.6.1.4.1.57264.1.5": "hraness/message-like-me",
+      "1.3.6.1.4.1.57264.1.5": "hraness/textbutler",
       "1.3.6.1.4.1.57264.1.6": ref,
       "1.3.6.1.4.1.57264.1.11": derUtf8String("github-hosted"),
-      "1.3.6.1.4.1.57264.1.12": derUtf8String("https://github.com/hraness/message-like-me"),
+      "1.3.6.1.4.1.57264.1.12": derUtf8String("https://github.com/hraness/textbutler"),
       "1.3.6.1.4.1.57264.1.13": derUtf8String(sha),
       "1.3.6.1.4.1.57264.1.14": derUtf8String(ref),
       "1.3.6.1.4.1.57264.1.15": derUtf8String("1342143606"),
@@ -34,7 +34,7 @@ describe("npm Sigstore release signer policy", () => {
       "1.3.6.1.4.1.57264.1.21": derUtf8String(invocation),
       "1.3.6.1.4.1.57264.1.22": derUtf8String("public"),
       "1.3.6.1.4.1.57264.1.24": derUtf8String(
-        `repo:hraness@307125679/message-like-me@1342143606:ref:${ref}`,
+        `repo:hraness@307125679/textbutler@1342143606:ref:${ref}`,
       ),
     });
   });
@@ -43,7 +43,7 @@ describe("npm Sigstore release signer policy", () => {
     const agentrouterTag = "agentrouter-v0.1.0";
     const agentrouterWorkflow = ".github/workflows/release-agentrouter.yml";
     const agentrouterIdentity =
-      `https://github.com/hraness/message-like-me/${agentrouterWorkflow}@refs/tags/${agentrouterTag}`;
+      `https://github.com/hraness/textbutler/${agentrouterWorkflow}@refs/tags/${agentrouterTag}`;
     const policy = releaseSignerIdentity(agentrouterTag, sha, invocation, agentrouterWorkflow);
     expect(policy.identity).toBe(agentrouterIdentity);
     expect(new RegExp(policy.options.certificateIdentityURI, "u").test(agentrouterIdentity)).toBe(true);

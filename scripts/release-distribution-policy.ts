@@ -20,7 +20,7 @@ export type ReleasePackage = Readonly<{
 }>;
 
 export const publicPackageName = "@hraness/message-like-me";
-export const publicRepository = "hraness/message-like-me";
+export const publicRepository = "hraness/textbutler";
 export const rootReleasePackage: ReleasePackage = Object.freeze({
   name: publicPackageName,
   repository: publicRepository,
