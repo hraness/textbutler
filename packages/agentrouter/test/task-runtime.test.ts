@@ -153,7 +153,7 @@ describe("runtime-created lease authority", () => {
   });
   test("mutating a lease-store alias cannot relabel execution or its eventual release", async () => {
     const f = setup(), gate = deferred<void>();
-    let alias!: { provider: "codex" | "claude"; accountId: string; owner: string; generation: number; expiresAt: number };
+    let alias!: { provider: "codex" | "claude" | "devin"; accountId: string; owner: string; generation: number; expiresAt: number };
     const acquire = f.leases.acquire.bind(f.leases);
     f.leases.acquire = input => { alias = { ...acquire(input) }; return alias; };
     try {
