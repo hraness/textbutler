@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { SqliteAccountLeases } from "../../agentrouter/src/accounts.ts";
+import { SqliteAccountLeases } from "@hraness/agentmixer";
 import { automationId, parseAutomationGrant, type AutomationGrant } from "../../transport/src/automation-contract.ts";
 
 export type RunState = "running" | "dispatching" | "submitted" | "failed" | "partial" | "indeterminate" | "cancelled" | "ignored" | "abandoned";

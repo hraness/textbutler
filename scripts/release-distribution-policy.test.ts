@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
 
 import {
-  agentrouterReleasePackage,
   assertReleaseAssetBytes,
   parseGitHubRelease,
   parseNpmRelease,
@@ -79,41 +78,22 @@ describe("public release distribution policy", () => {
     expect(() => releaseArchiveName("latest")).toThrow("release version");
   });
 
-  test("binds each closed package descriptor to its own tag, archive, and manifest", () => {
+  test("binds the closed package descriptor to its own tag, archive, and manifest", () => {
     expect(releasePackageForName("@hraness/message-like-me")).toBe(rootReleasePackage);
-    expect(releasePackageForName("@hraness/agentrouter")).toBe(agentrouterReleasePackage);
+    expect(() => releasePackageForName("@hraness/agentmixer")).toThrow("manifest identity");
     expect(() => releasePackageForName("@hraness/other")).toThrow("manifest identity");
-    expect(() => releasePackageForName("agentrouter")).toThrow("manifest identity");
+    expect(() => releasePackageForName("message-like-me")).toThrow("manifest identity");
     expect(() => releasePackageForName("constructor")).toThrow("manifest identity");
     expect(() => releasePackageForName("hasOwnProperty")).toThrow("manifest identity");
-
-    const agentrouter = releaseDistribution(agentrouterReleasePackage);
-    expect(agentrouter.releaseArchiveName("0.1.0")).toBe("hraness-agentrouter-0.1.0.tgz");
-    expect(agentrouter.stableTag.exec("agentrouter-v0.1.0")?.[1]).toBe("0.1.0");
-    expect(agentrouter.stableTag.test("v0.1.0")).toBe(false);
-    expect(agentrouter.stableTag.test("agentrouter-v0.1.0-rc.1")).toBe(false);
-    expect(agentrouter.releaseVersionForCurrentAdmission({
-      license: "MIT",
-      name: "@hraness/agentrouter",
-      version: "9.9.9",
-    }, "agentrouter-v0.1.0")).toBe("0.1.0");
-    expect(() => agentrouter.releaseVersionForCurrentAdmission({
-      license: "MIT",
-      name: "@hraness/agentrouter",
-    }, "v0.1.0")).toThrow("canonical stable version");
-    expect(() => agentrouter.releaseVersionForCurrentAdmission({
-      license: "MIT",
-      name: "@hraness/message-like-me",
-    }, "agentrouter-v0.1.0")).toThrow("wrong public package");
 
     const root = releaseDistribution(rootReleasePackage);
     expect(root.releaseArchiveName(version)).toBe(releaseArchiveName(version));
     expect(root.stableTag.exec(`v${version}`)?.[1]).toBe(version);
-    expect(root.stableTag.test(`agentrouter-v${version}`)).toBe(false);
+    expect(root.stableTag.test(`agentmixer-v${version}`)).toBe(false);
     expect(() => root.releaseVersionForCurrentAdmission({
       license: "MIT",
       name: "@hraness/message-like-me",
-    }, `agentrouter-v${version}`)).toThrow("canonical stable version");
+    }, `agentmixer-v${version}`)).toThrow("canonical stable version");
   });
 
   test("requires MIT npm identity and public-repository provenance", () => {

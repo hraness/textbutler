@@ -4,7 +4,7 @@ const PACKAGE_REPOSITORY = "hraness/textbutler";
 const REPOSITORY_ID = "1342143606";
 const GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com";
 const SHA = /^[0-9a-f]{40}$/u;
-const STABLE_TAG = /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
+const STABLE_TAG = /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
 const WORKFLOW_PATH = /^\.github\/workflows\/[a-z0-9][a-z0-9-]{0,63}\.yml$/u;
 const RUN_INVOCATION =
   /^https:\/\/github\.com\/hraness\/textbutler\/actions\/runs\/[1-9][0-9]*\/attempts\/[1-9][0-9]*$/u;

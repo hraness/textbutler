@@ -1,13 +1,14 @@
-# Agentrouter native process boundary
+# AgentMixer native process boundary
 
-Agentrouter owns provider policy and account leases. A shared native process
+AgentMixer owns provider policy and account leases. A shared native process
 transport owns an exact admitted process scope and byte streams. Applications
 own durable custody records, credentials, workspaces, artifact admission and
 recovery. Sharing the process implementation must preserve those owners.
 
-This plan starts from `a878d72d37ed86fd0cb3a3b78924a1221ce0135a`. Agentrouter is
-currently a private package under `packages/agentrouter`; this change does not
-publish it or activate a provider backend.
+This plan starts from `a878d72d37ed86fd0cb3a3b78924a1221ce0135a`. AgentMixer now
+lives in the standalone `hraness/agentmixer` repository as the published
+`@hraness/agentmixer` package; `agentmixer/` paths below refer to that
+repository's layout. This change does not activate a provider backend.
 
 ## Invariants
 
@@ -36,12 +37,12 @@ publish it or activate a provider backend.
 Implemented and independently reviewed source; repository integration remains
 pending:
 
-- `packages/agentrouter/src/process-port.ts` declares an in-memory
+- `agentmixer/src/process-port.ts` declares an in-memory
   `ProviderProcessPort`: readiness, root observation, exact native settlement,
   operation completion, bounded backend byte streams, explicit write outcomes,
   input closure and synchronous stop fences. It is not another wire protocol,
   launch API, runtime qualification or saved-PID signaling API.
-- `packages/agentrouter/src/codex-account-process.ts` binds that port to the
+- `agentmixer/src/codex-account-process.ts` binds that port to the
   existing account controller. It preserves native settlement independently of
   delivery success and joins delivery before reporting successful operation
   completion. Matching native `not-started` evidence needs no invented root
@@ -51,12 +52,12 @@ pending:
   each host write. An immutable binding alone cannot establish current authority.
   Rejected or asynchronous checks admit no bytes; any accidentally started
   promise remains owned until settlement. Late readiness after stop rejects.
-- `packages/agentrouter/src/codex-account-transport.ts` consumes explicit byte
+- `agentmixer/src/codex-account-transport.ts` consumes explicit byte
   outcomes instead of Node writable callbacks. RPC success requires both the
   matched response and full write acceptance within the caller's deadline.
   Failed or uncertain writes close admission. Node `end`/`close` settle local
   consumer work; only the injected host receipt proves native EOF.
-- `packages/agentrouter/src/codex-account.ts` publishes its shared close attempt
+- `agentmixer/src/codex-account.ts` publishes its shared close attempt
   before synchronously aborting the active request. Reentrant cleanup remains
   single-owned and an already queued write cannot run before that invalidation.
 - Synthetic tests cover pre-readiness cancellation, stale invocation and account
@@ -200,8 +201,8 @@ not establish shared artifact installation or live runtime qualification.
 Worker checks for phase 1 use synthetic streams only:
 
 ```sh
-bun test packages/agentrouter/test/codex-account-process.test.ts packages/agentrouter/test/codex-account-transport.test.ts packages/agentrouter/test/codex-account.test.ts
-bun x --no-install tsc --noEmit -p packages/agentrouter/tsconfig.json
+bun test agentmixer/test/codex-account-process.test.ts agentmixer/test/codex-account-transport.test.ts agentmixer/test/codex-account.test.ts
+bun x --no-install tsc --noEmit -p agentmixer/tsconfig.json
 git diff --check
 ```
 

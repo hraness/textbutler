@@ -79,7 +79,7 @@ async function serviceFixture(f: ReturnType<typeof fixture>, selection?: Provide
     prices: { observedAt: Date.now(), models: [{ id: "synthetic-model", inputUsdPerMillion: 1, outputUsdPerMillion: 2, classifierEligible: true }] } },
     { id: "synthetic-managed", label: "Synthetic managed account", route: "codex" }] });
   const service = await TextbutlerControlService.open({ dataDir, automation: f.port, providers: leases => ({ ...createProviderHost({ dataDir, config, leases }),
-    selection: selection ?? (async () => ({ qualification: { status: "qualified", profile: "agentrouter.scoped-tools.v1", runtimeVersion: "synthetic-control-fixture", runtimeDigest: "1".repeat(64), evidenceDigest: "2".repeat(64), expiresAt: Date.now() + 60_000,
+    selection: selection ?? (async () => ({ qualification: { status: "qualified", profile: "agentmixer.scoped-tools.v1", runtimeVersion: "synthetic-control-fixture", runtimeDigest: "1".repeat(64), evidenceDigest: "2".repeat(64), expiresAt: Date.now() + 60_000,
       controls: { noCommandTools: true, exactToolInventory: true, contactReadIsolation: true, contactWriteIsolation: true, isolatedConfiguration: true, authOutsideWorkspace: true, hostBrokerOnly: true } },
       defaultReplyModel: "synthetic-model", modelCatalog: syntheticModels("claude") })),
   }) }); services.push(service);

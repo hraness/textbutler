@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { parseActionIntent, type ActionIntent, type TextbutlerTransport } from "../../transport/src/index.ts";
-import { parseClassification } from "../../agentrouter/src/models.ts";
+import { parseClassification } from "@hraness/agentmixer";
 import { disclose, parseSettings, type ContactSettings, type Settings } from "./config.ts";
 import { decideReply, type ConversationState, type MessageEvent } from "./decision.ts";
 import { Hooks, type HookContext } from "./hooks.ts";

@@ -1,7 +1,7 @@
-import { BROKER_TOOL_NAMES, type ToolBroker } from "../../agentrouter/src/broker.ts";
-import { brokerDescriptors } from "../../agentrouter/src/broker-descriptors.ts";
+import { BROKER_TOOL_NAMES, type ToolBroker } from "@hraness/agentmixer";
+import { brokerDescriptors } from "@hraness/agentmixer";
 import { createCapabilityBroker, createCapabilityProfile, type CapabilityBroker, type CapabilityContext, type CapabilityJson,
-  type CapabilityProfileIdentity } from "../../agentrouter/src/capabilities.ts";
+  type CapabilityProfileIdentity } from "@hraness/agentmixer";
 
 export type ButlerPurpose = "classify" | "respond";
 function profile(purpose: ButlerPurpose, execute: (name: string, input: CapabilityJson, context: CapabilityContext) => Promise<unknown>) {

@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { createManagedCodexAccountController, type CodexAccountTransport, type CodexManagedLoginMethod } from "../../agentrouter/src/codex-account.ts";
-import { createCodexAccountStdioTransport, type CodexAccountProcessPort } from "../../agentrouter/src/codex-account-transport.ts";
-import { createCodexAccountProcess, type CodexAccountDeviceCodeAdmission, type CodexAccountProcessOptions, type CodexAccountRuntimeAdmission } from "../../agentrouter/src/codex-account-process.ts";
-import { identifier } from "../../agentrouter/src/validation.ts";
+import { createManagedCodexAccountController, type CodexAccountTransport, type CodexManagedLoginMethod } from "@hraness/agentmixer";
+import { createCodexAccountStdioTransport, type CodexAccountProcessPort } from "@hraness/agentmixer";
+import { createCodexAccountProcess, type CodexAccountDeviceCodeAdmission, type CodexAccountProcessOptions, type CodexAccountRuntimeAdmission } from "@hraness/agentmixer";
+import { identifier } from "@hraness/agentmixer";
 import type { ManagedCodexAccountFactory } from "./provider-host.ts";
 
 export type ManagedCodexFactoryOptions = Readonly<{

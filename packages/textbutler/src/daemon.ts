@@ -11,7 +11,7 @@ import { createGhostgetOwnerReadPort } from "./ghostget-owner-read.ts";
 import type { OwnerConversationReadPort } from "./enrollment.ts";
 import { DaemonCustody } from "./daemon-custody.ts";
 import { createProviderHost, type ManagedCodexAccountFactory } from "./provider-host.ts";
-import type { ClaudeApiAdapterOptions } from "../../agentrouter/src/claude-api.ts";
+import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
 import { createGhostgetAutomationProcess } from "./ghostget-automation-process.ts";
 import { createAutomationOwnerPort } from "./automation-owner.ts";
 import { createDaemonReplyLoop } from "./reply-loop.ts";

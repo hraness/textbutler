@@ -13,8 +13,7 @@ const MAXIMUM_GIT_OUTPUT_BYTES = 256 * 1_024;
 const GIT_TIMEOUT_MILLISECONDS = 120_000;
 const SHA = /^[0-9a-f]{40}$/u;
 const STABLE_TAG = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
-const SCOPED_STABLE_TAG = /^agentrouter-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
-const TAG_REF = /^refs\/tags\/((?:agentrouter-v|v)[A-Za-z0-9][A-Za-z0-9._-]{0,126})$/u;
+const TAG_REF = /^refs\/tags\/(v[A-Za-z0-9][A-Za-z0-9._-]{0,126})$/u;
 
 export type GitCommandResult = Readonly<{
   exitCode: number;
@@ -144,17 +143,15 @@ function validTagRef(ref: string): boolean {
 
 type StableVersion = Readonly<{ namespace: string; version: readonly [bigint, bigint, bigint] }>;
 
-/** A release tag carries one governed namespace: "v" for the root package or
- * "agentrouter-v" for AgentRouter. Newest-tag admission compares only within
- * the requested tag's own namespace so the two release cadences stay disjoint. */
+/** A release tag carries the governed "v" namespace. Newest-tag admission
+ * compares only within the requested tag's own namespace. */
 function stableVersion(tag: string): StableVersion | undefined {
-  const grammar = tag.startsWith("agentrouter-v") ? SCOPED_STABLE_TAG : STABLE_TAG;
-  const match = grammar.exec(tag);
+  const match = STABLE_TAG.exec(tag);
   if (match === null || match[1] === undefined || match[2] === undefined || match[3] === undefined) {
     return undefined;
   }
   return Object.freeze({
-    namespace: tag.startsWith("agentrouter-v") ? "agentrouter-v" : "v",
+    namespace: "v",
     version: Object.freeze([BigInt(match[1]), BigInt(match[2]), BigInt(match[3])]) as readonly [bigint, bigint, bigint],
   });
 }

@@ -90,7 +90,7 @@ const repository = requireEnvironment("GITHUB_REPOSITORY");
 if (repository !== publicRepository) throw new Error(`Public release admission must run in ${publicRepository}.`);
 const token = requireEnvironment("GITHUB_TOKEN");
 const verifiedSha = requireEnvironment("VERIFIED_SHA", /^[0-9a-f]{40}$/u);
-const verifiedTag = requireEnvironment("VERIFIED_TAG", /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u);
+const verifiedTag = requireEnvironment("VERIFIED_TAG", /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u);
 const [manifestArgument, extraArgument] = process.argv.slice(2);
 if (extraArgument !== undefined) throw new Error("Usage: check-public-release.ts [MANIFEST.json]");
 const releaseManifest = JSON.parse(

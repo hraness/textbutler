@@ -45,7 +45,7 @@ const SCANNED_ROOT_FILES = [
 const IGNORED_NAMES = new Set([".git", "node_modules"]);
 // Generated pack-time output; it is compiled from already-scanned sources and absent in a
 // clean checkout, so scanning it would only feed hand-tuned source regexes build artifacts.
-const IGNORED_PATHS = new Set(["packages/agentrouter/dist"]);
+const IGNORED_PATHS = new Set<string>([]);
 const DATABASE_EXTENSIONS = new Set([".db", ".sqlite", ".sqlite3"]);
 const NON_BUN_SCRIPT_EXTENSIONS = new Set(["." + "p" + "y", "." + "p" + "yc", "." + "p" + "yo"]);
 const NON_BUN_CACHE_DIRECTORY = ["__", "py", "cache__"].join("");

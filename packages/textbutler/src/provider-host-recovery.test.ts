@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createManagedCodexAccountController, type CodexAccountCloseReceipt, type CodexAccountRequest } from "../../agentrouter/src/codex-account.ts";
+import { createManagedCodexAccountController, type CodexAccountCloseReceipt, type CodexAccountRequest } from "@hraness/agentmixer";
 import { createProviderHost } from "./provider-host.ts";
 import { RunJournal } from "./journal.ts";
 
