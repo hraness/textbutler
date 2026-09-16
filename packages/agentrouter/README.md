@@ -348,6 +348,41 @@ port. Account sign-in and product-provider terms need separate qualification;
 [Anthropic's SDK overview](https://code.claude.com/docs/en/agent-sdk/overview) directs
 third-party product integrations to supported API authentication unless approved.
 
+## Gobstopper preset command shim
+
+`src/gobstopper-editor.ts` is a source-checkout executable that backs
+gobstopper's `agentic` compaction strategy through `runAgentTask()`. It reads
+the normalized transcript JSON a `preset.command` receives on stdin, presents a
+fixed `keep`/`elide`/`summarize`/`defer` capability profile to the cheapest
+`selectClassifierModel()`-eligible Claude model through a bounded Messages-API
+task adapter, and writes `{"edits": [...], "context_tokens_after": n}` on
+stdout — the exact `Edit` wire shape gobstopper parses. Diagnostics go to
+stderr; a nonzero exit marks failure. The shim lives in `src/` only: it is a
+host integration tool, not part of the packed `dist` contract.
+
+```toml
+[presets.agentrouter]
+strategy = "agentic"
+command = "bun /path/to/packages/agentrouter/src/gobstopper-editor.ts"
+```
+
+The editor tools only record the model's calls through the capability broker;
+there is no filesystem, shell or network tool surface. Recorded calls lower to
+`Edit` objects with `calls_to_plan` semantics: elide positions map through
+`items[i].line_index` for elidable items only, summarize injects a digest,
+keep is advisory, and any defer emits an empty edit list. A protected tail of
+the last eight items (`GOBSTOPPER_EDITOR_PROTECT_TAIL`) is never touched.
+Account custody uses a per-process SQLite lease store; no cross-process
+account coordination is claimed.
+
+Authentication needs a bound Anthropic API key — `ANTHROPIC_API_KEY` by
+default, another variable via `GOBSTOPPER_EDITOR_KEY_ENV`, or an owner file via
+`GOBSTOPPER_EDITOR_KEY_DIRECTORY`. Model choice comes from a fresh
+host-observed catalog: `GOBSTOPPER_EDITOR_MODEL_CATALOG` points at a
+ModelCatalog JSON, otherwise live Models discovery runs against the built-in
+list prices (overridable via `GOBSTOPPER_EDITOR_PRICES`). `--dry-run`
+validates stdin and prints an empty plan without provider work.
+
 `createCodexTaskAdapter()` is the relay-backed task adapter for application
 capability profiles. It requires a host `CodexResponsesUpstream`; selecting a
 subscription route does not provide subscription authentication. It maps the
