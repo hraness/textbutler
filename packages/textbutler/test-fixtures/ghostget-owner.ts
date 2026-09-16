@@ -5,7 +5,7 @@ import { join } from "node:path";
 const args = process.argv.slice(2), operation = args[2], authId = args[args.indexOf("--auth") + 1];
 const input = JSON.parse(await Bun.stdin.text());
 const directory = process.env.GHOSTGET_STATE_HOME!;
-appendFileSync(join(directory, "calls.jsonl"), JSON.stringify({ args, input, runtimeArgs: process.execArgv }) + "\n", { mode: 0o600 });
+appendFileSync(join(directory, "calls.jsonl"), JSON.stringify({ args, input, runtimeArgs: process.execArgv, supportAudience: process.env.HRANESS_SUPPORT_AUDIENCE, supportEmail: process.env.HRANESS_SUPPORT_EMAIL }) + "\n", { mode: 0o600 });
 if (authId === "slow") {
   // Acknowledge the completed call record before a test interrupts this process.
   writeFileSync(join(directory, "slow-ready"), "ready\n", { mode: 0o600 });
