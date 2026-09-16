@@ -10,7 +10,7 @@ The source includes the owner daemon, contact reply loop, versioned Ghostget aut
 flowchart LR
   Menu[Menu companion] --> Control[Owner-only control socket]
   Control --> Butler[Textbutler daemon]
-  Butler --> Router[Agentrouter]
+  Butler --> Router[AgentMixer]
   Router --> Provider[Admitted agent provider]
   Provider --> Tools[Contact-bound tool broker]
   Tools --> Memory[One contact workspace]
@@ -22,7 +22,7 @@ flowchart LR
   Ghostget --> Messages[iMessage and WhatsApp]
 ```
 
-Ghostget owns native permissions, message and contact acquisition, provider actions, and receipts. Textbutler does not open chat.db or automate Messages directly. Agentrouter owns provider selection, shared-account leases, cancellation, model catalogs, qualification evidence, and a bounded tool interface. Textbutler owns conversation policy and the durable send transaction. The menu companion changes owner settings through a small local protocol; it never gives a model arbitrary local commands.
+Ghostget owns native permissions, message and contact acquisition, provider actions, and receipts. Textbutler does not open chat.db or automate Messages directly. AgentMixer owns provider selection, shared-account leases, cancellation, model catalogs, qualification evidence, and a bounded tool interface. Textbutler owns conversation policy and the durable send transaction. The menu companion changes owner settings through a small local protocol; it never gives a model arbitrary local commands.
 
 The background lifecycle uses a user LaunchAgent: native messaging belongs to the signed-in Mac user, and login persistence is independent of the menu companion. Installation records the exact runtime, entrypoint, data directory and generation; removal verifies its private receipt and loaded service identity. Uninstall preserves contact data. New settings start paused. A private SQLite custody lock prevents duplicate daemon ownership and permits recovery only for a dead recorded process and its exact unserved socket. A temporary live launchd install/start/uninstall test passed while preserving synthetic owner data. The CLI companion is the supported release path; desktop app packaging has been removed; the CLI companion is the only local runtime surface.
 
@@ -98,19 +98,19 @@ Executable extensions are application code with the daemon's trust. They are ins
 
 The daemon reads a bounded private `plugins/extensions.json` manifest and preflights its complete inventory before importing listed TypeScript/JavaScript entry modules. Each default export must match the manifest ID/version and known hook names. Source digests appear in the loaded extension metadata. No directory scanning, package installation or hot reload occurs; changes require a full daemon process restart. The routed agent emits `memory.updated` only after a successful conditional write, with its path and committed revision. A notification failure does not undo that write or replay it.
 
-## Agentrouter
+## AgentMixer
 
-Agentrouter begins as an MIT-licensed source package independent of Textbutler's product model. Its account lease coordinates the selected provider account without embedding credentials in a contact workspace. Credential resolvers remain trusted host services. A lease cannot be stolen merely because its time elapsed while a process might still be alive.
+AgentMixer begins as an MIT-licensed source package independent of Textbutler's product model. Its account lease coordinates the selected provider account without embedding credentials in a contact workspace. Credential resolvers remain trusted host services. A lease cannot be stolen merely because its time elapsed while a process might still be alive.
 
 Provider adapters declare observed, exact-version qualification. A launch plan is not proof of a sandbox. Codex's shell-disable setting and Claude's exact tool list are useful inputs, but an adapter is not admitted until attempted shell/process calls, host file reads, inherited MCP/plugin configuration, auth-file access, alternate agents, and additional workspaces are demonstrably blocked. No bypass-permissions mode is acceptable.
 
-The source implements a pinned Claude Agent SDK adapter with explicit API-key account binding, a private verified executable snapshot, isolated runtime directories, no built-in tools or inherited settings, broker-only MCP, bounded raw output, and joined process-group termination. Its production gate requires independent qualification of the exact executable and SDK identity. Synthetic protocol and native-runtime fixtures do not activate it. The experimental Codex app-server driver verifies each model request's tool inventory through a host relay and keeps contact storage outside native scratch. It has no live account transport or production registration; native confinement and adversarial custody qualification remain incomplete. See the [Agentrouter implementation and evidence](../../packages/agentrouter/README.md).
+The source implements a pinned Claude Agent SDK adapter with explicit API-key account binding, a private verified executable snapshot, isolated runtime directories, no built-in tools or inherited settings, broker-only MCP, bounded raw output, and joined process-group termination. Its production gate requires independent qualification of the exact executable and SDK identity. Synthetic protocol and native-runtime fixtures do not activate it. The experimental Codex app-server driver verifies each model request's tool inventory through a host relay and keeps contact storage outside native scratch. It has no live account transport or production registration; native confinement and adversarial custody qualification remain incomplete. See the [AgentMixer implementation and evidence](https://github.com/hraness/agentmixer#readme).
 
 A separately selected Claude API adapter executes the bounded tool loop in the trusted host. It exposes only the six broker tools and never starts a model-selected process. Account checks bind the actual packaged runtime and private credential generation; replacing a credential invalidates old discovery and running account work. Fresh model availability and price metadata select a cheap classifier. This explicit API choice does not silently replace Claude Code or Codex and does not use their subscription authentication.
 
 The model receives a fixed contact/workspace identity and a fixed run ID. File operations are brokered and conditional. Public web requests are separately bounded and must not reach loopback, private networks, local sockets, or cloud metadata through DNS or redirects. Message tools stage recipient-free intents for the one conversation. Unknown tool names and unknown input fields fail. Credential/account services are never model tools.
 
-Oompa's existing runtime provider port and account/process-custody patterns are source references. Its ordinary workspace-write execution profile is not the requested contact-only sandbox. AI Charts is a prospective second consumer. Do not migrate either product to Agentrouter until an adapter has equivalent feature and recovery evidence; avoid changing their active work in this redesign.
+Oompa's existing runtime provider port and account/process-custody patterns are source references. Its ordinary workspace-write execution profile is not the requested contact-only sandbox. AI Charts is a prospective second consumer. Do not migrate either product to AgentMixer until an adapter has equivalent feature and recovery evidence; avoid changing their active work in this redesign.
 
 ## Ghostget contract and rich features
 

@@ -41,7 +41,7 @@ do not require a signed Mac release; windowed desktop app packaging has been rem
   no account or message reads occur just by loading configuration.
 - `provider-host.ts`: explicit account selection, current model availability,
   credential generation fencing, shared account leases, and optional trusted
-  [managed Codex account controls](../agentrouter/MANAGED-CODEX.md). Its managed
+  [managed Codex account controls](https://github.com/hraness/agentmixer/blob/main/MANAGED-CODEX.md). Its managed
   task entry joins the exact account controller before the runtime acquires one
   task lease; owner operations remain busy through task cleanup. Pending sign-in
   cannot be canceled by a reply, and uncertain cleanup retains recovery state.

@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { createManagedCodexAccountController, type CodexAccountBinding, type CodexAccountEvent, type CodexAccountRequest } from "../../agentrouter/src/codex-account.ts";
+import { createManagedCodexAccountController, type CodexAccountBinding, type CodexAccountEvent, type CodexAccountRequest } from "@hraness/agentmixer";
 import { CONTROL_PROTOCOL as protocol, parseControlResponse, type ControlResponse } from "../../control/src/index.ts";
 import { createProviderHost } from "./provider-host.ts";
 import { TextbutlerControlService, parseControlRequest } from "./control-service.ts";

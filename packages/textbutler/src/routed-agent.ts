@@ -1,18 +1,18 @@
 import { basename } from "node:path";
-import { AgentRouter, assertQualified, type RuntimeQualification } from "../../agentrouter/src/runtime.ts";
-import { createPublicWeb } from "../../agentrouter/src/public-web.ts";
-import { createToolBroker, type PublicWeb } from "../../agentrouter/src/broker.ts";
-import { selectClassifierModel, type ModelCatalog } from "../../agentrouter/src/models.ts";
+import { AgentMixer, assertQualified, type RuntimeQualification } from "@hraness/agentmixer";
+import { createPublicWeb } from "@hraness/agentmixer";
+import { createToolBroker, type PublicWeb } from "@hraness/agentmixer";
+import { selectClassifierModel, type ModelCatalog } from "@hraness/agentmixer";
 import { parseActionIntent, type ActionIntent } from "../../transport/src/index.ts";
 import type { ContactSettings } from "./config.ts";
 import { CLASSIFIER_INSTRUCTIONS } from "./decision.ts";
 import type { AgentRequest, ButlerAgent } from "./runtime.ts";
 import { CONTACT_GUIDANCE, ContactWorkspace } from "./workspace.ts";
 import type { Hooks } from "./hooks.ts";
-import type { CapabilityBroker } from "../../agentrouter/src/capabilities.ts";
-import type { AgentTaskRequest, AgentTaskResult, AgentTaskRoute, TaskRuntimeQualification } from "../../agentrouter/src/task-runtime.ts";
+import type { CapabilityBroker } from "@hraness/agentmixer";
+import type { AgentTaskRequest, AgentTaskResult, AgentTaskRoute, TaskRuntimeQualification } from "@hraness/agentmixer";
 import { contactCapabilityIdentity, createContactCapabilityBroker, type ButlerPurpose } from "./contact-capabilities.ts";
-import { boundedText, identifier } from "../../agentrouter/src/validation.ts";
+import { boundedText, identifier } from "@hraness/agentmixer";
 
 type SelectionModels = Readonly<{ modelCatalog: ModelCatalog; defaultReplyModel: string }>;
 export type ProviderSelection = SelectionModels & (Readonly<{ kind?: "legacy"; qualification: RuntimeQualification }>
@@ -21,7 +21,7 @@ const TASK_LIMITS = Object.freeze({ maxRunMs: 120_000, maxCleanupMs: 15_000, max
 const TASK_CONTROLS = ["noCommandTools", "exactToolInventory", "workspaceReadIsolation", "workspaceWriteIsolation",
   "isolatedConfiguration", "authOutsideWorkspace", "hostBrokerOnly"] as const;
 export type RoutedAgentOptions = Readonly<{
-  router: AgentRouter;
+  router: AgentMixer;
   selection: (contact: ContactSettings, purpose: ButlerPurpose) => Promise<ProviderSelection>;
   /** Trusted host owns account handoff and calls the existing runTask admission. */
   runManagedTask?: (request: AgentTaskRequest, broker: CapabilityBroker) => Promise<AgentTaskResult>;

@@ -398,107 +398,6 @@ test("tag releases use annotated-tag authority and split exact GitHub-first and 
   expect(npmPublish).toBeGreaterThan(githubPublish);
 });
 
-test("agentrouter tag releases bind the agentrouter namespace, manifest, writers, and smoke", async () => {
-  const workflow = await readFile(join(WORKFLOWS, "release-agentrouter.yml"), "utf8");
-
-  for (const required of [
-    'tags:\n      - "agentrouter-v*"',
-    "permissions:\n  contents: read",
-    "group: stable-release",
-    "cancel-in-progress: false",
-    "ref: refs/tags/${{ steps.request.outputs.tag }}",
-    "refs/tags/$EVENT_REF_NAME",
-    "^agentrouter-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
-    'node --experimental-strip-types ./scripts/release-ref-authority.ts release "$REQUESTED_TAG"',
-    'Bun.file("packages/agentrouter/package.json")',
-    'expected_tag="agentrouter-v$package_version"',
-    "bun run ./scripts/build-agentrouter-dist.ts",
-    "npm pack --ignore-scripts --pack-destination artifacts ./packages/agentrouter",
-    "release-artifact-checksum.ts write artifacts/*.tgz artifacts/SHA256SUMS",
-    "release-artifact-checksum.ts check artifacts/*.tgz artifacts/SHA256SUMS",
-    "agentrouter-package-smoke.ts artifacts/*.tgz",
-    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-    "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
-    "name: agentrouter-release-${{ github.run_attempt }}",
-    "name: agentrouter-release-writer-${{ github.run_attempt }}",
-    "name: agentrouter-github-release-writer-${{ github.run_attempt }}",
-    "retention-days: 30",
-    "Stage exact dependency-free release writers from reviewed source",
-    'npm_writer_root="$(mktemp -d "$RUNNER_TEMP/agentrouter-npm-writer.XXXXXX")"',
-    'github_writer_root="$(mktemp -d "$RUNNER_TEMP/agentrouter-github-writer.XXXXXX")"',
-    "install -m 0600 -- packages/agentrouter/package.json",
-    "Release writer closure is not the exact regular-file allowlist",
-    "expected_npm_writer_inventory=$'package.json\\tf\\nscripts\\td\\nscripts/check-npm-trusted-publishing.ts\\tf\\nscripts/npm-release-policy.ts\\tf\\nscripts/publish-npm-release.ts\\tf\\nscripts/release-artifact-checksum.ts\\tf\\nscripts/release-distribution-policy.ts\\tf\\nscripts/release-process-environment.ts\\tf'",
-    "expected_github_writer_inventory=$'package.json\\tf\\nscripts\\td\\nscripts/publish-github-release.ts\\tf\\nscripts/release-artifact-checksum.ts\\tf\\nscripts/release-distribution-policy.ts\\tf\\nscripts/release-included-response.ts\\tf\\nscripts/release-process-environment.ts\\tf\\nscripts/release-ref-authority.ts\\tf'",
-    "artifact-ids: ${{ needs.verify.outputs.release_artifact_id }}",
-    "artifact-ids: ${{ needs.verify.outputs.github_writer_artifact_id }}",
-    "Release artifact has no exact immutable identity",
-    "verify:",
-    "exact_artifact:",
-    "matrix:\n        os: [ubuntu-24.04, macos-15]",
-    "publish_github:",
-    "name: Publish immutable GitHub Release",
-    "pre_npm:",
-    "name: Admit immutable GitHub bytes and npm retry state",
-    "publish_npm:",
-    "name: Publish exact npm package through OIDC only",
-    "admit:",
-    "name: Admit exact public npm and GitHub distributions",
-    "contents: write",
-    "id-token: write",
-    "contents: none",
-    "check-github-release.ts artifacts/*.tgz artifacts/SHA256SUMS packages/agentrouter/package.json",
-    "check-npm-retry-state.ts artifacts/*.tgz packages/agentrouter/package.json",
-    "check-public-release.ts packages/agentrouter/package.json",
-    "writer/scripts/publish-npm-release.ts artifacts/*.tgz",
-    "github-release-writer/scripts/publish-github-release.ts \"$VERIFIED_TAG\" artifacts/*.tgz artifacts/SHA256SUMS",
-    "Install the pinned Sigstore verifier",
-  ] as const) {
-    expect(workflow).toContain(required);
-  }
-
-  // The agentrouter channel has no site, fixture, or committed-dist coupling.
-  for (const absent of [
-    "workflow_dispatch:",
-    "pull_request:",
-    "environment:",
-    "create-github-app-token",
-    "MLM_RELEASE_APP_PRIVATE_KEY",
-    "working-directory: site",
-    "sync:readme",
-    "site_version",
-    "./scripts/package-smoke.ts",
-    "imessage.test.ts",
-    "/commits/tags/",
-    "--clobber",
-    "fetch-depth: 0",
-    "git fetch --force",
-    "git tag --list",
-  ] as const) {
-    expect(workflow).not.toContain(absent);
-  }
-  expect(workflow.match(/contents: write/gu)).toHaveLength(1);
-  expect(workflow.match(/id-token: write/gu)).toHaveLength(1);
-  const githubWriter = workflow.slice(
-    workflow.indexOf("\n  publish_github:\n"),
-    workflow.indexOf("\n  pre_npm:\n"),
-  );
-  const npmWriter = workflow.slice(
-    workflow.indexOf("\n  publish_npm:\n"),
-    workflow.indexOf("\n  admit:\n"),
-  );
-  const finalAdmission = workflow.slice(workflow.indexOf("\n  admit:\n"));
-  expect(githubWriter).toContain("contents: write");
-  expect(githubWriter).not.toContain("id-token: write");
-  expect(githubWriter).not.toContain("actions/checkout");
-  expect(githubWriter).toContain("GH_TOKEN: ${{ github.token }}");
-  expect(npmWriter).toContain("contents: none");
-  expect(npmWriter).toContain("id-token: write");
-  expect(npmWriter).not.toContain("actions/checkout");
-  expect(npmWriter).not.toContain("GH_TOKEN");
-  expect(finalAdmission).toContain("needs.publish_npm.outputs.npm_completion_run_attempt");
-});
-
 test("site promotion gates complete workflow history before App attestation and a leased workflow-token move", async () => {
   const [
     completeWorkflow,
@@ -914,8 +813,6 @@ test("workflow changes have one explicit code owner", async () => {
   expect(value).toBe(
     "/.github/workflows/** @0thernet\n" +
     "/.github/CODEOWNERS @0thernet\n" +
-    "/scripts/agentrouter-package-smoke.ts @0thernet\n" +
-    "/scripts/build-agentrouter-dist.ts @0thernet\n" +
     "/scripts/check-github-release.ts @0thernet\n" +
     "/scripts/check-npm-retry-state.ts @0thernet\n" +
     "/scripts/check-npm-trusted-publishing.ts @0thernet\n" +
@@ -929,7 +826,6 @@ test("workflow changes have one explicit code owner", async () => {
     "/scripts/site-production* @0thernet\n" +
     "/docs/publishing.md @0thernet\n" +
     "/package.json @0thernet\n" +
-    "/packages/agentrouter/package.json @0thernet\n" +
     "/bun.lock @0thernet\n",
   );
 });

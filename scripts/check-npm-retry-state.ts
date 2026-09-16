@@ -138,7 +138,7 @@ if (release === null) {
     verifiedSha: required("VERIFIED_SHA", /^[0-9a-f]{40}$/u),
     verifiedTag: required(
       "VERIFIED_TAG",
-      /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u,
+      /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u,
     ),
     version: manifest.version,
   });
