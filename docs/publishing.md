@@ -72,10 +72,12 @@ existing GitHub Apps, rulesets, protected refs, status contexts, environment
 reviewers, workflow IDs, Vercel project, and production branch unchanged. The
 canonical source identity for new release and promotion runs is
 `hraness/textbutler`; an old-name redirect is not authority for a new run.
-The npm names `@hraness/message-like-me` and `@hraness/agentrouter`, their tag
-namespaces, the `messagelikeme` command, wire schemas, and historical release
-receipts remain unchanged. Do not rewrite an existing tag, npm version, or
-provenance statement.
+The npm name `@hraness/message-like-me`, its tag namespace, the
+`messagelikeme` command, wire schemas, and historical release receipts remain
+unchanged. `@hraness/agentmixer` publishes independently from the
+`hraness/agentmixer` repository under its own `v*` tag namespace; this
+repository consumes it only as a pinned immutable release artifact. Do not
+rewrite an existing tag, npm version, or provenance statement.
 
 Merge this version-neutral control migration independently before the next
 product/version change. Refresh the complete administrative controls census
@@ -114,32 +116,15 @@ denial, expected-old lease, and provider readback are machine gates. An agent
 may perform the independent review and exact dispatch required for a changed
 workflow-control epoch; that review precedes dispatch.
 
-## AgentRouter package publication
+## AgentMixer package consumption
 
-`@hraness/agentrouter` publishes through its own tag namespace and its own
-tag-triggered workflow, `release-agentrouter.yml`, mirroring the root Release
-contract. An annotated `agentrouter-v<version>` tag on a reviewed `main`
-ancestor runs the same verify → exact-artifact → immutable GitHub Release →
-read-only retry admission → OIDC-only npm writer → final public admission
-chain, with the AgentRouter package manifest, tarball name, tag prefix, and
-workflow path bound through the shared closed release-package descriptor. Both
-release workflows share concurrency group `stable-release`, so a root and an
-AgentRouter release can never interleave their GitHub Latest assertions. The
-AgentRouter channel has no site or production-promotion coupling; its releases
-distribute the package only.
-
-Owner-side controls required once before the first AgentRouter tag:
-
-- Extend the immutable-tag ruleset coverage to `refs/tags/agentrouter-v*` with
-  the same update and deletion restrictions and no bypass actors as the
-  existing `refs/tags/v*` scope.
-- Ensure `@hraness/agentrouter` exists publicly under the Hraness npm scope,
-  then configure its sole trusted publisher as GitHub Actions repository
-  `hraness/textbutler`, workflow file `release-agentrouter.yml`. Require
-  the exact permission set `createPackage` plus npm's provider-imposed
-  `createStagedPackage`, and keep the staged-package inventory exactly empty.
-  Once trusted publishing is proven, disallow traditional token publication
-  for the package.
+`@hraness/agentmixer` is published independently from the `hraness/agentmixer`
+repository; its tag namespace, release workflow, provenance identity, and npm
+trusted publisher live there and are governed by that repository's runbook.
+This repository consumes it only as a pinned, immutable GitHub Release
+tarball. Upgrading the pin is a reviewed `package.json`/`bun.lock` change
+against an already-admitted upstream release; it never re-runs, rewrites, or
+co-signs an upstream release.
 
 ## Establish the production controls once
 

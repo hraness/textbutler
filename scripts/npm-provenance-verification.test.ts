@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import { parseVerifiedNpmProvenance } from "./npm-provenance-verification";
 import {
-  agentrouterReleasePackage,
   rootReleasePackage,
   type ReleasePackage,
 } from "./release-distribution-policy";
@@ -162,27 +161,14 @@ describe("npm provenance verification policy", () => {
     expect(() => parseVerifiedNpmProvenance(wrongCommit, coordinate)).toThrow("reviewed Git commit");
   });
 
-  test("binds the agentrouter descriptor to its own tag namespace and workflow", () => {
-    const agentrouterCoordinate = Object.freeze({
-      releasePackage: agentrouterReleasePackage,
-      sha512,
-      verifiedSha,
+  test("rejects the former scoped release tag in a coordinate", () => {
+    expect(() => parseVerifiedNpmProvenance(audit(), {
+      ...coordinate,
       verifiedTag: `agentrouter-v${version}`,
-      version,
-    });
-    const agentrouterAudit = audit(
-      {},
-      "https://github.com/hraness/textbutler/actions/runs/123/attempts/3",
-      agentrouterReleasePackage,
-    );
-    expect(() => parseVerifiedNpmProvenance(agentrouterAudit, agentrouterCoordinate)).not.toThrow();
-    expect(() => parseVerifiedNpmProvenance(agentrouterAudit, coordinate))
-      .toThrow("exactly one provenance-bearing release package");
-    expect(() => parseVerifiedNpmProvenance(audit(), agentrouterCoordinate))
-      .toThrow("exactly one provenance-bearing release package");
-    expect(() => parseVerifiedNpmProvenance(agentrouterAudit, {
-      ...agentrouterCoordinate,
-      verifiedTag,
+    })).toThrow("coordinate is invalid");
+    expect(() => parseVerifiedNpmProvenance(audit(), {
+      ...coordinate,
+      verifiedTag: `agentmixer-v${version}`,
     })).toThrow("coordinate is invalid");
   });
 

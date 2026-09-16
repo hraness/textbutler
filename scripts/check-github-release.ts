@@ -93,7 +93,7 @@ const token = required("GITHUB_TOKEN");
 const verifiedSha = required("VERIFIED_SHA", /^[0-9a-f]{40}$/u);
 const verifiedTag = required(
   "VERIFIED_TAG",
-  /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u,
+  /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u,
 );
 const branch = required("DEFAULT_BRANCH", /^[A-Za-z0-9._/-]+$/u);
 const tarballPath = resolve(tarballArgument);

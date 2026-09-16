@@ -15,7 +15,7 @@ owner-selected Ghostget conversation enrollment, optional history
 initialization, private memory, executable hooks, reply policy and send journal.
 The supported local surface is the `textbutler` CLI plus its native menu-bar
 companion. It runs from a prebuilt binary and does not require an app bundle,
-signing, notarization, or a download manager. Agentrouter includes a
+signing, notarization, or a download manager. AgentMixer includes a
 restricted Claude Agent SDK adapter and shared account custody. Live automated
 replies remain unavailable until Ghostget's durable events and scoped
 automation grants, and the provider's contact-only execution, are qualified.
@@ -28,7 +28,7 @@ first start; nothing compiles source or opens a windowed application.
 
 Start with the [architecture and capability status](docs/textbutler/architecture.md),
 [Textbutler runtime](packages/textbutler/README.md),
-[Agentrouter](packages/agentrouter/README.md),
+[AgentMixer](https://github.com/hraness/agentmixer#readme),
 [transport adapter](packages/transport/README.md), or the
 [menu companion adapter](packages/textbutler/src/menubar.ts).
 
