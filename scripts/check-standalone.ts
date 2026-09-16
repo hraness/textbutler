@@ -26,18 +26,11 @@ const SCANNED_DIRECTORIES = [
   "skills",
   "src",
   "packages",
-  "apps/macos/scripts",
-  "apps/macos/tests",
 ] as const;
 const SCANNED_ROOT_FILES = [
   ".gitignore",
   "AGENTS.md",
   "PRODUCT.md",
-  "Package.swift",
-  "apps/macos/package.json",
-  "apps/macos/README.md",
-  "apps/macos/MenuControl.swift",
-  "apps/macos/menubar.swift",
   "CONTRIBUTING.md",
   "LICENSE",
   "README.md",

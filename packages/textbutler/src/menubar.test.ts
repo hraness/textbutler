@@ -1,118 +1,154 @@
-import { chmod, link, lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, expect, test } from "bun:test";
-import { installMenuBarBinary, installedMenuBarBinary, menuBarBinaryCandidates, resolveMenuBarBinary } from "./menubar.ts";
-import { renderMenuBarLaunchAgentPlist } from "./launch-agent.ts";
+import { validateSnapshot, type MenuItem, type Snapshot } from "@hraness/desktop-foundation";
 import { runTextbutlerCli } from "./cli.ts";
+import { startDaemon, type RunningDaemon } from "./daemon.ts";
+import { companionOptions, menuLabel, snapshotItems } from "./menubar.ts";
+import { disconnectedSnapshot, type DesktopSnapshot } from "../../control/src/index.ts";
 
-const roots: string[] = [];
-afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+const roots: string[] = [], daemons: RunningDaemon[] = [];
+afterEach(async () => { for (const daemon of daemons.splice(0)) await daemon.close(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+async function root(): Promise<string> { const path = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(path); return path; }
+async function start(dataDir: string): Promise<RunningDaemon> { const daemon = await startDaemon({ dataDir }); daemons.push(daemon); return daemon; }
 
-test("resolves only an owned, private, physical prebuilt binary", async () => {
-  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(root);
-  const binary = join(root, "textbutler-menubar");
-  await writeFile(binary, "synthetic prebuilt binary", { mode: 0o700 });
-  expect(await resolveMenuBarBinary([binary])).toBe(binary);
-  await chmod(binary, 0o755);
-  expect(await resolveMenuBarBinary([binary])).toBe(binary);
-  await chmod(binary, 0o777);
-  await expect(resolveMenuBarBinary([binary])).rejects.toThrow("not installed");
+/** The produced items must satisfy the shared runner's wire contract. */
+function wire(items: readonly MenuItem[]): ReadonlyMap<string, boolean> {
+  return validateSnapshot({ version: 1, type: "snapshot", appId: "textbutler", name: "Textbutler", title: "Tb", revision: 1, items } satisfies Snapshot);
+}
+function labels(items: readonly MenuItem[]): string[] {
+  return items.flatMap(item => item.kind === "separator" ? [] : item.kind === "submenu" ? [item.label, ...labels(item.items)] : [item.label]);
+}
+function action(items: readonly MenuItem[], id: string): Extract<MenuItem, { kind: "action" }> {
+  const found = items.find(item => item.kind === "action" && item.id === id);
+  if (!found || found.kind !== "action") throw new Error(`missing action ${id}`);
+  return found;
+}
+function base(overrides: Partial<DesktopSnapshot> = {}): DesktopSnapshot {
+  return { ...disconnectedSnapshot(), connection: "connected", revision: 7, ...overrides };
+}
+
+describe("menu label presentation", () => {
+  test("sanitizes control, newline and bidi text before it reaches a menu row", () => {
+    expect(menuLabel("a\u202Ab\nc\u0000d\u2066e")).toBe("a b c d e");
+    expect(menuLabel("  spaced   out ")).toBe("spaced out");
+    expect(menuLabel("\u202e\u2067\u0007")).toBe("");
+  });
+  test("truncates by unicode scalar values at the bound", () => {
+    const result = menuLabel("x".repeat(100));
+    expect([...result].length).toBe(72);
+    expect(result.endsWith("…")).toBe(true);
+    expect(menuLabel("emoji 😀 ".repeat(30), 10)).toBe("emoji 😀 e…");
+  });
 });
 
-test("does not build or select a missing development binary", async () => {
-  await expect(resolveMenuBarBinary(["/tmp/does-not-exist/textbutler-menubar"])).rejects.toThrow("Install the prebuilt CLI companion");
+describe("snapshot menu mapping", () => {
+  test("reflects paused, running, setup and disconnected states in the wire contract", () => {
+    for (const [snapshot, state, checked, enabled] of [
+      [base(), "Automatic replies paused", true, true],
+      [base({ settings: { paused: false, activeContactLimit: 5 }, automation: { state: "running", detail: "Replies are live." } }), "Automatic replies running", false, true],
+      [base({ settings: { paused: false, activeContactLimit: 5 } }), "Automatic replies need setup", false, true],
+      [disconnectedSnapshot(), "Daemon disconnected", true, false],
+    ] as const) {
+      const items = snapshotItems(snapshot, { confirmedAgeSeconds: 3, fresh: true });
+      const actions = wire(items);
+      expect(items[0]).toMatchObject({ kind: "label", label: state });
+      const toggle = action(items, "toggle-pause");
+      expect(toggle.checked).toBe(checked);
+      expect(toggle.enabled).toBe(enabled);
+      expect(actions.get("toggle-pause")).toBe(enabled);
+      expect(action(items, "refresh").enabled).not.toBe(false);
+      expect(items.at(-1)).toMatchObject({ kind: "quit", label: "Quit Textbutler" });
+    }
+  });
+  test("bounds contact rows and reports the remainder", () => {
+    const contacts = Array.from({ length: 23 }, (_, index) => ({
+      id: `contact-${index}`, name: `Contact ${index}\u202a`, subtitle: `Subtitle ${index}`,
+      settings: { enabled: index % 2 === 0, responseMode: "smart" as const, keyword: "butler", provider: "codex" as const, disclosure: { character: "🤖", begin: "{", end: "}" } },
+    }));
+    const items = snapshotItems(base({ contacts }), { confirmedAgeSeconds: 0, fresh: true });
+    wire(items);
+    const contactsMenu = items.find(item => item.kind === "submenu" && item.label === "Contacts");
+    if (contactsMenu?.kind !== "submenu") throw new Error("missing contacts submenu");
+    expect(contactsMenu.items.filter(item => item.kind === "submenu").length).toBe(20);
+    expect(labels(contactsMenu.items)).toContain("3 more contacts");
+    expect(labels(items).some(label => /[\u202a-\u202e]/u.test(label))).toBe(false);
+    expect(items[1]).toMatchObject({ label: "12 enabled of 23 contacts · limit 5" });
+  });
+  test("summarizes accounts, capabilities and newest-first activity", () => {
+    const items = snapshotItems(base({
+      providerAccounts: [
+        { id: "claude-main", label: "Claude primary", provider: "claude", route: "claude-api", status: "ready", detail: "Ready detail", defaultReplyModel: "m", classifierModel: "c" },
+        { id: "codex-main", label: "Codex primary", provider: "codex", route: "codex", status: "setup-required", detail: "Setup detail", defaultReplyModel: null, classifierModel: null },
+      ],
+      activity: [
+        { id: "old", at: "2026-01-01T00:00:00Z", contactId: null, title: "Old event", detail: "old detail" },
+        { id: "new", at: "2026-03-01T00:00:00Z", contactId: null, title: "New event", detail: "new detail" },
+      ],
+    }), { confirmedAgeSeconds: 61, fresh: true });
+    wire(items);
+    const all = labels(items);
+    expect(all).toContain("Agent accounts · 1 of 2 ready");
+    expect(all).toContain("Claude primary · Ready");
+    expect(all).toContain("Codex primary · Setup required");
+    expect(all).toContain("Messages · Setup required");
+    expect(all.indexOf("New event")).toBeLessThan(all.indexOf("Old event"));
+    expect(all).toContain("Updated 1m ago");
+  });
+  test("marks unconfirmed and stale states distinctly", () => {
+    expect(labels(snapshotItems(disconnectedSnapshot(), { confirmedAgeSeconds: null, fresh: false }))).toContain("Daemon status not confirmed");
+    expect(labels(snapshotItems(disconnectedSnapshot(), { confirmedAgeSeconds: 90, fresh: false }))).toContain("Last confirmed 1m ago");
+  });
 });
 
-test("an explicit development binary replaces old installed bytes without silently falling back", async () => {
-  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(root);
-  const old = join(root, "old"), current = join(root, "current");
-  await writeFile(old, "old binary", { mode: 0o700 });
-  await writeFile(current, "new binary", { mode: 0o700 });
-  const installed = await installMenuBarBinary(old, root);
-  const selected = await resolveMenuBarBinary(menuBarBinaryCandidates(root, current));
-  expect(selected).toBe(current);
-  await installMenuBarBinary(selected, root);
-  expect(await readFile(installed, "utf8")).toBe("new binary");
-  await rm(current);
-  await expect(resolveMenuBarBinary(menuBarBinaryCandidates(root, current))).rejects.toThrow("not installed");
+describe("daemon-backed companion options", () => {
+  test("snapshot maps a live owner daemon response and marks it fresh", async () => {
+    const dataDir = await root();
+    const daemon = await start(dataDir);
+    const options = companionOptions(dataDir);
+    const items = await options.snapshot(new AbortController().signal);
+    wire(items);
+    expect(items[0]).toMatchObject({ label: "Automatic replies paused" });
+    expect(labels(items)).toContain("Updated 0s ago");
+    expect((await daemon.service.snapshot()).revision).toBe(1);
+  });
+  test("an unreachable daemon degrades to a bounded disconnected menu", async () => {
+    const dataDir = await root();
+    const options = companionOptions(dataDir);
+    const items = await options.snapshot(new AbortController().signal);
+    wire(items);
+    expect(items[0]).toMatchObject({ label: "Daemon disconnected" });
+    expect(action(items, "toggle-pause").enabled).toBe(false);
+    expect(labels(items)).toContain("Daemon status not confirmed");
+  });
+  test("toggle-pause applies one revision-checked daemon mutation and never retries", async () => {
+    const dataDir = await root();
+    const daemon = await start(dataDir);
+    const options = companionOptions(dataDir);
+    const signal = new AbortController().signal;
+    await options.snapshot(signal);
+    expect((await daemon.service.snapshot()).settings.paused).toBe(true);
+    await options.onAction("toggle-pause", signal);
+    expect((await daemon.service.snapshot()).settings.paused).toBe(false);
+    // A stale in-memory revision is rejected by the daemon, not retried.
+    await expect(options.onAction("toggle-pause", signal)).rejects.toThrow("settings-update-conflict");
+    expect((await daemon.service.snapshot()).settings.paused).toBe(false);
+    await options.snapshot(signal); // the runner re-reads state after an action
+    await options.onAction("toggle-pause", signal);
+    expect((await daemon.service.snapshot()).settings.paused).toBe(true);
+  });
 });
 
-test("stages a verified prebuilt binary in the stable private user location", async () => {
-  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(root);
-  const source = join(root, "source-menubar"); await writeFile(source, "prebuilt", { mode: 0o700 });
-  const target = await installMenuBarBinary(source, root);
-  expect(target).toBe(installedMenuBarBinary(root));
-  expect(await readFile(target, "utf8")).toBe("prebuilt");
-  const info = await lstat(target); expect(info.mode & 0o077).toBe(0);
-  expect(await installMenuBarBinary(target, root)).toBe(target);
-  await chmod(source, 0o777);
-  await expect(installMenuBarBinary(source, root)).rejects.toThrow("unsafe");
-});
-
-test("menu launchd artifact runs at login without an auto-restart loop", () => {
-  const plist = renderMenuBarLaunchAgentPlist({ home: "/fixture/user", dataDir: "/fixture/user/Library/Application Support/Textbutler", binary: "/fixture/user/Library/Application Support/Textbutler/bin/textbutler-menubar", generation: "12345678-1234-1234-1234-123456789abc" });
-  expect(plist).toContain("<key>Label</key><string>app.textbutler.menubar</string>");
-  expect(plist).toContain("<key>RunAtLoad</key><true/>");
-  expect(plist).not.toContain("<key>KeepAlive</key>");
-  expect(plist).toContain("<string>--data-dir</string>");
-  expect(plist).toContain("<string>/fixture/user/Library/Application Support/Textbutler/bin/textbutler-menubar</string>");
-});
-
-test("installation rejects symlinked parents without writing through them", async () => {
-  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(root);
-  const home = join(root, "home"), outside = join(root, "outside");
-  await mkdir(home, { mode: 0o700 }); await mkdir(outside, { mode: 0o700 });
-  await symlink(outside, join(home, "Library"));
-  const source = join(root, "source"); await writeFile(source, "fixture", { mode: 0o700 });
-  await expect(installMenuBarBinary(source, home)).rejects.toThrow("unsafe");
-  await expect(lstat(join(outside, "Application Support"))).rejects.toThrow();
-});
-
-test("installation rejects aliased source bytes and preserves an installed binary", async () => {
-  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(root);
-  const source = join(root, "source"); await writeFile(source, "first", { mode: 0o700 });
-  const installed = await installMenuBarBinary(source, root);
-  await link(source, join(root, "alias"));
-  await expect(installMenuBarBinary(source, root)).rejects.toThrow("unsafe");
-  expect(await readFile(installed, "utf8")).toBe("first");
-});
-
-test("protected root-owned distribution bytes install into a user-owned private destination", async () => {
-  const source = "/usr/bin/true";
-  expect((await lstat(source)).uid).toBe(0);
-  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-menubar-")); roots.push(root);
-  const target = await installMenuBarBinary(source, root);
-  const info = await lstat(target);
-  expect(info.uid).toBe(process.getuid?.() ?? -1);
-  expect(info.mode & 0o077).toBe(0);
-  expect(await readFile(target)).toEqual(await readFile(source));
-});
-
-test("the menu-bar CLI delegates install without building a binary", async () => {
-  const lines: string[] = []; let installedDataDir: string | undefined;
-  const lifecycle = {
-    async install(dataDir: string) { installedDataDir = dataDir; return { label: "app.textbutler.menubar" as const, installation: "installed" as const, service: "loaded" as const, plistPath: "/fixture/user/Library/LaunchAgents/app.textbutler.menubar.plist", pid: null, detail: "installed", automaticReplies: "unavailable" as const }; },
-    async uninstall() { throw new Error("not used"); },
-    async status() { throw new Error("not used"); },
-  };
-  expect(await runTextbutlerCli(["menubar", "install", "--data-dir", "/fixture/user/Library/Application Support/Textbutler"], { write: (text: string) => { lines.push(text); } }, { menuBarLaunchAgent: lifecycle, menuBarBinary: "/fixture/user/Library/Application Support/Textbutler/bin/textbutler-menubar" })).toBe(0);
-  expect(installedDataDir).toBe("/fixture/user/Library/Application Support/Textbutler");
-  expect(JSON.parse(lines[0]!)).toMatchObject({ ok: true, binary: "/fixture/user/Library/Application Support/Textbutler/bin/textbutler-menubar", launchAgent: { label: "app.textbutler.menubar" } });
-});
-
-test("menu status reads only its lifecycle and reports uncertain custody as a failure", async () => {
-  for (const installation of ["absent", "installed", "conflict", "indeterminate", "unsupported"] as const) {
+describe("menubar CLI routing", () => {
+  test("status reports the shared companion lifecycle, not a LaunchAgent", async () => {
+    const dataDir = await root();
     const lines: string[] = [];
-    const lifecycle = {
-      async install(): Promise<never> { throw new Error("status must not install"); },
-      async uninstall(): Promise<never> { throw new Error("status must not uninstall"); },
-      async status(dataDir: string) {
-        expect(dataDir).toBe("/fixture/private");
-        return { label: "app.textbutler.menubar" as const, installation, service: "not-loaded" as const, plistPath: "/fixture/menu.plist", pid: null, detail: "synthetic status", automaticReplies: "unavailable" as const };
-      },
-    };
-    const ok = installation === "absent" || installation === "installed";
-    expect(await runTextbutlerCli(["menubar", "status", "--data-dir", "/fixture/private"], { write: text => { lines.push(text); } }, { menuBarLaunchAgent: lifecycle })).toBe(ok ? 0 : 1);
-    expect(JSON.parse(lines[0]!)).toMatchObject({ ok, launchAgent: { label: "app.textbutler.menubar", installation } });
-  }
+    expect(await runTextbutlerCli(["menubar", "status", "--data-dir", dataDir], { write: text => lines.push(text) })).toBe(0);
+    expect(JSON.parse(lines[0]!)).toMatchObject({ appId: "textbutler", running: false, state: "stopped" });
+    expect(lines[0]).not.toContain("launchAgent");
+  });
+  test("unknown menubar verbs and extra arguments are rejected", async () => {
+    await expect(runTextbutlerCli(["menubar", "bogus"], { write: () => {} })).rejects.toThrow();
+    await expect(runTextbutlerCli(["menubar", "status", "extra"], { write: () => {} })).rejects.toThrow();
+  });
 });

@@ -142,7 +142,7 @@ One narrow native command accepts the versioned control request. It connects to 
 
 1. Use the verified Ghostget 0.18.2 package, which includes the reviewed automation source and native helpers. Real account synchronization, recipient identity, rich actions and revocation still require a bounded owner-authorized live test; artifact admission and synthetic fixtures do not prove delivery.
 2. Independently qualify the native Claude SDK and Codex adapters for the requested no-shell, contact-only profile before enabling those choices. The separate Claude API path requires explicit account setup and packaged-runtime admission.
-3. Assemble and publish the exact CLI package with its architecture-matched prebuilt menu companion. Verify the package bytes, executable mode, singleton behavior, and LaunchAgent install/uninstall lifecycle. A source checkout or missing companion must never trigger a build at launch.
+3. Publish the CLI package with its pinned desktop-foundation SDK dependency. Verify the package bytes, the verified pinned runner download, singleton behavior, and the shared autostart install/uninstall lifecycle. A source checkout or missing companion must never trigger a build at launch.
 4. Keep historical repository and published package identities as compatibility and provenance anchors. The Textbutler site is assigned to `textbutler.app`; later identity migrations must preserve immutable artifacts and existing release protections.
 
 ## Sources

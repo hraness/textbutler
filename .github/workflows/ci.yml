@@ -69,9 +69,3 @@ jobs:
           set -euo pipefail
           mkdir -p "$HOME"
           bun test src/imessage.test.ts src/contacts.test.ts src/metrics.test.ts
-      - name: Build Textbutler menu-bar companion
-        run: bun run --cwd apps/macos menubar:build
-      - name: Verify Swift security-analysis build discovery
-        run: swift build
-      - name: Test native menu control with synthetic sockets
-        run: bun run --cwd apps/macos menubar:test
