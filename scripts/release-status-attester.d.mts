@@ -24,7 +24,7 @@ export interface ReleaseAuthorityStatusRequest<
     target_url: null;
   }>;
   readonly endpoint: string;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly targetSha: string;
 }
@@ -40,7 +40,7 @@ export interface ReleaseAuthorityStatusReceipt<
   readonly creator: Readonly<{ id: number; login: string; nodeId: string }>;
   readonly description: string;
   readonly installationId: number;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly serverDate: string;
   readonly state: State;

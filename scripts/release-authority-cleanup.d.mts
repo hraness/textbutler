@@ -35,7 +35,7 @@ export interface CleanupIncident {
   readonly headBranch: "main";
   readonly headSha: string;
   readonly htmlUrl: string;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly runAttempt: number;
   readonly runId: number;
@@ -119,7 +119,7 @@ export interface CleanupPreflightReceipt {
   }>;
   readonly predecessor: CleanupPredecessor;
   readonly quarantineUntil: string;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly rules: CleanupRulesReceipt;
   readonly schema: "message-like-me-release-authority-cleanup-preflight-v2";
   readonly serverDates: Readonly<{
@@ -154,7 +154,7 @@ export interface CleanupTerminalReceipt {
     terminalStatusId: number;
     terminalStatusNodeId: string;
   }>;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly revocation: Readonly<{
     converged: true;
@@ -179,7 +179,7 @@ export interface CleanupTerminalReceipt {
     }>;
     description: "Release authority consumed after the production-ref attempt";
     installationId: 159058102;
-    repository: "hraness/message-like-me";
+    repository: "hraness/textbutler";
     repositoryId: 1342143606;
     serverDate: string;
     state: "error";
@@ -240,7 +240,7 @@ export interface CleanupIncompleteFinalReceipt {
     sha: string;
   }> | null;
   readonly readbackFailureSha256: string | null;
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly runAttempt: 1;
   readonly runId: number;
   readonly schema: "message-like-me-release-authority-cleanup-incomplete-v2";

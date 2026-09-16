@@ -10,7 +10,7 @@ import {
   rootReleasePackage,
 } from "./release-distribution-policy";
 
-const REPOSITORY = "hraness/message-like-me";
+const REPOSITORY = "hraness/textbutler";
 const REPOSITORY_ID = "1342143606";
 const REGISTRY = "https://registry.npmjs.org/";
 const SLSA_PREDICATE = "https://slsa.dev/provenance/v1";
@@ -198,14 +198,14 @@ export function parseVerifiedNpmProvenance(
   const metadata = record(runDetails.metadata, "npm provenance run metadata");
   const invocation = text(
     metadata.invocationId,
-    /^https:\/\/github\.com\/hraness\/message-like-me\/actions\/runs\/[1-9][0-9]*\/attempts\/[1-9][0-9]*$/u,
+    /^https:\/\/github\.com\/hraness\/textbutler\/actions\/runs\/[1-9][0-9]*\/attempts\/[1-9][0-9]*$/u,
     "npm provenance invocation",
   );
   if (builder.id !== "https://github.com/actions/runner/github-hosted" || invocation.length > 256) {
     throw new Error("npm provenance builder or invocation is invalid.");
   }
   const invocationMatch =
-    /^https:\/\/github\.com\/hraness\/message-like-me\/actions\/runs\/([1-9][0-9]*)\/attempts\/([1-9][0-9]*)$/u
+    /^https:\/\/github\.com\/hraness\/textbutler\/actions\/runs\/([1-9][0-9]*)\/attempts\/([1-9][0-9]*)$/u
       .exec(invocation);
   if (invocationMatch === null) throw new Error("npm provenance invocation is invalid.");
   const [, runId, attemptText] = invocationMatch;

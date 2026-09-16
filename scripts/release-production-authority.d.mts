@@ -43,7 +43,7 @@ interface ProductionAuthorityBase<Phase extends string, Schema extends string> {
   readonly context: "message-like-me/website-production-authority";
   readonly phase: Phase;
   readonly productionRef: "refs/heads/website-production";
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly repositoryId: 1342143606;
   readonly schema: Schema;
   readonly targetSha: string;
@@ -175,7 +175,7 @@ export function finalizeProductionAuthority(input: Readonly<{
     productionRef: "refs/heads/website-production";
     receiptSha256: string;
     releasePublishedAt: string;
-    repository: "hraness/message-like-me";
+    repository: "hraness/textbutler";
     rules: ProductionAuthorityRulesReceipt;
     schema: "message-like-me-provider-promotion-v2";
     verifiedSha: string;

@@ -105,7 +105,7 @@ function consumed(at, attested, promotionDigest) {
       terminalStatusId: item.statusId, terminalStatusNodeId: item.statusNodeId } }, revocation(at));
 }
 function combined(item) {
-  return { commit_url: `https://api.github.com/repos/${repo}/commits/${sha}`, repository: { ...identity, name: "message-like-me", owner: { login: "hraness", type: "Organization" } },
+  return { commit_url: `https://api.github.com/repos/${repo}/commits/${sha}`, repository: { ...identity, name: "textbutler", owner: { login: "hraness", type: "Organization" } },
     sha, state: item.state === "success" ? "success" : "failure", statuses: [{ context, created_at: item.createdAt,
       description: item.description, id: item.statusId, node_id: item.statusNodeId, state: item.state, target_url: null,
       updated_at: item.createdAt, url: item.statusUrl }], total_count: 1, url: `https://api.github.com/repos/${repo}/commits/${sha}/status` };

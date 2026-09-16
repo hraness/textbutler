@@ -354,7 +354,7 @@ test("tag releases use annotated-tag authority and split exact GitHub-first and 
     expect(source).not.toContain(".head_commit");
   }
   for (const required of [
-    "https://github.com/hraness/message-like-me.git",
+    "https://github.com/hraness/textbutler.git",
     '["ls-remote", "--refs", REPOSITORY_URL, MAIN_REF]',
     '["ls-remote", "--refs", "--tags", REPOSITORY_URL, `refs/tags/${namespace}*`]',
     '`refs/tags/${namespace}*`',
@@ -1021,7 +1021,7 @@ test("publishing documents the exact App, environment, canary, and ref controls"
     "`Commit statuses: Read and write`",
     "exactly `statuses:write` plus `metadata:read`",
     "no `contents` or\n  `workflows` authority",
-    "{hraness/message-like-me}",
+    "{hraness/textbutler}",
     "GitHub Actions Integration `15368`",
     "message-like-me/website-production-authority",
     "GH013: Repository rule violations found for refs/heads/website-production.",

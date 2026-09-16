@@ -359,8 +359,8 @@ function checkPackageManifest(value: unknown): string[] {
     problems.push("package.json homepage must be https://messagelikeme.com");
   }
   const repository = record(manifest.repository, "package.json repository");
-  if (repository.url !== "git+https://github.com/hraness/message-like-me.git") {
-    problems.push("package.json repository must be hraness/message-like-me");
+  if (repository.url !== "git+https://github.com/hraness/textbutler.git") {
+    problems.push("package.json repository must be hraness/textbutler");
   }
   const bin = record(manifest.bin, "package.json bin");
   if (Object.keys(bin).length !== 1 || bin.messagelikeme !== "./dist/cli.js") {

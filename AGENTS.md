@@ -120,9 +120,12 @@ apps, signing, and notarization are outside the current product scope.
   authentication, accounts, telemetry, analytics, synchronization, and message
   sending. The installed Agent Skill supplies semantic analysis and unsent
   drafting through the agent already running it.
-- Keep the command name `messagelikeme`, the repository and package name
-  `message-like-me`, and the Agent Skill name `message-like-me`. Treat
-  `messagelikeme.com` as an informational project page, never as a data plane.
+- Keep the command name `messagelikeme`, the package name
+  `message-like-me`, and the Agent Skill name `message-like-me`. The canonical
+  GitHub repository is `hraness/textbutler` with unchanged numeric ID
+  `1342143606`; follow the version-neutral identity migration in the publishing
+  runbook. Treat `messagelikeme.com` as an informational project page, never as
+  a data plane.
 - Keep CLI commands namespaced as `ingest imessage|x-archive|contacts|bundle`,
   `sources list|show`,
   `contacts list|show|resolve`,

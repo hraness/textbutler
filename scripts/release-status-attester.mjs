@@ -1,6 +1,6 @@
 import { withReleaseAppTokenFromEnvironment } from "./release-app-token.mjs";
 
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 const EXPECTED_REPOSITORY_ID = 1_342_143_606;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const MAX_STATUS_RESPONSE_AGE_MILLISECONDS = 15_000;
@@ -328,7 +328,7 @@ function parseCombinedRepository(value) {
   );
   if (
     repository.id !== EXPECTED_REPOSITORY_ID ||
-    repository.name !== "message-like-me" ||
+    repository.name !== "textbutler" ||
     repository.full_name !== EXPECTED_REPOSITORY ||
     owner.login !== "hraness" ||
     owner.type !== "Organization"
