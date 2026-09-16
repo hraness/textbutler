@@ -36,7 +36,7 @@ test("identifies Accounts URL authorities without confusing unrelated hosts or U
     for (const value of [
       "https://account.hraness.com/support?product=message-like-me",
       "https://ACCOUNT.HRANESS.COM/support",
-      "https://unrelated.example@account.hraness.com/support",
+      "https://fixture:@account.hraness.com/support",
       "account.hraness.com",
     ]) {
       await writeFile(join(root, "index.js"), `export const value=${JSON.stringify(value)};`);
