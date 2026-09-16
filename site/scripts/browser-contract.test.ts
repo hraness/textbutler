@@ -1,11 +1,28 @@
 import { expect, test } from 'bun:test';
-import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserOwner,
+import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
   deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
 
 test('the native matrix covers four separate surfaces, both themes and touch', () => {
   const cases = browserCases();
   expect(cases).toHaveLength(16);
   expect(new Set(cases.map((item) => `${item.width}/${item.theme}${item.path}`)).size).toBe(16);
+});
+
+test('media fixtures isolate host transparency while preserving theme and reduced motion', () => {
+  for (const theme of ['light', 'dark']) {
+    const baseline = browserMediaFeatures(theme);
+    expect(baseline).toEqual([
+      { name: 'prefers-color-scheme', value: theme },
+      { name: 'prefers-reduced-motion', value: 'reduce' },
+      { name: 'forced-colors', value: 'none' },
+      { name: 'prefers-reduced-transparency', value: 'no-preference' },
+    ]);
+    expect(browserMediaFeatures(theme, 'reduce')).toEqual([
+      ...baseline.slice(0, -1), { name: 'prefers-reduced-transparency', value: 'reduce' },
+    ]);
+  }
+  expect(() => browserMediaFeatures('unknown')).toThrow();
+  expect(() => browserMediaFeatures('light', 'unknown')).toThrow();
 });
 
 test('browser children receive no inherited credentials or personal home', () => {

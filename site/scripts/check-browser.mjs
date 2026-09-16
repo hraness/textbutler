@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserOwner,
+import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
   deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
 
 // This gate serves only the built informational website. It never runs the CLI,
@@ -198,6 +198,11 @@ try {
         }
       })), 'Route interception');
       page = await deadline(context.newPage(), 'Page startup');
+      const mediaSession = await deadline(context.newCDPSession(page), 'Media fixture session');
+      const applyMedia = (transparency) => deadline(mediaSession.send('Emulation.setEmulatedMedia', {
+        features: browserMediaFeatures(sample.theme, transparency),
+      }), 'Media fixture application');
+      await applyMedia('no-preference');
       page.setDefaultTimeout(10_000);
       page.setDefaultNavigationTimeout(15_000);
       page.on('pageerror', (error) => failures.push(error.message));
@@ -252,6 +257,7 @@ try {
         };
         for (const sheet of document.styleSheets) visit(sheet.cssRules);
         return { paper: document.documentElement.dataset.hranessTheme,
+          reducedTransparency: matchMedia('(prefers-reduced-transparency: reduce)').matches,
           background: getComputedStyle(document.body).backgroundColor,
           bodyFont: getComputedStyle(document.body).fontFamily,
           bodyInk: getComputedStyle(document.body).color,
@@ -297,9 +303,24 @@ try {
       await deadline(cdp.detach(), 'Font inspection detach');
       item.metrics = metrics;
       item.assets = [...assets].sort();
+      assert.equal(metrics.reducedTransparency, false);
       assertPresentation(metrics, sample);
       if (sample.path === '/') {
         item.textures = await assertWallAssets(context, metrics.fieldBackground, origin);
+        await applyMedia('reduce');
+        item.reducedTransparency = await deadline(page.evaluate(() => ({
+          matches: matchMedia('(prefers-reduced-transparency: reduce)').matches,
+          headerBackdrop: getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter,
+          fieldBackground: getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage,
+        })), 'Reduced transparency metrics');
+        assert.deepEqual(item.reducedTransparency, { matches: true, headerBackdrop: 'none', fieldBackground: 'none' });
+        await applyMedia('no-preference');
+        const restored = await deadline(page.evaluate(() => ({
+          matches: matchMedia('(prefers-reduced-transparency: reduce)').matches,
+          headerBackdrop: getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter,
+          fieldBackground: getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage,
+        })), 'Restored transparency metrics');
+        assert.deepEqual(restored, { matches: false, headerBackdrop: metrics.headerBackdrop, fieldBackground: metrics.fieldBackground });
         const summary = page.locator('details summary').first();
         await summary.focus();
         await summary.press('Enter');

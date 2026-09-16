@@ -5,6 +5,19 @@ export function browserCases() {
     ['/', '/docs', '/sources', '/preview'].map((path) => ({ width, theme, path }))));
 }
 
+// Pin the synthetic presentation state instead of inheriting host accessibility
+// preferences. The browser gate separately exercises the reduced fallback.
+export function browserMediaFeatures(theme, transparency = 'no-preference') {
+  assert.ok(['light', 'dark'].includes(theme));
+  assert.ok(['no-preference', 'reduce'].includes(transparency));
+  return [
+    { name: 'prefers-color-scheme', value: theme },
+    { name: 'prefers-reduced-motion', value: 'reduce' },
+    { name: 'forced-colors', value: 'none' },
+    { name: 'prefers-reduced-transparency', value: transparency },
+  ];
+}
+
 // The source-owned README badge is external; this offline gate substitutes only
 // its exact image request, never a document, API, script, or another asset.
 export function isSyntheticBadge(request) {
