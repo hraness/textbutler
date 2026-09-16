@@ -321,6 +321,12 @@ test("tag releases use annotated-tag authority and split exact GitHub-first and 
   expect(publicAdmission).toContain("requiredAttempt: Number(npmCompletionRunAttempt)");
   expect(publicAdmission).toContain("maximumAttempt: Number(npmCompletionRunAttempt)");
   expect(githubAdmission).toContain("reviewed-main ancestry");
+  for (const admission of [githubAdmission, publicAdmission]) {
+    expect(admission).toContain("const maximumComparisonBytes = 8 * 1_024 * 1_024;");
+    expect(admission).toMatch(
+      /"GitHub reviewed-main ancestry",\n\s+(?:githubHeaders|headers),\n\s+maximumComparisonBytes,\n/u,
+    );
+  }
   expect(githubAdmission).toContain("releases/latest");
   expect(githubAdmission).toContain("GitHub Release bytes differ from the reviewed workflow artifact");
   expect(githubPublisher.match(/verifyRemoteAnnotatedTag\(\);/gu)).toHaveLength(2);
