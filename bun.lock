@@ -7,7 +7,7 @@
       "devDependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.268",
         "@anthropic-ai/sdk": "0.125.0",
-        "@hraness/desktop-foundation": "https://github.com/hraness/desktop-foundation/releases/download/v0.6.1/hraness-desktop-foundation-0.6.1.tgz",
+        "@hraness/desktop-foundation": "https://github.com/hraness/desktop-foundation/releases/download/v0.7.0/hraness-desktop-foundation-0.7.0.tgz",
         "@hraness/support-foundation": "github:hraness/support-foundation#2d034b357680353574411217d68b02b6755b07ed",
         "@modelcontextprotocol/sdk": "1.30.0",
         "@types/bun": "1.3.14",
@@ -46,7 +46,7 @@
 
     "@hono/node-server": ["@hono/node-server@2.1.1", "", { "peerDependencies": { "hono": "^4" } }, "sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg=="],
 
-    "@hraness/desktop-foundation": ["@hraness/desktop-foundation@https://github.com/hraness/desktop-foundation/releases/download/v0.6.1/hraness-desktop-foundation-0.6.1.tgz", { "bin": { "companion": "./dist/src/cli.js" } }, "sha512-rqwnMS3iYC92H/WLIvmx2Ii/4CsIoZinPW3/6igKL8s6bh5tgINnAaLokn7XhW2Lgu8o/QO+RfoJWLv0w1UC+g=="],
+    "@hraness/desktop-foundation": ["@hraness/desktop-foundation@https://github.com/hraness/desktop-foundation/releases/download/v0.7.0/hraness-desktop-foundation-0.7.0.tgz", { "bin": { "companion": "./dist/src/cli.js" } }, "sha512-lmGe/kJJqtVcbEIPKNGz0iWqVIb3jM4se1v5wR8vY6dA+haZ5u2XNBPL6n1zbLlMupZ7/Ue5/3SDU65x/yJ7SA=="],
 
     "@hraness/support-foundation": ["@hraness/support-foundation@github:hraness/support-foundation#2d034b3", {}, "hraness-support-foundation-2d034b3", "sha512-ayi8JeDAkaKkJDtQwe705DfNAas0na5fmf70BF+dHhADYdryBNhohahGDtItNZ+DD8rPxmmy7xRGfteixSC+1w=="],
 
