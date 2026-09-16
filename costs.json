@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "surfaces": {
+    "local:style-profile": {
+      "kind": "authoritative",
+      "retention": "account",
+      "owner": "src/profile.ts",
+      "deletion": "src/profile.ts",
+      "budget": {
+        "rowsPerAccount": 1,
+        "bytesPerAccountMonth": 1048576
+      },
+      "note": "local JSON style-profile store; private, never leaves the device"
+    }
+  },
+  "exempt": []
+}

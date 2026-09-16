@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   AgentRouter, CONTACT_TOOL_PROFILE, SqliteAccountLeases, parseClassification,
-  type AgentAdapter, type AgentRunRequest, type ModelCatalog,
+  type AgentAdapter, type AgentProvider, type AgentRunRequest, type ModelCatalog,
   type RuntimeQualification, type ToolBroker,
 } from "../../agentrouter/src/index.ts";
-import { newContact, type ContactSettings, type Provider } from "./config.ts";
+import { newContact, type ContactSettings } from "./config.ts";
 import { createRoutedButlerAgent } from "./routed-agent.ts";
 import type { AgentRequest } from "./runtime.ts";
 import { ContactWorkspace } from "./workspace.ts";
@@ -34,7 +34,7 @@ const model = (id: string, cost: number) => ({ id, inputUsdPerMillion: cost,
 
 type AdapterCall = { request: AgentRunRequest; broker: ToolBroker; disable(): void };
 async function setup(options: {
-  provider?: Provider;
+  provider?: AgentProvider;
   contact?: Partial<ContactSettings>;
   adapterQualification?: RuntimeQualification;
   selectionQualification?: RuntimeQualification;
