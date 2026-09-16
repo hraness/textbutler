@@ -44,21 +44,35 @@ function integer(value: unknown, field: string, minimum: number, maximum: number
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < minimum || value > maximum) throw new Error(`Invalid ${field}`);
   return value;
 }
+/** Each field is either empty (cleared) or exactly one visible grapheme. */
+function marker(value: unknown, field: string): string {
+  if (value === "") return "";
+  const symbol = string(value, field, 16);
+  const segments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  if ([...segments.segment(symbol)].length !== 1 || /[\p{White_Space}\p{Bidi_Control}]/u.test(symbol) || /^[\p{Default_Ignorable_Code_Point}\p{Mark}]+$/u.test(symbol)) throw new Error("Disclosure fields must be empty or one visible symbol");
+  return symbol;
+}
 export function parseDisclosure(value: unknown): Disclosure {
   const input = record(value);
-  const character = string(input.character, "character", 16);
-  const begin = string(input.begin, "begin", 16);
-  const end = string(input.end, "end", 16);
-  const segments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  for (const value of [character, begin, end]) {
-    if ([...segments.segment(value)].length !== 1 || /[\p{White_Space}\p{Bidi_Control}]/u.test(value) || /^[\p{Default_Ignorable_Code_Point}\p{Mark}]+$/u.test(value)) throw new Error("Disclosure fields must each be one visible symbol");
-  }
-  return Object.freeze({ character, begin, end });
+  return Object.freeze({ character: marker(input.character, "character"), begin: marker(input.begin, "begin"), end: marker(input.end, "end") });
+}
+/** The wrap a message carries, or null when every disclosure field is cleared. */
+export function disclosureMarkers(symbols: Disclosure): Readonly<{ prefix: string; suffix: string }> | null {
+  const parsed = parseDisclosure(symbols);
+  const left = `${parsed.character}${parsed.begin}`;
+  if (!left && !parsed.end) return null;
+  return Object.freeze({ prefix: left ? `${left} ` : "", suffix: parsed.end ? ` ${parsed.end}` : "" });
 }
 export function disclose(text: string, symbols: Disclosure = DEFAULT_DISCLOSURE): string {
-  const parsed = parseDisclosure(symbols);
+  const markers = disclosureMarkers(symbols);
   if (!text.trim() || Buffer.byteLength(text) > 16_384 || /\u0000/u.test(text)) throw new Error("Invalid response text");
-  return `${parsed.character}${parsed.begin} ${text.trim()} ${parsed.end}`;
+  const trimmed = text.trim();
+  return markers === null ? trimmed : `${markers.prefix}${trimmed}${markers.suffix}`;
+}
+/** True only when the text carries this disclosure's complete configured wrap. */
+export function disclosedText(text: string, symbols: Disclosure): boolean {
+  const markers = disclosureMarkers(symbols);
+  return markers !== null && text.startsWith(markers.prefix) && text.endsWith(markers.suffix) && text.length > markers.prefix.length + markers.suffix.length;
 }
 export function newContact(id: string, label: string, routeId: string): ContactSettings {
   return parseContact({ id, label, routeId, enabled: false, mode: "smart", keyword: "butler", provider: "codex", accountId: "default", replyModel: null, classifierModel: null, disclosure: DEFAULT_DISCLOSURE, revision: 1, pausedUntil: 0, humanCooldownMs: 300_000, debounceMs: 8_000, maxRepliesPerHour: 12 });

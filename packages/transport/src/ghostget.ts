@@ -146,7 +146,7 @@ export function createGhostgetTransport(options: GhostgetTransportOptions): Text
         if (value.planDigest !== plan.digest || value.routeRef !== plan.conversationId || value.contextRef !== plan.contextId || value.clientIntentSha256 !== known.intentHash || !["submitted", "failed", "partial", "indeterminate"].includes(String(value.state))) throw new Error("Changed run identity");
         const totalCount = integer(value.partCount, 1, 8), submittedCount = integer(value.provenPartCount, 0, totalCount);
         if (totalCount !== plan.actions.length || value.state === "submitted" && submittedCount !== totalCount || value.state === "partial" && (submittedCount === 0 || submittedCount === totalCount)) throw new Error("Invalid run count");
-        return success({ planId: plan.id, runId: string(value.runId, 128), state: value.state as SendReceipt["state"], submittedCount, totalCount, recordedAt: timestamp(value.recordedAt), delivery: "unknown", retryable: false });
+        return success({ planId: plan.id, runId: string(value.runId, 128), state: value.state as SendReceipt["state"], submittedCount, totalCount, acceptedMessageIds: null, recordedAt: timestamp(value.recordedAt), delivery: "unknown", retryable: false });
       } catch { return failure("indeterminate", "The send outcome is unknown. Reconcile its Ghostget journal; do not retry this action."); }
     },
   };

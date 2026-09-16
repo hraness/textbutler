@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { parseActionIntent, type ActionIntent, type TextbutlerTransport } from "../../transport/src/index.ts";
 import { parseClassification } from "@hraness/agentmixer";
-import { disclose, parseSettings, type ContactSettings, type Settings } from "./config.ts";
+import { disclose, disclosureMarkers, parseSettings, type ContactSettings, type Settings } from "./config.ts";
 import { decideReply, type ConversationState, type MessageEvent } from "./decision.ts";
 import { Hooks, type HookContext } from "./hooks.ts";
 import { RunJournal, type RunState } from "./journal.ts";
@@ -34,8 +34,10 @@ function composeResult(value: unknown, contact: ContactSettings): readonly Actio
   const actions = input.actions.map(parseActionIntent);
   const text = actions.filter(a => a.kind === "text");
   const disclosed = actions.map(action => action.kind === "text" ? { ...action, text: disclose(action.text, contact.disclosure) } : action);
-  // Standalone cards and reactions cannot carry a prefix. Put an attributed companion first.
-  if (text.length === 0 || actions[0]?.kind !== "text") disclosed.unshift({ kind: "text", text: disclose(input.summary, contact.disclosure) });
+  // Standalone cards and reactions cannot carry a prefix. Put an attributed
+  // companion first — only when this contact still has visible markers. With
+  // disclosure fully cleared the companion would be an unexplained extra text.
+  if (disclosureMarkers(contact.disclosure) !== null && (text.length === 0 || actions[0]?.kind !== "text")) disclosed.unshift({ kind: "text", text: disclose(input.summary, contact.disclosure) });
   if (disclosed.length > 8) throw new Error("Disclosure companion must fit within the action limit");
   return disclosed;
 }
@@ -114,6 +116,7 @@ export class ButlerRuntime {
       state = "dispatching";
       const receipt = await this.ports.transport.submit(plan.value, { mode: "delegated", grantId: grant }, controller.signal);
       if (!receipt.ok) return finish("indeterminate", "dispatch-result-unknown");
+      if (receipt.value.acceptedMessageIds) this.ports.journal.recordSentMessages(contact.id, receipt.value.runId, receipt.value.acceptedMessageIds, this.clock());
       const result = finish(receipt.value.state, receipt.value.state);
       try { await this.ports.hooks.emit("reply.sent", hook); } catch { /* Receipt remains authoritative if a notification hook fails. */ }
       return result;

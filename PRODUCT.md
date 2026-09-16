@@ -25,7 +25,7 @@ The owner brings Codex or Claude Code and their account. Ghostget owns access to
 
 ## Operating Context
 
-The Mac must be awake and signed in for local messaging. Quitting the menu companion leaves the separately installed user agent running. A global pause is always available. Contacts are selected explicitly; smart response is the default mode after activation. The keyword defaults to `butler`. The three disclosure fields default to `🤖`, `{`, and `}` and produce `🤖{ hello this is my response }`.
+The Mac must be awake and signed in for local messaging. Quitting the menu companion leaves the separately installed user agent running. A global pause is always available. Contacts are selected explicitly; smart response is the default mode after activation. The keyword defaults to `butler`. The three disclosure fields default to `🤖`, `{`, and `}` and produce `🤖{ hello this is my response }`. Each field may be cleared individually or together; cleared fields remove the visible wrap while the daemon still attributes butler output through its send journal.
 
 ## Capabilities and Constraints
 
@@ -34,6 +34,7 @@ The Mac must be awake and signed in for local messaging. Quitting the menu compa
 - Human activity, global pause, contact pause, deduplication, and rate limits take precedence over an LLM decision. The cheap classifier can choose silence; it cannot expand authority.
 - Rich actions include files, reactions, stickers, links, and mini-app experiences when the transport explicitly supports them. Unsupported capabilities are visible rather than silently imitated.
 - History bootstrapping never triggers sends. Owner-authored text provides owner-style evidence; incoming messages and butler output do not.
+- A separate owner workflow answers "what do I need to reply to?": the inbox scan lists conversations with unanswered inbound runs, `replies suggest` drafts a reviewable reply, and `replies send` dispatches only an explicit owner choice. Suggestions never send themselves.
 - Message Like Me was an unused product spike. Its wire contracts and published artifacts still have downstream consumers and must not be changed in place.
 
 ## Brand Commitments
