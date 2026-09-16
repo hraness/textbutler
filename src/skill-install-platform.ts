@@ -10,7 +10,7 @@ import { SKILL_INSTALL_PAIR, type SkillInstallName, type SkillInstallPlan, type 
 import { SkillInstallPlatform, type SkillInstallPlatformService } from "./skill-install-program.ts";
 import { bundledEnsoulSkillPath, bundledSkillPath, type SkillInstallOptions } from "./skill-install.ts";
 
-// The bundled pair currently has 21 files, seven directories and 173,272 bytes.
+// The bundled pair currently has 22 files, seven directories and 175,482 bytes.
 // These per-skill bounds also apply to a forced replacement's cleanup inventory.
 const MAX_ENTRIES = 64;
 const MAX_FILE_BYTES = 256 * 1024;
