@@ -1,10 +1,10 @@
 import { Database } from "bun:sqlite";
 import { constants } from "node:fs";
-import { chmod, link, lstat, open, realpath, rename, unlink } from "node:fs/promises";
+import { chmod, link, lstat, open, rename, unlink } from "node:fs/promises";
 import { connect, type Server } from "node:net";
 import { join } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
-import { ensurePrivateDirectory } from "./control-service.ts";
+import { assertOwnedPath, ensurePrivateDirectory } from "@hraness/local-custody/private-paths";
 
 const APPLICATION_ID = 0x54424355;
 type SocketIdentity = { dev: number; ino: number };
@@ -16,10 +16,12 @@ async function syncDirectory(path: string): Promise<void> {
   try { await handle.sync(); } finally { await handle.close(); }
 }
 async function identity(path: string): Promise<SocketIdentity | null> {
-  let value;
-  try { value = await lstat(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
-  if (!value.isSocket() || value.isSymbolicLink() || value.uid !== currentUid() || value.nlink !== 1 || (value.mode & 0o777) !== 0o600) throw new Error("An unknown or unsafe Textbutler socket entry already exists.");
-  return { dev: value.dev, ino: value.ino };
+  try {
+    return await assertOwnedPath(path, { kind: "socket", exactMode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new Error("An unknown or unsafe Textbutler socket entry already exists.", { cause: error });
+  }
 }
 function same(a: SocketIdentity | null, b: SocketIdentity): boolean { return a !== null && a.dev === b.dev && a.ino === b.ino; }
 async function refused(path: string): Promise<boolean> {
@@ -42,8 +44,12 @@ function parse(value: string): Custody {
   return item as unknown as Custody;
 }
 async function privateFile(path: string): Promise<void> {
-  const info = await lstat(path);
-  if (!info.isFile() || info.isSymbolicLink() || info.uid !== currentUid() || info.nlink !== 1 || (info.mode & 0o077) !== 0 || info.size > 1_048_576 || await realpath(path) !== path) throw new Error("Unsafe daemon custody database.");
+  try {
+    await assertOwnedPath(path, { kind: "file", ownerOnly: true, canonical: true, maximumBytes: 1_048_576n });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw error;
+    throw new Error("Unsafe daemon custody database.", { cause: error });
+  }
 }
 async function initializeDatabase(path: string, stateDir: string, applicationId: number): Promise<void> {
   try { await lstat(path); return; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
