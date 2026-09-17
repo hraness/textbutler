@@ -1,6 +1,6 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { assertOwnedPath, readOwnedFileStable } from "@hraness/local-custody/private-paths";
-import { parseClaudePriceCatalog, type ClaudePriceCatalog } from "../../agentrouter/src/claude-api-models.ts";
+import { parseClaudePriceCatalog, type ClaudePriceCatalog } from "@hraness/agentmixer";
 
 export type GhostgetHostConfig = Readonly<{ executable: string; runtimeExecutable?: string; authId: string; stateHome?: string;
   automationAccounts?: readonly Readonly<{ provider: "imessage" | "whatsapp"; authId: string }>[] }>;

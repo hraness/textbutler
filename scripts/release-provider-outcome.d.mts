@@ -37,6 +37,7 @@ export const releaseRestRequestBudget: Readonly<{
   providerBaseline: number;
   providerOutcome: number;
   providerPromotion: number;
+  providerRecovery: number;
   surroundingRelease: number;
   total: number;
 }>;

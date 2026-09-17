@@ -8,7 +8,7 @@ import { ContactWorkspace } from "./workspace.ts";
 import { RunJournal } from "./journal.ts";
 import { OwnerReadRecoveryError, assertSameConversation, bindingDigest, boundedHistory, parseConversationBinding, type ConversationBinding, type ObservedConversation, type OwnerConversationReadPort } from "./enrollment.ts";
 import type { ProviderHost } from "./provider-host.ts";
-import type { AccountLeaseStore } from "../../agentrouter/src/accounts.ts";
+import type { AccountLeaseStore } from "@hraness/agentmixer";
 import { selectButlerModel } from "./routed-agent.ts";
 import { parseAutomationBinding, type AutomationBinding, type AutomationCandidate, type OwnerAutomationPort } from "./automation-owner.ts";
 import { automationBindingDigest, parseAutomationGrant, type AutomationGrant } from "../../transport/src/automation.ts";

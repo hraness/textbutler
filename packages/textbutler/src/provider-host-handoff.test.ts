@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
-import { createCapabilityBroker, createCapabilityProfile } from "../../agentrouter/src/capabilities.ts";
-import { createManagedCodexAccountController, type CodexAccountCloseReceipt, type CodexAccountRequest } from "../../agentrouter/src/codex-account.ts";
-import { assertAgentTaskAccountLease, type AgentTaskAdapter, type AgentTaskBinding, type AgentTaskExecutionRequest, type AgentTaskRequest } from "../../agentrouter/src/task-runtime.ts";
+import { createCapabilityBroker, createCapabilityProfile } from "@hraness/agentmixer";
+import { createManagedCodexAccountController, type CodexAccountCloseReceipt, type CodexAccountRequest } from "@hraness/agentmixer";
+import { assertAgentTaskAccountLease, type AgentTaskAdapter, type AgentTaskBinding, type AgentTaskExecutionRequest, type AgentTaskRequest } from "@hraness/agentmixer";
 import { createProviderHost } from "./provider-host.ts";
 import { RunJournal } from "./journal.ts";
 

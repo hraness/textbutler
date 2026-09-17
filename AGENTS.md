@@ -156,8 +156,7 @@ apps, signing, and notarization are outside the current product scope.
   targets at user or project scope without leaving a partial pair.
 - Follow `docs/publishing.md` for the one-time production controls, stable
   release, and reviewed-`main` recovery procedure. Treat an immutable annotated
-  stable tag in the package's own namespace — `v*` for the root package or
-  `agentrouter-v*` for `@hraness/agentrouter` — matching every checked version
+  stable `v*` tag matching every checked version
   identity at a reviewed commit in current `main` history as a
   release request. Publish only after the complete root, site, packed-consumer,
   synthetic macOS gate, and exact-tarball macOS/Linux gates pass. Build the
@@ -215,7 +214,10 @@ apps, signing, and notarization are outside the current product scope.
   provider outcome gate to finish.
   Already-exact recovery must not enter the key environment. Recovery may
   revalidate only an existing immutable, artifact-complete Latest Release and
-  exact npm version and must never create either one. A later positive attempt
+  exact npm version and must never create either one. It may accept the
+  exact-SHA Production deployment that an earlier consumed site-route authority
+  created on that commit, never one that predates that authority's admitted
+  success. A later positive attempt
   may finish the same exact tag, commit, and tarball only when Sigstore binds
   the actual run ID and an allowed positive attempt. Keep Vercel Production
   Branch on `website-production`; `main` and pull requests are preview sources.

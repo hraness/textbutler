@@ -3,10 +3,10 @@ import { Database } from "bun:sqlite";
 import { chmod, lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
-import { SqliteAccountLeases } from "../../agentrouter/src/accounts.ts";
-import type { ManagedCodexAccountController } from "../../agentrouter/src/codex-account.ts";
-import type { CodexAccountProcessPort } from "../../agentrouter/src/codex-account-transport.ts";
-import type { CodexAccountProcessOptions } from "../../agentrouter/src/codex-account-process.ts";
+import { SqliteAccountLeases } from "@hraness/agentmixer";
+import type { ManagedCodexAccountController } from "@hraness/agentmixer";
+import type { CodexAccountProcessPort } from "@hraness/agentmixer";
+import type { CodexAccountProcessOptions } from "@hraness/agentmixer";
 import { createManagedCodexAccountFactory, type ManagedCodexFactoryOptions } from "./managed-codex.ts";
 
 const cleanup: (() => Promise<void>)[] = [];

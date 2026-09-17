@@ -8,9 +8,8 @@ const OIDC_CONFIG_ID = /^oidc:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 const SCOPED_PACKAGE = /^@[a-z0-9][a-z0-9._-]{0,127}\/[a-z0-9][a-z0-9._-]{0,127}$/u;
 
 /** One publishable package coordinate. tagPrefix namespaces its immutable
- * release tags ("v" for the root package, "agentrouter-v" for AgentRouter);
- * title prefixes the GitHub Release name. Every field is a closed constant —
- * no caller input may extend this set. */
+ * release tags; title prefixes the GitHub Release name. Every field is a
+ * closed constant — no caller input may extend this set. */
 export type ReleasePackage = Readonly<{
   name: string;
   repository: string;
@@ -28,16 +27,8 @@ export const rootReleasePackage: ReleasePackage = Object.freeze({
   title: "Message Like Me",
   workflowPath: ".github/workflows/release.yml",
 });
-export const agentrouterReleasePackage: ReleasePackage = Object.freeze({
-  name: "@hraness/agentrouter",
-  repository: publicRepository,
-  tagPrefix: "agentrouter-v",
-  title: "AgentRouter",
-  workflowPath: ".github/workflows/release-agentrouter.yml",
-});
 const releasePackages: ReadonlyMap<string, ReleasePackage> = new Map([
   [rootReleasePackage.name, rootReleasePackage],
-  [agentrouterReleasePackage.name, agentrouterReleasePackage],
 ]);
 
 /** Resolve the closed package descriptor for a staged manifest name. The

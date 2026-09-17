@@ -39,18 +39,11 @@ describe("npm Sigstore release signer policy", () => {
     });
   });
 
-  test("binds the AgentRouter signer to its own workflow and tag namespace", () => {
-    const agentrouterTag = "agentrouter-v0.1.0";
-    const agentrouterWorkflow = ".github/workflows/release-agentrouter.yml";
-    const agentrouterIdentity =
-      `https://github.com/hraness/textbutler/${agentrouterWorkflow}@refs/tags/${agentrouterTag}`;
-    const policy = releaseSignerIdentity(agentrouterTag, sha, invocation, agentrouterWorkflow);
-    expect(policy.identity).toBe(agentrouterIdentity);
-    expect(new RegExp(policy.options.certificateIdentityURI, "u").test(agentrouterIdentity)).toBe(true);
-    expect(new RegExp(policy.options.certificateIdentityURI, "u").test(identity)).toBe(false);
-    expect(policy.options.certificateOIDs["1.3.6.1.4.1.57264.1.6"]).toBe(`refs/tags/${agentrouterTag}`);
-    expect(policy.options.certificateOIDs["1.3.6.1.4.1.57264.1.18"].subarray(2).toString("utf8"))
-      .toBe(agentrouterIdentity);
+  test("rejects the former scoped package tag namespace", () => {
+    expect(() => releaseSignerIdentity("agentrouter-v0.1.0", sha, invocation, workflow))
+      .toThrow("coordinates");
+    expect(() => releaseSignerIdentity("agentmixer-v0.1.0", sha, invocation, workflow))
+      .toThrow("coordinates");
   });
 
   test("rejects non-stable tags and malformed commits before verification", () => {

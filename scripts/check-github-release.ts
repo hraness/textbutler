@@ -11,6 +11,9 @@ import {
 import { assertReviewedMainComparison } from "./release-ref-authority";
 
 const maximumJsonBytes = 512 * 1_024;
+// The reviewed-main ancestry comparison carries per-file patches for up to 300
+// changed files, so it shares the pinned provider helper's 8 MiB response bound.
+const maximumComparisonBytes = 8 * 1_024 * 1_024;
 const maximumArtifactBytes = 32 * 1_024 * 1_024;
 
 function required(name: string, pattern?: RegExp): string {
@@ -55,6 +58,7 @@ async function fetchJson(
   url: string,
   label: string,
   headers: Readonly<Record<string, string>>,
+  maximumBytes: number = maximumJsonBytes,
 ): Promise<unknown> {
   const response = await fetch(url, {
     cache: "no-store",
@@ -63,7 +67,7 @@ async function fetchJson(
     signal: AbortSignal.timeout(20_000),
   });
   if (response.status !== 200) throw new Error(`${label} returned HTTP ${String(response.status)}.`);
-  const bytes = await readBounded(response, label, maximumJsonBytes);
+  const bytes = await readBounded(response, label, maximumBytes);
   try {
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown;
   } catch {
@@ -93,7 +97,7 @@ const token = required("GITHUB_TOKEN");
 const verifiedSha = required("VERIFIED_SHA", /^[0-9a-f]{40}$/u);
 const verifiedTag = required(
   "VERIFIED_TAG",
-  /^(?:v|agentrouter-v)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u,
+  /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u,
 );
 const branch = required("DEFAULT_BRANCH", /^[A-Za-z0-9._/-]+$/u);
 const tarballPath = resolve(tarballArgument);
@@ -166,6 +170,7 @@ const comparison = await fetchJson(
   `${apiBase}/compare/${verifiedSha}...${branchSha}`,
   "GitHub reviewed-main ancestry",
   headers,
+  maximumComparisonBytes,
 ) as Readonly<{
   [key: string]: unknown;
 }>;

@@ -1,16 +1,16 @@
 import { join } from "node:path";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { AgentRouter, AgentStoppedError, unqualifiedAdapter, type AgentAdapter, type RuntimeQualification } from "../../agentrouter/src/runtime.ts";
-import { createClaudeApiAdapter, type ClaudeApiAdapterOptions } from "../../agentrouter/src/claude-api.ts";
-import { canonicalJson } from "../../agentrouter/src/codex-config.ts";
-import { createFileClaudeApiKeyResolver } from "../../agentrouter/src/claude-credentials.ts";
-import { discoverClaudeModels, type ClaudeModelDiscoveryOptions } from "../../agentrouter/src/claude-api-models.ts";
-import { selectClassifierModel, type ModelCatalog } from "../../agentrouter/src/models.ts";
-import type { AccountLease, AccountLeaseStore } from "../../agentrouter/src/accounts.ts";
-import type { CapabilityBroker } from "../../agentrouter/src/capabilities.ts";
-import type { AgentTaskAdapter, AgentTaskRequest, AgentTaskResult } from "../../agentrouter/src/task-runtime.ts";
-import type { AgentTaskAuthority } from "../../agentrouter/src/task-runtime.ts";
-import type { ManagedCodexAccountController } from "../../agentrouter/src/codex-account.ts";
+import { AgentMixer, AgentStoppedError, unqualifiedAdapter, type AgentAdapter, type RuntimeQualification } from "@hraness/agentmixer";
+import { createClaudeApiAdapter, type ClaudeApiAdapterOptions } from "@hraness/agentmixer";
+import { canonicalJson } from "@hraness/agentmixer";
+import { createFileClaudeApiKeyResolver } from "@hraness/agentmixer";
+import { discoverClaudeModels, type ClaudeModelDiscoveryOptions } from "@hraness/agentmixer";
+import { selectClassifierModel, type ModelCatalog } from "@hraness/agentmixer";
+import type { AccountLease, AccountLeaseStore } from "@hraness/agentmixer";
+import type { CapabilityBroker } from "@hraness/agentmixer";
+import type { AgentTaskAdapter, AgentTaskRequest, AgentTaskResult } from "@hraness/agentmixer";
+import type { AgentTaskAuthority } from "@hraness/agentmixer";
+import type { ManagedCodexAccountController } from "@hraness/agentmixer";
 import type { ProviderAccountConfig, HostConfig } from "./host-config.ts";
 import type { ContactSettings } from "./config.ts";
 import type { ProviderSelection } from "./routed-agent.ts";
@@ -18,7 +18,7 @@ import { parseProviderLoginChallenge, type ProviderLoginChallenge, type Provider
 
 export type { ProviderAccountDiagnostic } from "../../control/src/index.ts";
 export interface ProviderHost {
-  readonly router: AgentRouter;
+  readonly router: AgentMixer;
   accounts(): readonly ProviderAccountDiagnostic[];
   check(accountId: string, signal: AbortSignal): Promise<void>;
   startLogin(accountId: string, method: "chatgpt" | "chatgptDeviceCode", signal: AbortSignal): Promise<ProviderLoginChallenge>;
@@ -64,7 +64,7 @@ export function createProviderHost(options: {
   let closing: Promise<void> | undefined;
   // Observe the real runtime acquisition/release, without acquiring another
   // lease or inferring stopped custody from an exception or expired TTL.
-  const taskRouter = new AgentRouter({ adapters: [], taskAdapters: options.taskAdapters ?? [], now, leases: {
+  const taskRouter = new AgentMixer({ adapters: [], taskAdapters: options.taskAdapters ?? [], now, leases: {
     acquire(input) { const lease = options.leases.acquire(input); taskLeases.set(input.accountId, lease); return lease; },
     renew: (lease, at, ttl) => options.leases.renew(lease, at, ttl),
     release(lease) {
@@ -186,7 +186,7 @@ export function createProviderHost(options: {
     finally { pending.delete(task); checking.delete(accountId); }
   };
   return {
-    router: new AgentRouter({ adapters: [route, unqualifiedAdapter("codex")], leases: options.leases, now }),
+    router: new AgentMixer({ adapters: [route, unqualifiedAdapter("codex")], leases: options.leases, now }),
     accounts() { return accounts.map(account => {
       const provider = account.route === "codex" ? "codex" as const : "claude" as const;
       if (account.route === "codex" && options.managedCodex) {

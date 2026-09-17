@@ -3,12 +3,12 @@ import { Database } from "bun:sqlite";
 import { mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { AgentRouter } from "../../agentrouter/src/runtime.ts";
-import { SqliteAccountLeases } from "../../agentrouter/src/accounts.ts";
-import { BROKER_TOOL_NAMES } from "../../agentrouter/src/broker.ts";
-import type { CapabilityBroker } from "../../agentrouter/src/capabilities.ts";
-import type { AgentTaskAdapter, AgentTaskExecutionRequest, TaskRuntimeQualification } from "../../agentrouter/src/task-runtime.ts";
-import type { ModelCatalog } from "../../agentrouter/src/models.ts";
+import { AgentMixer } from "@hraness/agentmixer";
+import { SqliteAccountLeases } from "@hraness/agentmixer";
+import { BROKER_TOOL_NAMES } from "@hraness/agentmixer";
+import type { CapabilityBroker } from "@hraness/agentmixer";
+import type { AgentTaskAdapter, AgentTaskExecutionRequest, TaskRuntimeQualification } from "@hraness/agentmixer";
+import type { ModelCatalog } from "@hraness/agentmixer";
 import { contactCapabilityIdentity, type ButlerPurpose } from "./contact-capabilities.ts";
 import { createRoutedButlerAgent, type ProviderSelection } from "./routed-agent.ts";
 import { ContactWorkspace } from "./workspace.ts";
@@ -52,7 +52,7 @@ async function setup(execute?: Execute, change?: (value: ProviderSelection, purp
         stoppedAtUnixMs: NOW, proofDigest: "c".repeat(64) }; },
     };
   });
-  const router = new AgentRouter({ adapters: [], taskAdapters: adapters, leases, now: () => NOW });
+  const router = new AgentMixer({ adapters: [], taskAdapters: adapters, leases, now: () => NOW });
   const signal = new AbortController();
   const agent = createRoutedButlerAgent({ router, now: () => NOW, getWorkspace: async () => workspace, isActive: () => active,
     runManagedTask: (request, broker) => router.runTask(request, broker),

@@ -5,7 +5,7 @@ import { initializeOwnerState, TEXTBUTLER_CONTROL_PROTOCOL } from "./control-ser
 import { defaultDataDirectory, requestDaemon, startDaemon } from "./daemon.ts";
 import { createLaunchAgentLifecycle, type LaunchAgentLifecycle } from "./launch-agent.ts";
 import { runMenuBarCommand } from "./menubar.ts";
-import type { ClaudeApiAdapterOptions } from "../../agentrouter/src/claude-api.ts";
+import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
 
 export const CLI_USAGE = "textbutler support [protocol --json|offer --json|shown ID|release ID|dismiss|snooze|enable|status --json] | init|doctor|providers list|providers check ACCOUNT|daemon run|daemon install|daemon uninstall|daemon status|menubar [start|stop|status|doctor|install|uninstall] [--data-dir /physical/private/path]";
 export async function runTextbutlerCli(argv: readonly string[], output: { write(text: string): unknown } = process.stdout, options: { launchAgent?: LaunchAgentLifecycle;
