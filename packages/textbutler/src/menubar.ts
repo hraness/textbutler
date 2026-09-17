@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 import { handleCompanionCommand, openBrowser, type CompanionOptions, type MenuItem } from "@hraness/desktop-foundation";
-import { CONTROL_PROTOCOL, disconnectedSnapshot, type DesktopSnapshot } from "../../control/src/index.ts";
+import { CONTROL_PROTOCOL, disconnectedSnapshot, type ControlRequest, type ControlResponse, type DesktopSnapshot } from "../../control/src/index.ts";
 import { requestDaemon } from "./daemon.ts";
 import { TRAY_ICON } from "./menubar-icon.ts";
 
@@ -61,6 +61,38 @@ function capabilityItems(snapshot: DesktopSnapshot): MenuItem[] {
   });
 }
 
+/** Owner reply inbox: pending conversations to triage and drafts awaiting an
+ * explicit send. The menu can trigger a scan or suggestion and send only the
+ * exact reviewed draft — free-text replies stay on the CLI. */
+function replyItems(snapshot: DesktopSnapshot): MenuItem[] {
+  const replies = snapshot.replies;
+  if (!replies) return [{ kind: "label", label: "Messaging automation is not configured" }];
+  const rows: MenuItem[] = [{ kind: "action", id: "replies.scan", label: "Check for replies" }];
+  for (const item of replies.pending.slice(0, 10)) {
+    const draft = replies.drafts.find(candidate => candidate.contactId === item.contactId);
+    rows.push({ kind: "submenu", label: menuLabel(`${item.name} · ${item.pendingCount} to answer`) || "Conversation", items: [
+      { kind: "label" as const, label: menuLabel(item.enabled ? "Automatic replies on" : "Automatic replies off") },
+      ...(item.preview ? detailItems(item.preview) : []),
+      ...(item.reason ? detailItems(item.reason) : []),
+      ...(item.sendable ? [{ kind: "action" as const, id: `replies.suggest:${item.contactId}`, label: draft ? "Suggest a fresh reply" : "Suggest a reply" }]
+        : []),
+    ]});
+  }
+  for (const draft of replies.drafts.slice(0, 10)) {
+    rows.push({ kind: "submenu", label: menuLabel(`Draft · ${draft.name}`) || "Draft", items: [
+      ...detailItems(draft.preview),
+      ...(draft.actionCount > 1 ? [{ kind: "label" as const, label: `Includes ${draft.actionCount} actions` }] : []),
+      { kind: "label" as const, label: menuLabel(`Expires ${draft.expiresAt.slice(11, 16)} UTC`) },
+      { kind: "action" as const, id: `replies.send:${draft.id}`, label: "Send this reply" },
+      { kind: "action" as const, id: `replies.discard:${draft.id}`, label: "Discard suggestion" },
+    ]});
+  }
+  if (replies.pending.length === 0 && replies.drafts.length === 0) {
+    rows.push({ kind: "label", label: replies.scannedAt === null ? "Check for replies to scan enrolled conversations" : "Nothing waiting for a reply" });
+  }
+  return rows;
+}
+
 function activityItems(activity: DesktopSnapshot["activity"]): MenuItem[] {
   const recent = [...activity].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, 8);
   if (!recent.length) return [{ kind: "label", label: "No recent activity" }];
@@ -90,6 +122,7 @@ export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeS
     { kind: "submenu", label: "Status detail", items: detailItems(snapshot.automation?.detail ?? snapshot.detail) },
     { kind: "separator" },
     { kind: "action", id: "toggle-pause", label: "Automatic replies paused", checked: paused, enabled: connected },
+    { kind: "submenu", label: `Replies · ${snapshot.replies ? snapshot.replies.pending.reduce((count, item) => count + item.pendingCount, 0) : 0} waiting`, items: replyItems(snapshot) },
     { kind: "submenu", label: "Contacts", items: contactItems(snapshot.contacts) },
     { kind: "submenu", label: `Agent accounts · ${ready} of ${accounts.length} ready`, items: accountItems(snapshot) },
     { kind: "submenu", label: "Capabilities", items: capabilityItems(snapshot) },
@@ -110,6 +143,16 @@ export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeS
 export function companionOptions(dataDir: string, open: typeof openBrowser = openBrowser): CompanionOptions {
   let lastSnapshot: DesktopSnapshot | null = null;
   let confirmedAt: number | null = null;
+  /** Job-backed control calls resolve their stored result before returning. */
+  const daemonJob = async (request: ControlRequest): Promise<ControlResponse> => {
+    let response = await requestDaemon({ dataDir, request });
+    const deadline = Date.now() + 90_000;
+    while (response.ok && response.kind === "job" && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      response = await requestDaemon({ dataDir, request: { protocol: CONTROL_PROTOCOL, command: "owner.job.read", jobId: response.jobId } });
+    }
+    return response;
+  };
   return {
     appId: "textbutler",
     name: "Textbutler",
@@ -143,6 +186,28 @@ export function companionOptions(dataDir: string, open: typeof openBrowser = ope
       if (id === "open-website") { await open(WEBSITE); return; }
       if (id === "product.support") { await open(SUPPORT); return; }
       if (id === "refresh") return; // the runner re-reads state after every action
+      if (id === "replies.scan") {
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "replies.scan" });
+        if (!response.ok) throw new Error(`replies-scan-${response.code}`);
+        return;
+      }
+      if (id.startsWith("replies.suggest:")) {
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "replies.suggest", contactId: id.slice(16) });
+        if (!response.ok) throw new Error(`replies-suggest-${response.code}`);
+        return;
+      }
+      if (id.startsWith("replies.send:")) {
+        // Sends only ever target an exact reviewed draft; there is no free-text path here.
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "replies.send", draftId: id.slice(13) });
+        if (!response.ok) throw new Error(`replies-send-${response.code}`);
+        if (response.kind === "reply-sent" && response.state !== "submitted") throw new Error(`replies-send-${response.state}`);
+        return;
+      }
+      if (id.startsWith("replies.discard:")) {
+        const response = await requestDaemon({ dataDir, request: { protocol: CONTROL_PROTOCOL, command: "replies.discard", draftId: id.slice(16) } });
+        if (!response.ok) throw new Error(`replies-discard-${response.code}`);
+        return;
+      }
       if (id === "toggle-pause") {
         const current = lastSnapshot;
         if (!current || current.connection !== "connected") return;

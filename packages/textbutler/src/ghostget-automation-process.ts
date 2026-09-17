@@ -42,7 +42,7 @@ async function claim(options: GhostgetAutomationProcessOptions): Promise<() => P
 export async function createGhostgetAutomationProcess(input: GhostgetAutomationProcessOptions) {
   const options = structuredClone(input);
   for (const path of [options.executable, options.custodyDirectory, options.runtimeExecutable, options.stateHome]) if (path !== undefined && !isAbsolute(path)) throw new Error("Ghostget host paths must be absolute");
-  if (!options.providers.length || options.providers.length > 2 || new Set(options.providers.map(row => row.provider)).size !== options.providers.length) throw new Error("One explicit account per messaging network is required");
+  if (!options.providers.length || options.providers.length > 3 || new Set(options.providers.map(row => row.provider)).size !== options.providers.length) throw new Error("One explicit account per messaging network is required");
   for (const row of options.providers) { automationProvider(row.provider); automationId(row.authId); }
   const release = await claim(options);
   const environment: Record<string, string> = { PATH: "/usr/bin:/bin:/usr/sbin:/sbin", HRANESS_SUPPORT_AUDIENCE: "off", HRANESS_SUPPORT_EMAIL: "off" };

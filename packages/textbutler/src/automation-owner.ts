@@ -1,5 +1,5 @@
-import { AUTOMATION_ACTIONS, automationBindingDigest, automationHash, parseAutomationEnrollment, parseAutomationGrant, type AutomationConversation,
-  type AutomationEnrollment, type AutomationGrant, type AutomationIdentity, type AutomationProvider, type AutomationStatus, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
+import { AUTOMATION_ACTIONS, automationBindingDigest, automationHash, automationId, parseAutomationEnrollment, parseAutomationGrant, type AutomationConversation,
+  type AutomationEnrollment, type AutomationGrant, type AutomationGrantRequest, type AutomationIdentity, type AutomationProvider, type AutomationStatus, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import type { HistoryMessage } from "./enrollment.ts";
 
 /** Durable recipient identity. Readiness, revision and grants are intentionally separate. */
@@ -14,6 +14,9 @@ export interface OwnerAutomationPort {
   enroll(candidate: AutomationCandidate, initializeHistory: boolean, signal: AbortSignal): Promise<{ binding: AutomationBinding; messages: HistoryMessage[] }>;
   validate(binding: AutomationBinding, signal: AbortSignal): Promise<AutomationEnrollment>;
   grant(binding: AutomationBinding, intentId: string, signal: AbortSignal): Promise<AutomationGrant>;
+  /** Same validated delegation with owner-supplied tight bounds (action kinds,
+   * quota and expiry) for a single explicit owner-initiated send. */
+  grantScoped(binding: AutomationBinding, request: AutomationGrantRequest, intentId: string, signal: AbortSignal): Promise<AutomationGrant>;
   grantByIntent(intentId: string, signal: AbortSignal): Promise<AutomationGrant | null>;
   grantStatus(binding: AutomationBinding, grantId: string, signal: AbortSignal): Promise<AutomationGrant>;
   revoke(id: string, signal?: AbortSignal): Promise<void>;
@@ -41,7 +44,7 @@ export function createAutomationOwnerPort(options: { client: GhostgetAutomationC
   const client = options.client, providers = [...options.providers], now = options.now ?? Date.now;
   const statuses = new Map<AutomationProvider, { status: AutomationStatus; observedAt: number }>();
   const remember = (status: AutomationStatus) => { statuses.set(status.identity.provider, { status: structuredClone(status), observedAt: now() }); };
-  if (!providers.length || providers.length > 2 || new Set(providers).size !== providers.length || providers.some(value => value !== "imessage" && value !== "whatsapp")) throw new Error("Invalid owner messaging networks");
+  if (!providers.length || providers.length > 3 || new Set(providers).size !== providers.length || providers.some(value => value !== "imessage" && value !== "whatsapp" && value !== "beeper")) throw new Error("Invalid owner messaging networks");
   const validate = async (binding: AutomationBinding, signal: AbortSignal) => {
     const expected = parseAutomationBinding(binding); signal.throwIfAborted();
     if (!providers.includes(expected.identity.provider)) throw new Error("Messaging provider is not configured");
@@ -98,6 +101,21 @@ export function createAutomationOwnerPort(options: { client: GhostgetAutomationC
       const actions = AUTOMATION_ACTIONS.filter(action => status.actions[action].available);
       return parseAutomationGrant(await client.grant({ enrollmentId: binding.enrollmentId, expectedBindingDigest: binding.bindingDigest,
         actions, expiresAt: new Date(now() + 30 * 86_400_000).toISOString(), maximumActions: 100_000, minimumIntervalMs: 0 }, intentId, signal));
+    },
+    async grantScoped(binding, request, intentId, signal) {
+      await validate(binding, signal);
+      const status = await client.status(binding.identity.provider, signal); signal.throwIfAborted();
+      remember(status);
+      if (automationHash(status.identity) !== automationHash(binding.identity) || !status.connected || !status.events.available) throw new Error("Messaging delegation is unavailable");
+      if (automationId(request.enrollmentId) !== binding.enrollmentId || request.expectedBindingDigest !== binding.bindingDigest) throw new Error("Scoped grant changed its recipient");
+      const actions = request.actions.map(action => { if (!AUTOMATION_ACTIONS.includes(action) || !status.actions[action].available) throw new Error("Requested action is unavailable"); return action; });
+      if (!actions.length || actions.length > 8 || new Set(actions).size !== actions.length) throw new Error("Scoped grant needs 1-8 distinct actions");
+      const expiresAt = Date.parse(request.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now() || expiresAt > now() + 30 * 86_400_000
+        || !Number.isSafeInteger(request.maximumActions) || request.maximumActions < 1 || request.maximumActions > 100_000
+        || !Number.isSafeInteger(request.minimumIntervalMs) || request.minimumIntervalMs < 0 || request.minimumIntervalMs > 86_400_000) throw new Error("Scoped grant bounds are invalid");
+      return parseAutomationGrant(await client.grant({ enrollmentId: binding.enrollmentId, expectedBindingDigest: binding.bindingDigest,
+        actions, expiresAt: new Date(expiresAt).toISOString(), maximumActions: request.maximumActions, minimumIntervalMs: request.minimumIntervalMs }, intentId, signal));
     },
     grantByIntent: (intentId, signal) => client.grantByIntent(intentId, signal),
     async grantStatus(binding, grantId, signal) {

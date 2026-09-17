@@ -75,6 +75,7 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
     const enrollment = options.enrollment ?? (host.ghostget === undefined || host.ghostget.automationAccounts ? undefined : createGhostgetOwnerReadPort({ ...host.ghostget, custodyDirectory: join(dataDir, "state") }));
     extensions = await loadOwnerExtensions(dataDir);
     service = await TextbutlerControlService.open({ dataDir, ...(options.initialSettings === undefined ? {} : { initialSettings: options.initialSettings }), ...(enrollment === undefined ? {} : { enrollment }), ...(automation === undefined ? {} : { automation }), recoverRuns: true,
+      ...(messaging === undefined ? {} : { client: messaging.client }), hooks: extensions.hooks,
       providers: leases => createProviderHost({ dataDir, config: host, leases, ...(options.providerArtifact === undefined ? {} : { runtimeArtifact: options.providerArtifact }),
         ...(options.managedCodex === undefined ? {} : { managedCodex: options.managedCodex }) }) });
     await service.recoverInactiveGrants();

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { AUTOMATION_ACTIONS, automationBindingDigest, createGhostgetAutomationClient, type AutomationGrant, type AutomationGrantRequest,
-  type AutomationEnrollment, type AutomationProvider } from "../../transport/src/automation.ts";
+  type AutomationEnrollment, type AutomationProvider, type AutomationCoordinate } from "../../transport/src/automation.ts";
 import { createAutomationOwnerPort, parseAutomationBinding, automationBinding } from "./automation-owner.ts";
 import { TextbutlerControlService, TEXTBUTLER_CONTROL_PROTOCOL as protocol } from "./control-service.ts";
 import { createProviderHost, type ProviderHost } from "./provider-host.ts";
@@ -16,7 +16,7 @@ afterEach(async () => { for (const service of services.splice(0)) await service.
 function fixture(provider: AutomationProvider = "imessage") {
   const now = Date.now(), calls: string[] = [], revoked: string[] = [], grants: AutomationGrant[] = [];
   const identity = { provider, authId: "synthetic", accountIdentity: "a".repeat(64), accountSubject: "synthetic-account", implementationIdentity: "b".repeat(64), sourceGeneration: "synthetic-generation" };
-  const coordinate = provider === "imessage" ? { provider, chatGuid: "iMessage;-;synthetic", service: "iMessage" as const, observedChatRowId: 1 } : { provider, conversationJid: "12345@s.whatsapp.net" };
+  const coordinate: AutomationCoordinate = provider === "imessage" ? { provider, chatGuid: "iMessage;-;synthetic", service: "iMessage" as const, observedChatRowId: 1 } : provider === "beeper" ? { provider, accountId: "synthetic-account-id", conversationId: "synthetic-conversation" } : { provider, conversationJid: "12345@s.whatsapp.net" };
   const conversation = { coordinate, title: "Synthetic person", kind: "single" as const, participants: ["synthetic-person"] };
   const enrollment: AutomationEnrollment = { id: `enrollment:${provider}`, identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision: 0, ready: true, reason: null };
   let enrolled = false, drift = false, blockGrant: (() => Promise<void>) | undefined, revokeFails = false, loseGrant = false;
@@ -140,7 +140,7 @@ for (const defect of ["missing-classifier", "stale-classifier", "stale-response"
 }
 
 test("owner automation has explicit startup, exact network identity and opt-in context import", async () => {
-  for (const provider of ["imessage", "whatsapp"] as const) {
+  for (const provider of ["imessage", "whatsapp", "beeper"] as const) {
     const f = fixture(provider), signal = new AbortController().signal;
     expect(f.calls).toEqual([]);
     const listed = await f.port.list(signal); expect(f.calls).toEqual(["conversations"]);

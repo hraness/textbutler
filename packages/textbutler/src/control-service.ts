@@ -6,19 +6,21 @@ import type { ControlRequest, ControlResponse, DesktopSnapshot } from "../../con
 import { configureContact, newContact, DEFAULT_ACTIVE_LIMIT, parseSettings, type ContactSettings, type Settings } from "./config.ts";
 import { ContactWorkspace } from "./workspace.ts";
 import { RunJournal } from "./journal.ts";
-import { OwnerReadRecoveryError, assertSameConversation, bindingDigest, boundedHistory, parseConversationBinding, type ConversationBinding, type ObservedConversation, type OwnerConversationReadPort } from "./enrollment.ts";
+import { OwnerReadRecoveryError, assertSameConversation, bindingDigest, boundedHistory, parseConversationBinding, type ConversationBinding, type HistoryMessage, type ObservedConversation, type OwnerConversationReadPort } from "./enrollment.ts";
 import type { ProviderHost } from "./provider-host.ts";
 import type { AccountLeaseStore } from "@hraness/agentmixer";
 import { selectButlerModel } from "./routed-agent.ts";
 import { parseAutomationBinding, type AutomationBinding, type AutomationCandidate, type OwnerAutomationPort } from "./automation-owner.ts";
-import { automationBindingDigest, parseAutomationGrant, type AutomationGrant } from "../../transport/src/automation.ts";
+import { automationBindingDigest, parseAutomationGrant, type AutomationGrant, type AutomationProvider, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
+import { OwnerReplies, type PendingObservation } from "./owner-replies.ts";
+import { Hooks } from "./hooks.ts";
 
 export const TEXTBUTLER_CONTROL_PROTOCOL = "textbutler.control.v1" as const;
 const MAX_SETTINGS_BYTES = 524_288;
 const MAX_CONTACTS = 200;
 const CONTACT_KEYS = ["id", "label", "routeId", "enabled", "mode", "keyword", "provider", "accountId", "replyModel", "classifierModel", "disclosure", "revision", "pausedUntil", "humanCooldownMs", "debounceMs", "maxRepliesPerHour"];
 type FailureCode = "invalid-request" | "conflict" | "capacity" | "unavailable";
-class ControlFailure extends Error { constructor(readonly code: FailureCode, message: string) { super(message); } }
+export class ControlFailure extends Error { constructor(readonly code: FailureCode, message: string) { super(message); } }
 function fail(code: FailureCode, message: string): never { throw new ControlFailure(code, message); }
 function record(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) fail("invalid-request", "Expected a plain control object.");
@@ -38,6 +40,7 @@ function text(value: unknown, max = 256): string {
 }
 function contactId(value: unknown): string { const id = text(value, 80); if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/u.test(id)) fail("invalid-request", "Invalid contact identifier."); return id; }
 function bool(value: unknown): boolean { if (typeof value !== "boolean") fail("invalid-request", "Invalid control flag."); return value; }
+function providerName(provider: AutomationProvider): string { return provider === "imessage" ? "iMessage" : provider === "beeper" ? "Beeper" : "WhatsApp"; }
 function parseUiSettings(value: unknown) {
   const settings = record(value); exact(settings, ["enabled", "responseMode", "keyword", "provider", "disclosure", ...(settings.accountId === undefined ? [] : ["accountId"])]);
   const disclosure = record(settings.disclosure); exact(disclosure, ["character", "begin", "end"]);
@@ -73,9 +76,29 @@ export function parseControlRequest(value: unknown): ControlRequest {
     if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(loginId)) fail("invalid-request", "Invalid provider sign-in identity.");
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, accountId: contactId(item.accountId), loginId };
   }
+  if (item.command === "replies.scan") {
+    exact(item, ["protocol", "command"]); return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command };
+  }
+  if (item.command === "replies.suggest") {
+    exact(item, ["protocol", "command", "contactId"]);
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId) };
+  }
+  if (item.command === "replies.send") {
+    if (Object.hasOwn(item, "draftId")) {
+      exact(item, ["protocol", "command", "draftId"]);
+      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, draftId: text(item.draftId, 120) };
+    }
+    exact(item, ["protocol", "command", "contactId", "text"]);
+    if (typeof item.text !== "string" || !item.text.trim() || Buffer.byteLength(item.text) > 16_384 || item.text.includes("\0")) fail("invalid-request", "Reply text must be 1-16,384 bytes without NUL.");
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), text: item.text };
+  }
+  if (item.command === "replies.discard") {
+    exact(item, ["protocol", "command", "draftId"]);
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, draftId: text(item.draftId, 120) };
+  }
   if (item.command === "messaging.start") {
     exact(item, ["protocol", "command", "provider"]);
-    if (item.provider !== "imessage" && item.provider !== "whatsapp") fail("invalid-request", "Choose a configured messaging provider.");
+    if (item.provider !== "imessage" && item.provider !== "whatsapp" && item.provider !== "beeper") fail("invalid-request", "Choose a configured messaging provider.");
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, provider: item.provider };
   }
   if (item.command === "contact.enroll") {
@@ -170,13 +193,24 @@ export class TextbutlerControlService {
   private runtimeStatus: { state: "running" | "paused" | "unavailable"; detail: string } = { state: "unavailable", detail: "Automatic replies need a configured messaging connection, scoped contact grant and admitted agent account." };
   private jobs = new Map<string, { result?: ControlResponse; expires: number }>();
   private activeJob: { controller: AbortController; promise: Promise<void> } | undefined;
-  private constructor(readonly dataDir: string, private readonly settingsPath: string, private readonly journal: RunJournal, private readonly enrollment?: OwnerConversationReadPort, readonly providers?: ProviderHost, readonly automation?: OwnerAutomationPort) {}
-  static async open(options: { dataDir: string; initialSettings?: Settings; recoverRuns?: boolean; enrollment?: OwnerConversationReadPort; providers?: (leases: AccountLeaseStore) => ProviderHost; automation?: OwnerAutomationPort }): Promise<TextbutlerControlService> {
+  private readonly replies: OwnerReplies | undefined;
+  private constructor(readonly dataDir: string, private readonly settingsPath: string, private readonly journal: RunJournal, private readonly enrollment?: OwnerConversationReadPort, readonly providers?: ProviderHost, readonly automation?: OwnerAutomationPort, private readonly client?: GhostgetAutomationClient, hooks?: Hooks) {
+    this.replies = automation !== undefined && client !== undefined ? new OwnerReplies({
+      state: () => this.runtimeState(), journal: this.journal,
+      automation: () => this.automation, client: () => this.client, enrollment: () => this.enrollment, providers: () => this.providers,
+      hooks: hooks ?? new Hooks(),
+      workspace: contactId => ContactWorkspace.create(join(this.dataDir, "contacts", contactId)),
+      grantWork: this.grantWork,
+      publishGrant: (contactId, grant) => this.publishGrant(contactId, grant),
+      now: () => Date.now(),
+    }) : undefined;
+  }
+  static async open(options: { dataDir: string; initialSettings?: Settings; recoverRuns?: boolean; enrollment?: OwnerConversationReadPort; providers?: (leases: AccountLeaseStore) => ProviderHost; automation?: OwnerAutomationPort; client?: GhostgetAutomationClient; hooks?: Hooks }): Promise<TextbutlerControlService> {
     const state = await initializeOwnerState(options.dataDir, options.initialSettings);
     const journal = await RunJournal.open(join(state.dataDir, "state", "runs.sqlite"));
     try {
       if (options.recoverRuns === true) journal.recover(Date.now());
-      return new TextbutlerControlService(state.dataDir, state.settingsPath, journal, options.enrollment, options.providers?.(journal.accountLeases()), options.automation);
+      return new TextbutlerControlService(state.dataDir, state.settingsPath, journal, options.enrollment, options.providers?.(journal.accountLeases()), options.automation, options.client, options.hooks);
     } catch (error) { journal.close(); throw error; }
   }
   private async current(): Promise<{ state: OwnerState; bytes: string }> {
@@ -245,6 +279,24 @@ export class TextbutlerControlService {
     })();
     this.grantWork.set(contact.id, work);
     try { return await work; } finally { this.grantWork.delete(contact.id); }
+  }
+  /** The reply loop reports the cluster it already observed; owner scans replace it. */
+  notePending(contactId: string, value: PendingObservation | null): void { this.replies?.notePending(contactId, value); }
+  /** Journal provenance reclassifies disclosure-free sends that the history
+   * reader could only mark owner-authored. */
+  private reauthor(messages: HistoryMessage[]): HistoryMessage[] {
+    return messages.map(message => message.author === "owner" && this.journal.knownSentMessage(message.id) ? { ...message, author: "butler" as const } : message);
+  }
+  /** Owner-initiated sends publish or retract their scoped grant through the
+   * same serialized settings write as every other grant change. */
+  private publishGrant(contactId: string, grant: AutomationGrant | null): Promise<void> {
+    return this.serial(async () => {
+      const latest = await this.current();
+      if (this.closed) return;
+      const grants = { ...latest.state.grants };
+      if (grant === null) delete grants[contactId]; else grants[contactId] = grant;
+      await this.publish(latest, latest.state.settings, latest.state.bindings, grants);
+    });
   }
   private revokeDisabled(contactId: string, grant: AutomationGrant): void {
     if (!this.automation || this.grantWork.has(contactId)) return;
@@ -329,12 +381,12 @@ export class TextbutlerControlService {
       const supported = observed.filter(value => value.status.connected && actions.some(action => value.status.actions[action].available));
       const unavailable = observed.map(value => {
         const reasons = [...new Set(actions.map(action => value.status.actions[action].reason).filter((reason): reason is string => typeof reason === "string" && reason.length > 0))];
-        return `${value.status.identity.provider === "imessage" ? "iMessage" : "WhatsApp"}: ${reasons.join(" ") || "This feature is unavailable on the checked connection."}`;
+        return `${providerName(value.status.identity.provider)}: ${reasons.join(" ") || "This feature is unavailable on the checked connection."}`;
       });
       const combined = unavailable.join(" ");
       const unavailableDetail = combined.length <= 4096 ? combined : `${combined.slice(0, 4000).replace(/[\uD800-\uDBFF]$/u, "")}… Details shortened.`;
       return { id, status: supported.length ? "available" as const : observed.length ? "unsupported" as const : "setup-required" as const,
-        detail: supported.length ? `Last confirmed by ${supported.map(value => value.status.identity.provider === "imessage" ? "iMessage" : "WhatsApp").join(" and ")}. The selected contact's grant and current provider capability are checked before sending.`
+        detail: supported.length ? `Last confirmed by ${supported.map(value => providerName(value.status.identity.provider)).join(" and ")}. The selected contact's grant and current provider capability are checked before sending.`
           : observed.length ? unavailableDetail : "Connect messaging to check this feature's availability." };
     };
     const activity = state.settings.contacts.flatMap(contact => this.journal.recent(contact.id, 50)).sort((a, b) => b.startedAt - a.startedAt).slice(0, 200).map(run => ({ id: run.id, at: new Date(run.updatedAt).toISOString(), contactId: run.contactId, title: run.state, detail: run.reason }));
@@ -345,7 +397,7 @@ export class TextbutlerControlService {
       ...(this.automation ? { messagingProviders: this.automation.providers() } : {}),
       settings: { paused: state.settings.paused, activeContactLimit: state.settings.maxActiveContacts },
       contacts: state.settings.contacts.map(contact => { const binding = state.bindings[contact.id], grant = state.grants[contact.id], recovering = this.grantFailures.has(contact.id) || this.pendingGrant(contact.id); return { id: contact.id, name: contact.label,
-        subtitle: binding?.version === 2 ? `${binding.identity.provider === "imessage" ? "iMessage" : "WhatsApp"} · ${contact.enabled && grant && Date.parse(grant.expiresAt) > Date.now() && !recovering ? "Contact grant active" : "Butler off or grant unavailable"}` : binding ? "Selected Messages conversation · sending unavailable" : "Owner-configured workspace · sending unavailable",
+        subtitle: binding?.version === 2 ? `${providerName(binding.identity.provider)} · ${contact.enabled && grant && Date.parse(grant.expiresAt) > Date.now() && !recovering ? "Contact grant active" : "Butler off or grant unavailable"}` : binding ? "Selected Messages conversation · sending unavailable" : "Owner-configured workspace · sending unavailable",
         ...(binding?.version !== 2 ? {} : { messaging: { provider: binding.identity.provider,
           state: this.grantWork.has(contact.id) ? "revocation-pending" as const : recovering || !contact.enabled && grant ? "recovery-required" as const : contact.enabled && grant && Date.parse(grant.expiresAt) > Date.now() ? "active" as const : "missing" as const,
           detail: this.grantWork.has(contact.id) ? "The messaging grant is changing. New dispatches wait until it settles."
@@ -363,6 +415,7 @@ export class TextbutlerControlService {
         richCapability("stickers", ["sticker"]), richCapability("links", ["link"]),
         richCapability("polls", ["poll"]), richCapability("mini-apps", ["app-clip", "experience"]),
       ], activity,
+      ...(this.replies === undefined ? {} : { replies: this.replies.view(state) }),
     };
   }
   private enrollAutomation(request: Extract<ControlRequest, { command: "contact.enroll" }>): ControlResponse {
@@ -375,7 +428,8 @@ export class TextbutlerControlService {
       const observed = await this.automation!.enroll(candidate.candidate, request.initializeHistory, signal); signal.throwIfAborted();
       const binding = parseAutomationBinding(observed.binding);
       if (binding.bindingDigest !== automationBindingDigest(candidate.candidate.identity, candidate.candidate.conversation)) throw new Error("Messaging enrollment changed its target");
-      const messages = request.initializeHistory ? boundedHistory(observed.messages) : [];
+      const reauthored = this.reauthor(observed.messages);
+      const messages = request.initializeHistory ? boundedHistory(reauthored) : [];
       const historyOmittedCount = request.initializeHistory ? observed.messages.length - messages.length : 0;
       const historyShortenedCount = request.initializeHistory ? messages.filter(message => observed.messages.find(original => original.id === message.id || `sha256:${hash(original.id)}` === message.id)?.text !== message.text).length : 0;
       return this.serial(async () => {
@@ -468,6 +522,36 @@ export class TextbutlerControlService {
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "snapshot", snapshot: await this.snapshot() };
       });
     }
+    if (request.command === "replies.scan") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return this.startJob(async signal => {
+        const scan = await replies.scan(signal); signal.throwIfAborted();
+        const view = replies.view((await this.current()).state);
+        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "replies",
+          scannedAt: scan.scannedAt, checked: scan.checked, unreadable: scan.unreadable, pending: scan.pending, drafts: view.drafts };
+      });
+    }
+    if (request.command === "replies.suggest") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return this.startJob(async signal => {
+        const result = await replies.suggest(request.contactId, signal); signal.throwIfAborted();
+        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-suggestion", draft: result.draft, pending: result.pending };
+      });
+    }
+    if (request.command === "replies.send") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return this.startJob(async signal => {
+        const result = "draftId" in request
+          ? await replies.send({ draftId: request.draftId }, signal)
+          : await replies.send({ contactId: request.contactId, text: request.text }, signal);
+        signal.throwIfAborted();
+        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-sent", ...result };
+      });
+    }
+    if (request.command === "replies.discard") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-discarded", discarded: replies.discard(request.draftId) };
+    }
     if (request.command === "messaging.start") {
       if (!this.automation) fail("unavailable", "Messaging automation is not configured.");
       return this.startJob(async signal => { await this.automation!.start(request.provider, signal); signal.throwIfAborted(); await this.recoverInactiveGrants();
@@ -482,10 +566,10 @@ export class TextbutlerControlService {
           const duplicate = Object.values(current.state.bindings).some(binding => binding.version === 2 && binding.bindingDigest === automationBindingDigest(candidate.identity, candidate.conversation));
           const id = randomUUID(); this.automationCandidates.set(id, { candidate, expires: Date.now() + 300_000 });
           return { id, name: candidate.conversation.title ?? candidate.conversation.participants.join(", "),
-            subtitle: `${candidate.identity.provider === "imessage" ? "iMessage" : "WhatsApp"} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
+            subtitle: `${providerName(candidate.identity.provider)} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
             eligible: !duplicate, reason: duplicate ? "Already added" : "Ready to add" };
         });
-        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows, detail: "Choose an exact one-to-one iMessage or WhatsApp conversation. Adding a contact keeps its butler disabled." };
+        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows, detail: "Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled." };
       });
       if (!this.enrollment) fail("unavailable", "Messages selection is not configured. Set up the owner-installed Ghostget CLI in Textbutler's host configuration, then restart the daemon.");
       return this.startJob(async signal => {
@@ -513,7 +597,8 @@ export class TextbutlerControlService {
       return this.startJob(async signal => {
         const observed = await this.enrollment!.read(candidate.conversation.binding, request.initializeHistory, signal);
         signal.throwIfAborted(); assertSameConversation(candidate.conversation.binding, observed.conversation);
-        const messages = request.initializeHistory ? boundedHistory(observed.messages) : [];
+        const reauthored = this.reauthor(observed.messages);
+        const messages = request.initializeHistory ? boundedHistory(reauthored) : [];
         const historyOmittedCount = request.initializeHistory ? observed.messages.length - messages.length : 0;
         const historyShortenedCount = request.initializeHistory ? messages.filter(message => observed.messages.find(original => original.id === message.id || `sha256:${hash(original.id)}` === message.id)?.text !== message.text).length : 0;
         return this.serial(async () => {
