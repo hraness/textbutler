@@ -187,9 +187,16 @@ export function extractXArchiveFileRust(descriptor: number, archiveSize: number)
   }
 }
 
+/** Emit a non-fatal telemetry notice when the Rust engine falls back to TS. */
+export function emitXArchiveRustFallback(reason: string): void {
+  if (typeof process !== "undefined" && process.stderr?.write) {
+    process.stderr.write(`[oh-archive-rust-fallback] ${reason}\n`);
+  }
+}
+
 /**
- * Prefer the strict Rust reader when its vendored WASM artifact is present and
- * the archive fits in wasm32 memory; otherwise use the TypeScript reference.
+ * Prefer the strict Rust reader when its WASM artifact is present and the
+ * archive fits in wasm32 memory; otherwise use the TypeScript reference.
  * Any Rust-side failure falls back to the reference implementation so the
  * TypeScript contract remains authoritative.
  */
@@ -198,9 +205,10 @@ export function extractXArchiveFileAuto(descriptor: number, archiveSize: number)
     try {
       return extractXArchiveFileRust(descriptor, archiveSize);
     } catch {
-      // The TypeScript reader performs the same validation and re-raises the
-      // equivalent error for hostile archives.
+      emitXArchiveRustFallback("rust-read-failed");
     }
+  } else {
+    emitXArchiveRustFallback("archive-too-large-or-no-artifact");
   }
   return extractXArchiveFile(descriptor, archiveSize);
 }
