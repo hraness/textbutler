@@ -66,8 +66,12 @@ account and managed permission admit them. Message targets must belong to the
 enrolled conversation. Attachment and sticker paths are resolved by Textbutler's
 contact file broker; Ghostget receives admitted bytes, not arbitrary paths.
 
-Every response starts with disclosed text. For a nontext response, Textbutler
-inserts a companion such as `🤖{ … }` before the rich actions. Execution stops
+Every response starts with disclosed text while disclosure markers remain
+configured. For a nontext response, Textbutler inserts a companion such as
+`🤖{ … }` before the rich actions; when the owner clears all three disclosure
+fields no companion is added and butler authorship is carried by the accepted
+message IDs the run receipt returns to Textbutler's journal instead of by
+visible text. Execution stops
 when a preceding action fails or the conversation changes. An accepted receipt
 does not claim delivery.
 

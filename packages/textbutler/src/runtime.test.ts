@@ -23,7 +23,7 @@ function setup(overrides: Partial<RuntimePorts> = {}) {
     prepare: async (request: PrepareRequest) => ({ ok: true, value: { protocol: TRANSPORT_PROTOCOL, id: "p1", intentId: request.intentId, conversationId: request.conversationId, contextId: request.contextId, digest: "a".repeat(64), expiresAt: new Date(now + 1000).toISOString(), actions: request.actions } }),
     submit: async plan => {
       submitted.push([...plan.actions]);
-      return { ok: true, value: { planId: plan.id, runId: "receipt1", state: "submitted", submittedCount: plan.actions.length, totalCount: plan.actions.length, recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
+      return { ok: true, value: { planId: plan.id, runId: "receipt1", state: "submitted", submittedCount: plan.actions.length, totalCount: plan.actions.length, acceptedMessageIds: plan.actions.map((_action, index) => `accepted:${plan.id}:${index}`), recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
     },
   };
   const ports: RuntimePorts = {
@@ -99,7 +99,7 @@ test.each(["partial", "indeterminate"] as const)("a concurrent event cannot clai
   };
   fixture.transport.submit = async plan => {
     sendCalls++; sendEntered.resolve(); await settleSend.promise;
-    return { ok: true, value: { planId: plan.id, runId: "synthetic-uncertain", state, submittedCount: state === "partial" ? 1 : 0, totalCount: plan.actions.length, recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
+    return { ok: true, value: { planId: plan.id, runId: "synthetic-uncertain", state, submittedCount: state === "partial" ? 1 : 0, totalCount: plan.actions.length, acceptedMessageIds: null, recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
   };
   const first = fixture.runtime.process(event);
   await sendEntered.promise;
@@ -169,4 +169,25 @@ test("persisted sends enforce the cap even when transport history undercounts", 
   expect((await fixture.runtime.process(event)).status).toBe("submitted");
   expect((await fixture.runtime.process({ ...event, id: "m2" })).reason).toBe("rate-limit");
   expect(fixture.submitted.length).toBe(1);
+});
+test("cleared disclosure sends bare text and the journal still proves authorship", async () => {
+  const fixture = setup();
+  fixture.setSettings({ ...fixture.getSettings(), contacts: fixture.getSettings().contacts.map(c => ({ ...c, disclosure: { character: "", begin: "", end: "" } })) });
+  expect((await fixture.runtime.process(event)).status).toBe("submitted");
+  expect(fixture.submitted).toEqual([[{ kind: "text", text: "Hello there." }]]);
+  expect(fixture.journal.isButlerMessage("c1", "accepted:p1:0")).toBe(true);
+});
+test("cleared disclosure adds no companion before a nontext response", async () => {
+  const fixture = setup();
+  fixture.setSettings({ ...fixture.getSettings(), contacts: fixture.getSettings().contacts.map(c => ({ ...c, disclosure: { character: "", begin: "", end: "" } })) });
+  fixture.ports.agent.compose = async () => ({ summary: "I like that idea.", actions: [{ kind: "reaction", messageId: "m1", emoji: "👍", action: "add" }] });
+  expect((await fixture.runtime.process(event)).status).toBe("submitted");
+  expect(fixture.submitted).toEqual([[{ kind: "reaction", messageId: "m1", emoji: "👍", action: "add" }]]);
+});
+test("accepted message ids attribute disclosure-free sends to the butler", async () => {
+  const fixture = setup();
+  fixture.setSettings({ ...fixture.getSettings(), contacts: fixture.getSettings().contacts.map(c => ({ ...c, disclosure: { character: "", begin: "", end: "" } })) });
+  expect((await fixture.runtime.process(event)).status).toBe("submitted");
+  // History classifies this outgoing bare text through journal provenance, not the visible wrap.
+  expect(fixture.journal.knownSentMessage("accepted:p1:0")).toBe(true);
 });

@@ -115,6 +115,77 @@ describe("snapshot menu mapping", () => {
   });
 });
 
+describe("owner replies submenu", () => {
+  const replies = (overrides: Partial<import("../../control/src/index.ts").RepliesView> = {}) => ({
+    scannedAt: "2026-03-01T00:00:00Z", pending: [], drafts: [], ...overrides,
+  });
+  const pending = {
+    contactId: "contact-1", name: "Alice Example", provider: "imessage" as const, enabled: true,
+    pendingCount: 2, lastInboundAt: "2026-03-01T00:00:00Z", preview: "Dinner at 7?\u202e", sendable: true, reason: null,
+  };
+  const draft = {
+    id: "draft:abc", contactId: "contact-1", name: "Alice Example", summary: "Suggestion",
+    preview: "\ud83e\udd16{ Yes, 7 works. }", actionCount: 1, expiresAt: "2026-03-01T00:15:00Z",
+  };
+  function repliesMenu(items: readonly MenuItem[]): Extract<MenuItem, { kind: "submenu" }> {
+    const menu = items.find(item => item.kind === "submenu" && item.label.startsWith("Replies"));
+    if (menu?.kind !== "submenu") throw new Error("missing replies submenu");
+    return menu;
+  }
+  test("pending conversations offer a scan and a suggest action only when sendable", () => {
+    const items = snapshotItems(base({ replies: replies({ pending: [pending] }) }), { confirmedAgeSeconds: 0, fresh: true });
+    wire(items);
+    const menu = repliesMenu(items);
+    expect(menu.label).toBe("Replies · 2 waiting");
+    const all = labels(menu.items);
+    expect(all).toContain("Alice Example · 2 to answer");
+    expect(all.some(label => label.includes("\u202e"))).toBe(false);
+    expect(all.some(label => label.includes("Dinner at 7?"))).toBe(true);
+    const conversation = menu.items.find(item => item.kind === "submenu" && item.label.includes("Alice Example"));
+    if (conversation?.kind !== "submenu") throw new Error("missing conversation row");
+    expect(conversation.items.some(item => item.kind === "action" && item.id === "replies.suggest:contact-1")).toBe(true);
+    const blocked = snapshotItems(base({ replies: replies({ pending: [{ ...pending, sendable: false, reason: "A previous send needs reconciliation." }], drafts: [] }) }), { confirmedAgeSeconds: 0, fresh: true });
+    const blockedMenu = repliesMenu(blocked);
+    const blockedConversation = blockedMenu.items.find(item => item.kind === "submenu" && item.label.includes("Alice Example"));
+    if (blockedConversation?.kind !== "submenu") throw new Error("missing blocked row");
+    expect(labels(blockedConversation.items)).toContain("A previous send needs reconciliation.");
+    expect(blockedConversation.items.some(item => item.kind === "action" && item.id === "replies.suggest:contact-1")).toBe(false);
+  });
+  test("reviewed drafts expose send and discard actions and nothing else can send", () => {
+    const items = snapshotItems(base({ replies: replies({ pending: [pending], drafts: [draft] }) }), { confirmedAgeSeconds: 0, fresh: true });
+    wire(items);
+    const menu = repliesMenu(items);
+    const draftRow = menu.items.find(item => item.kind === "submenu" && item.label === "Draft · Alice Example");
+    if (draftRow?.kind !== "submenu") throw new Error("missing draft row");
+    expect(labels(draftRow.items)).toContain("\ud83e\udd16{ Yes, 7 works. }");
+    expect(draftRow.items.some(item => item.kind === "action" && item.id === "replies.send:draft:abc")).toBe(true);
+    expect(draftRow.items.some(item => item.kind === "action" && item.id === "replies.discard:draft:abc")).toBe(true);
+    // The menu never offers a free-text send path.
+    const ids = JSON.stringify(items);
+    expect(ids).not.toContain("replies.text");
+    expect(ids.match(/"replies.send:[^"]*"/g)).toEqual(['"replies.send:draft:abc"']);
+  });
+  test("empty and unconfigured reply states stay explanatory", () => {
+    const fresh = repliesMenu(snapshotItems(base({ replies: replies() }), { confirmedAgeSeconds: 0, fresh: true }));
+    expect(fresh.label).toBe("Replies · 0 waiting");
+    expect(labels(fresh.items)).toContain("Nothing waiting for a reply");
+    const unscanned = repliesMenu(snapshotItems(base({ replies: replies({ scannedAt: null }) }), { confirmedAgeSeconds: 0, fresh: true }));
+    expect(labels(unscanned.items)).toContain("Check for replies to scan enrolled conversations");
+    const missing = repliesMenu(snapshotItems(base(), { confirmedAgeSeconds: 0, fresh: true }));
+    expect(labels(missing.items)).toContain("Messaging automation is not configured");
+  });
+  test("menu send and suggest actions reach the daemon as reviewed-draft commands", async () => {
+    const dataDir = await root();
+    await start(dataDir);
+    const options = companionOptions(dataDir);
+    const signal = new AbortController().signal;
+    // No messaging automation: every replies action fails closed at the daemon.
+    await expect(options.onAction("replies.send:draft:abc", signal)).rejects.toThrow("replies-send-unavailable");
+    await expect(options.onAction("replies.suggest:contact-1", signal)).rejects.toThrow("replies-suggest-unavailable");
+    await expect(options.onAction("replies.discard:draft:abc", signal)).rejects.toThrow("replies-discard-unavailable");
+  });
+});
+
 describe("daemon-backed companion options", () => {
   test("support stays available offline and opens only after an explicit action", async () => {
     const dataDir = await root();

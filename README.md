@@ -68,6 +68,32 @@ shows daemon state, contact and account readiness, capabilities, and recent
 activity. It controls global pause and opens the informational Textbutler
 website. It does not provide contact enrollment or account setup.
 
+## Answer your own messages
+
+Separate from automatic replies, the daemon can triage what is waiting on you:
+
+```sh
+bun run textbutler inbox                          # which enrolled conversations need a reply
+bun run textbutler replies suggest CONTACT        # draft a reply (never sends)
+bun run textbutler replies send draft:<id>        # send the exact reviewed draft
+bun run textbutler replies send CONTACT TEXT...   # send literal owner text
+bun run textbutler replies discard draft:<id>     # drop a suggestion
+```
+
+`CONTACT` is the exact contact id or a unique name match. The menu's **Replies**
+submenu runs the same scan, offers per-conversation suggestions, and sends only
+the exact reviewed draft — free-text replies stay on the CLI. Suggestions expire
+after fifteen minutes and are rejected if the conversation or disclosure
+settings changed underneath them. An owner send reuses the contact's live grant
+when it covers the actions; otherwise the daemon issues a scoped ten-minute
+grant for just those action kinds.
+
+Every text reply is wrapped in the contact's three disclosure symbols, rendered
+`🤖{ … }` by default. Each field may be cleared individually; clearing all three
+sends plain text. Cleared disclosure never makes butler output ambiguous
+internally — the send journal records the provider-accepted message IDs and
+history attributes them to the butler without relying on visible markers.
+
 ## Legacy Message Like Me history tools
 
 **A local-first CLI and Agent Skill for studying private messaging history and
@@ -851,7 +877,7 @@ profile to a fixture.
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change.
 
 The canonical repository is
-[`hraness/message-like-me`](https://github.com/hraness/message-like-me).
+[`hraness/textbutler`](https://github.com/hraness/textbutler).
 The informational project page is
 [`messagelikeme.com`](https://messagelikeme.com). The CLI does not connect to
 the site, and the site never receives message or contact data.

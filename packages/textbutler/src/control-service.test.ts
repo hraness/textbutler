@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, readFile, realpath, rm, symlink, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
+import { writeFile } from "node:fs/promises";
+import { AgentMixer, CONTACT_TOOL_PROFILE, SqliteAccountLeases, type AgentAdapter, type ModelCatalog, type RuntimeQualification } from "@hraness/agentmixer";
+import { automationBindingDigest, automationHash, createGhostgetAutomationClient, type AutomationMessage } from "../../transport/src/automation.ts";
+import { automationBinding, createAutomationOwnerPort } from "./automation-owner.ts";
+import type { ProviderHost } from "./provider-host.ts";
 import { newContact, type Settings } from "./config.ts";
 import { TextbutlerControlService, TEXTBUTLER_CONTROL_PROTOCOL as protocol, initializeOwnerState, parseControlRequest } from "./control-service.ts";
 import { ContactWorkspace } from "./workspace.ts";
@@ -116,5 +122,107 @@ describe("persistent owner control service", () => {
     await symlink(join(dataDir, "state"), join(dataDir, "contacts"));
     expect(await service.request({ protocol, command: "contact.memory.read", contactId: "synthetic-a" })).toMatchObject({ ok: false, code: "unavailable" });
     await unlink(join(dataDir, "contacts"));
+  });
+});
+
+describe("owner reply triage through the control surface", () => {
+  async function replySetup() {
+    const REPLY_NOW = Date.now();
+    const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-replies-")); roots.push(dataDir);
+    const contact = { ...newContact("synthetic-a", "Synthetic A", "enrollment:fixture"), enabled: true };
+    await initializeOwnerState(dataDir, { schemaVersion: 1, paused: true, maxActiveContacts: 1, contacts: [contact] });
+    const identity = { provider: "imessage" as const, authId: "fixture", accountIdentity: "1".repeat(64), accountSubject: "synthetic-account", implementationIdentity: "2".repeat(64), sourceGeneration: "synthetic-db" };
+    const conversation = { coordinate: { provider: "imessage" as const, chatGuid: "iMessage;-;fixture@example.test", service: "iMessage" as const, observedChatRowId: 1 }, title: "Synthetic", kind: "single" as const, participants: ["fixture@example.test"] };
+    const enrolled = () => ({ id: "enrollment:fixture", identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision: 0, ready: true, reason: null });
+    const binding = automationBinding(enrolled());
+    const messages: AutomationMessage[] = [{ id: "inbound-1", coordinate: conversation.coordinate, direction: "incoming", occurredAt: new Date(REPLY_NOW - 10_000).toISOString(), text: "Can you pick up dinner?", kind: "message", relatedMessageId: null, attachments: [] }];
+    const sent: readonly unknown[][] = [], mutableSent = sent as unknown[][], plans = new Map<string, { id: string; intentId: string; actions: readonly unknown[] }>();
+    const grantStore = new Map<string, Record<string, unknown>>(); let grantSequence = 0;
+    const client = createGhostgetAutomationClient(async (method, params) => {
+      if (method === "poll") return enrolled();
+      if (method === "history") return { enrollment: enrolled(), messages: messages.slice(-Number(params.limit)) };
+      if (method === "status") return { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"].map(kind => [kind, { available: true, reason: null }])) };
+      if (method === "prepare") { const body = { ...params, bindingDigest: binding.bindingDigest, expiresAt: new Date(REPLY_NOW + 120_000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` }; plans.set(plan.id as string, plan as never); return plan; }
+      if (method === "submit") { const plan = plans.get(String(params.planId))!; mutableSent.push([...plan.actions]); return { id: "run:1", planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:1:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
+      if (method === "cancel") return { cancelled: true };
+      if (method === "grant") { const { intentId: _intentId, ...request } = params as Record<string, unknown>; const grant = { ...request, id: `grant:${++grantSequence}`, revoked: false, consumedActions: 0 }; grantStore.set(grant.id as string, grant); return grant; }
+      if (method === "grant.get") { const grant = grantStore.get(String(params.grantId)); if (!grant) throw new Error("Unknown grant"); return grant; }
+      if (method === "grant.by-intent") return { grant: null };
+      if (method === "revoke") { const grant = grantStore.get(String(params.grantId)); if (grant) grantStore.set(grant.id as string, { ...grant, revoked: true }); return { revoked: true }; }
+      throw new Error(`Unexpected fixture operation ${method}`);
+    }, () => REPLY_NOW);
+    const qualification: RuntimeQualification = { status: "qualified", profile: CONTACT_TOOL_PROFILE, runtimeVersion: "synthetic-test-only",
+      runtimeDigest: "a".repeat(64), evidenceDigest: "b".repeat(64), expiresAt: Date.now() + 86_400_000,
+      controls: { noCommandTools: true, exactToolInventory: true, contactReadIsolation: true, contactWriteIsolation: true, isolatedConfiguration: true, authOutsideWorkspace: true, hostBrokerOnly: true } };
+    const modelCatalog: ModelCatalog = { provider: "codex", observedAt: Date.now(),
+      models: [{ id: "reply-pinned", inputUsdPerMillion: 1, outputUsdPerMillion: 5, available: true, supportsStructuredOutput: true, classifierEligible: true }] };
+    const adapter: AgentAdapter = { provider: "codex", qualification, async run() { return { output: { summary: "Suggestion", actions: [{ kind: "text", text: "On it." }] }, processStopped: true }; } };
+    const db = new Database(":memory:");
+    const providers = { router: new AgentMixer({ adapters: [adapter], leases: new SqliteAccountLeases(db), now: () => REPLY_NOW }),
+      accounts: () => [{ id: "account-one", status: "ready", route: "codex-cli", detail: null }],
+      check: async () => { throw new Error("not used"); }, startLogin: async () => { throw new Error("not used"); },
+      cancelLogin: async () => { throw new Error("not used"); }, logout: async () => { throw new Error("not used"); },
+      runManagedTask: async () => { throw new Error("not used"); },
+      selection: async () => ({ qualification, modelCatalog, defaultReplyModel: "reply-pinned" }),
+      validateAccountChange: () => {}, close: async () => { db.close(); } } as unknown as ProviderHost;
+    // Persist the messaging binding so the reopened service sees an exact enrollment.
+    const settingsPath = join(dataDir, "state", "settings.json");
+    const state = JSON.parse(await readFile(settingsPath, "utf8"));
+    await writeFile(settingsPath, `${JSON.stringify({ ...state, bindings: { "synthetic-a": binding } }, null, 2)}\n`, { mode: 0o600 });
+    const service = await TextbutlerControlService.open({ dataDir, providers: () => providers,
+      automation: createAutomationOwnerPort({ client, providers: ["imessage"], now: () => REPLY_NOW }), client });
+    services.push(service);
+    const run = async (request: Record<string, unknown>) => {
+      let response = await service.request({ protocol, ...request });
+      for (let i = 0; response.ok && response.kind === "job" && i < 400; i++) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        response = await service.request({ protocol, command: "owner.job.read", jobId: response.jobId });
+      }
+      return response;
+    };
+    return { service, sent, db, run };
+  }
+  test("scan, suggest, send and discard stay behind owner commands", async () => {
+    const { service, sent, run } = await replySetup();
+    const scan = await run({ command: "replies.scan" });
+    expect(scan).toMatchObject({ ok: true, kind: "replies", checked: 1, unreadable: 0,
+      pending: [{ contactId: "synthetic-a", pendingCount: 1, sendable: true, preview: "Can you pick up dinner?" }] });
+    const suggest = await run({ command: "replies.suggest", contactId: "synthetic-a" });
+    expect(suggest).toMatchObject({ ok: true, kind: "reply-suggestion", draft: { contactId: "synthetic-a", preview: "🤖{ On it. }" } });
+    expect(sent).toEqual([]);
+    if (!suggest.ok || suggest.kind !== "reply-suggestion") throw new Error("Missing suggestion");
+    const sentReply = await run({ command: "replies.send", draftId: suggest.draft!.id });
+    expect(sentReply).toMatchObject({ ok: true, kind: "reply-sent", state: "submitted" });
+    expect(sent).toEqual([[{ kind: "text", text: "🤖{ On it. }" }]]);
+    const snapshot = await service.snapshot();
+    expect(snapshot.replies?.drafts).toEqual([]);
+    const literal = await run({ command: "replies.send", contactId: "synthetic-a", text: "Direct answer" });
+    expect(literal).toMatchObject({ ok: true, kind: "reply-sent", state: "submitted" });
+    expect(sent[1]).toEqual([{ kind: "text", text: "🤖{ Direct answer }" }]);
+    expect(await run({ command: "replies.discard", draftId: "draft:missing" })).toMatchObject({ ok: true, kind: "reply-discarded", discarded: false });
+  });
+  test("reply commands fail closed without messaging automation and never invent sends", async () => {
+    const { service } = await setup();
+    for (const request of [
+      { protocol, command: "replies.scan" },
+      { protocol, command: "replies.suggest", contactId: "synthetic-a" },
+      { protocol, command: "replies.send", contactId: "synthetic-a", text: "Hi" },
+      { protocol, command: "replies.send", draftId: "draft:none" },
+      { protocol, command: "replies.discard", draftId: "draft:none" },
+    ]) expect(await service.request(request as never)).toMatchObject({ ok: false, code: "unavailable" });
+    expect((await service.snapshot()).replies).toBeUndefined();
+  });
+  test("reply request parsing rejects empty text, mixed send forms and extra fields", () => {
+    for (const request of [
+      { protocol, command: "replies.send", contactId: "synthetic-a", text: "" },
+      { protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", draftId: "draft:1" },
+      { protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", extra: 1 },
+      { protocol, command: "replies.suggest" },
+      { protocol, command: "replies.suggest", contactId: "../bad" },
+      { protocol, command: "replies.scan", contactId: "synthetic-a" },
+      { protocol, command: "replies.discard" },
+    ]) expect(() => parseControlRequest(request)).toThrow();
+    expect(parseControlRequest({ protocol, command: "replies.send", contactId: "synthetic-a", text: "hi" })).toMatchObject({ command: "replies.send" });
+    expect(parseControlRequest({ protocol, command: "replies.send", draftId: "draft:1" })).toMatchObject({ command: "replies.send", draftId: "draft:1" });
   });
 });

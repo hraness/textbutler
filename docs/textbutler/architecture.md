@@ -82,13 +82,27 @@ No typing signal can prove the owner is absent. The current adapters expose no t
 
 The model proposes actions. It does not dispatch them. Owner-installed hooks may shape the work or veto a reply, but all action validation, contact binding, limits, and disclosure run afterwards.
 
-Every text action is wrapped by trusted code with the contact's three symbols. Each field must be one visible grapheme; an empty or invisible disclosure is rejected. Default rendering is `🤖{ hello this is my response }`.
+Every text action is wrapped by trusted code with the contact's three symbols. Each field is either cleared (empty) or exactly one visible grapheme; invisible or multi-grapheme fields are rejected. Default rendering is `🤖{ hello this is my response }`. Clearing all three fields removes the visible wrap entirely and sends plain text.
 
-Reactions, stickers, link previews, and app cards cannot literally carry that text prefix. A disclosed text companion is therefore the first action in a nontext response, and counts toward the eight-action maximum. The provider must execute in order and stop if that companion fails. App-specific cards may additionally identify Textbutler in their content, but never remove the companion requirement.
+Clearing disclosure never makes butler output indistinguishable internally. The transport reports the provider-accepted message IDs for every submitted action, and the daemon records them in a private `sent_messages` journal table. History and attribution classify an outgoing message as butler-authored through that journal first, and through the configured visible wrap for sends that predate it. A cleared wrap simply has no visible form; provenance stays exact.
+
+Reactions, stickers, link previews, and app cards cannot literally carry that text prefix. When visible markers remain configured, a disclosed text companion is therefore the first action in a nontext response, and counts toward the eight-action maximum. With disclosure fully cleared the companion would be unexplained extra text and is not added. The provider must execute in order and stop if that companion fails. App-specific cards may additionally identify Textbutler in their content, but never remove the companion requirement.
 
 Before send, the runtime rechecks owner activity, conversation revision, current settings, capability availability, cancellation, attachment ownership, target message membership, and the contact grant. It asks the transport to prepare an exact plan with an expiry and digest. Immediately before submission, it journals the dispatch intent. The transport must atomically validate the grant, contact route, context revision, and plan digest at its own effect boundary.
 
 `submitted` is not `delivered`. Partial and indeterminate outcomes pause further automated activity for that contact until explicit reconciliation. A crash while dispatching becomes indeterminate on recovery; it never causes a blind retry. A crash before dispatch abandons the run without sending. Provider failover cannot replay a possibly submitted action.
+
+## Owner reply triage
+
+The same machinery serves an explicit owner workflow that is distinct from automatic replies. `textbutler inbox` (or the menu's **Replies → Check for replies**) runs a bounded read-only pass over every enrolled conversation and reports each trailing run of unanswered inbound messages: the contact, a bounded sanitized preview, the pending count, whether a send is currently possible, and why not when it is not. The automatic loop's live observations feed the same view, so the inbox reflects what the daemon already saw between scans.
+
+`textbutler replies suggest CONTACT` asks the contact's configured agent to draft a reply for that pending run. A suggestion is a bounded draft with a fifteen-minute expiry: summary, exact proposed actions, and the disclosed preview the send would carry. It never dispatches. Drafts bind the conversation revision and disclosure settings they were created against; a stale context, changed disclosure, or expired draft is rejected rather than silently sent.
+
+Only an explicit send command dispatches: `textbutler replies send DRAFT` sends the exact reviewed draft, and `textbutler replies send CONTACT TEXT...` sends literal owner text through the identical grant, plan, journal, disclosure and reconciliation discipline as an automatic reply. `textbutler replies discard DRAFT` drops a suggestion. The menu bar exposes scan, per-conversation suggestion, draft review, send, and discard — it never offers a free-text send; literal replies stay on the CLI.
+
+An owner send reuses the contact's live standing grant when it covers the needed action kinds with remaining quota. Otherwise the daemon issues a tightly scoped grant: only the specific action kinds, ten-minute expiry, quota equal to the action count. The scoped grant is journaled with intent and pending state, published to the conversation, and revoked after the send when the contact is disabled. One serialized work registration covers grant issuance and dispatch together so delegated renewal and disable-revocation cannot race an in-flight send. The agent never sees this surface; it has no send authority in either direction.
+
+`replies.send` returns `submitted`, `failed`, `partial`, `cancelled`, or `indeterminate`. An indeterminate owner send blocks the next reply for that contact — automatic or owner-initiated — until the journaled intent is reconciled, exactly like an automatic send.
 
 ## Hooks and plugins
 

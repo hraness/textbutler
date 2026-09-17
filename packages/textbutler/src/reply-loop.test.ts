@@ -39,6 +39,7 @@ async function fixture() {
     dataDir: root, providers: undefined, runtimeState: async () => ({ settings, bindings: { "contact-1": binding }, grants: {} }), runJournal: () => journal,
     delegatedGrant: async contact => !settings.paused && settings.contacts.some(current => current.enabled && current.id === contact.id && current.revision === contact.revision) ? "grant:fixture" : null,
     onSettingsChanged(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    notePending() {},
   } });
   cleanup.push(async () => { await loop.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
   return { loop, journal, sent, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },

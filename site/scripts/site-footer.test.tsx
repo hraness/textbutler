@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { hranessAttribution } from '@hraness/site-footer';
+import { HRANESS_HOME_URL } from '@hraness/site-footer';
 
 import AboutPage from '../app/about/page.tsx';
 import DocsPage from '../app/docs/page.tsx';
@@ -17,7 +17,7 @@ import { CANONICAL_PAGE_PATHS } from '../app/_lib/site.ts';
 
 const siteRoot = resolve(import.meta.dir, '..');
 
-const SITE_FOOTER_PIN = 'github:hraness/site-footer#v0.13.0';
+const SITE_FOOTER_PIN = 'github:hraness/site-footer#v0.15.0';
 
 const publicPages: readonly Readonly<{
   name: string;
@@ -53,29 +53,38 @@ test('pins the shared site footer release and imports its stylesheet once', asyn
   expect(css.match(/@import '@hraness\/site-footer\/styles\.css';/gu)).toHaveLength(1);
 });
 
-test('exports the organization attribution copy the footer renders', () => {
-  expect(hranessAttribution.title).toBe('Built by Hraness');
-  expect(hranessAttribution.subtitle).toBe(
-    'Hraness is an advanced software research organization dedicated to advancing the frontier of machine intelligence.',
-  );
+test('binds the canonical Hraness home the shared footer attributes to', () => {
+  expect(HRANESS_HOME_URL).toBe('https://hraness.com/');
 });
 
-test('renders one shared Hraness footer with organization attribution on every public page', async () => {
+test('renders the in-flow content footer and one shared Hraness footer on every public page', async () => {
   expect(publicPages.slice(0, CANONICAL_PAGE_PATHS.length).map(({ name }) => name))
     .toEqual([...CANONICAL_PAGE_PATHS]);
 
   for (const page of publicPages) {
     const html = renderToStaticMarkup(await page.render());
 
+    // The product content footer sits after the page content and before the
+    // shared network footer, which stays mounted as the page's last landmark.
+    expect(html.match(/data-hraness-marketing="footer"/gu), page.name).toHaveLength(1);
+    expect(html.match(/<footer\b/gu), page.name).toHaveLength(2);
+    expect(html.indexOf('data-hraness-marketing="footer"'), page.name)
+      .toBeLessThan(html.indexOf('id="hraness-site-footer"'));
+    expect(html, page.name).toContain('<footer aria-label="Textbutler"');
+    expect(html, page.name).toContain('<img alt="" height="20" src="/icon.png" width="20"/>');
+    expect(html, page.name).toContain('hraness-marketing-footer__name');
+    expect(html, page.name).toContain('Built for Mac · MIT source · in development');
+    expect(html, page.name).toContain('aria-label="Footer navigation"');
+    expect(html, page.name).toContain('href="/about"');
+    expect(html, page.name).toContain('href="/sources"');
+    expect(html, page.name).not.toContain('product-brand-mark');
+
     expect(html.match(/id="hraness-site-footer"/gu), page.name).toHaveLength(1);
     expect(html, page.name).toContain('data-mailing-list="none"');
-    expect(html.match(/data-slot="hraness-attribution"/gu), page.name).toHaveLength(1);
-    expect(html, page.name).toContain(`>${hranessAttribution.title}</p>`);
-    expect(html, page.name).toContain(`>${hranessAttribution.subtitle}</p>`);
-    const attribution = /<div\b[^>]*data-slot="hraness-attribution"[^>]*>([\s\S]*?)<\/div>/u.exec(html);
+    const attribution = /<a\b[^>]*aria-label="Hraness home"[^>]*>([\s\S]*?)<\/a>/u.exec(html);
+    expect(attribution?.[0], page.name).toContain(`href="${HRANESS_HOME_URL}"`);
     expect(attribution?.[0], page.name).toContain('lang="en"');
-    expect(attribution?.[1], page.name).not.toContain('<a');
-    expect(html.match(/<footer\b/gu), page.name).toHaveLength(1);
+    expect(attribution?.[1], page.name).toContain('by Hraness');
 
     for (const credit of PERSONAL_MAKER_CREDIT) {
       expect(html, `${page.name} must not carry "${credit}"`).not.toContain(credit);
@@ -87,6 +96,6 @@ test('keeps the frame-safe preview free of the site footer', () => {
   const html = renderToStaticMarkup(<Preview />);
 
   expect(html).not.toContain('id="hraness-site-footer"');
-  expect(html).not.toContain('data-slot="hraness-attribution"');
+  expect(html).not.toContain('hraness-marketing-footer');
   for (const credit of PERSONAL_MAKER_CREDIT) expect(html).not.toContain(credit);
 });

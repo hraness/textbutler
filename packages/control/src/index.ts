@@ -11,7 +11,7 @@ export interface ContactSettings {
   disclosure: { character: string; begin: string; end: string };
 }
 export interface Contact { id: string; name: string; subtitle: string; settings: ContactSettings;
-  messaging?: { provider: "imessage" | "whatsapp"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
+  messaging?: { provider: "imessage" | "whatsapp" | "beeper"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
 export interface Activity { id: string; at: string; contactId: string | null; title: string; detail: string }
 export interface ProviderAccountDiagnostic {
   id: string; label: string; provider: "claude" | "codex"; route: "claude-api" | "claude-code" | "codex";
@@ -22,6 +22,15 @@ export interface ProviderAccountDiagnostic {
 export type ProviderLoginChallenge =
   | { type: "chatgpt"; loginId: string; authUrl: string }
   | { type: "chatgptDeviceCode"; loginId: string; verificationUrl: string; userCode: string };
+/** An enrolled conversation whose tail still awaits an owner answer. */
+export interface PendingReplyItem {
+  contactId: string; name: string; provider: "imessage" | "whatsapp" | "beeper" | "none"; enabled: boolean;
+  pendingCount: number; lastInboundAt: string | null; preview: string | null;
+  sendable: boolean; reason: string | null;
+}
+/** An owner-reviewed suggestion. Sending is always a separate explicit command. */
+export interface ReplyDraftView { id: string; contactId: string; name: string; summary: string; preview: string; actionCount: number; expiresAt: string }
+export interface RepliesView { scannedAt: string | null; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
 export interface DesktopSnapshot {
   protocol: typeof CONTROL_PROTOCOL;
   revision: number;
@@ -33,7 +42,8 @@ export interface DesktopSnapshot {
   activity: Activity[];
   providerAccounts?: readonly ProviderAccountDiagnostic[];
   automation?: { state: "running" | "paused" | "unavailable"; detail: string };
-  messagingProviders?: readonly ("imessage" | "whatsapp")[];
+  messagingProviders?: readonly ("imessage" | "whatsapp" | "beeper")[];
+  replies?: RepliesView;
 }
 export interface ConversationCandidate { id: string; name: string; subtitle: string; eligible: boolean; reason: string }
 export type ControlRequest =
@@ -45,11 +55,16 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.login.start"; accountId: string; method: "chatgpt" | "chatgptDeviceCode" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.login.cancel"; accountId: string; loginId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.logout"; accountId: string }
-  | { protocol: typeof CONTROL_PROTOCOL; command: "messaging.start"; provider: "imessage" | "whatsapp" }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "messaging.start"; provider: "imessage" | "whatsapp" | "beeper" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.settings.update"; contactId: string; expectedRevision: number; settings: ContactSettings }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.read"; contactId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.write"; contactId: string; expectedRevision: string; content: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "global.settings.update"; expectedRevision: number; settings: DesktopSnapshot["settings"] }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.scan" }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.suggest"; contactId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; draftId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; contactId: string; text: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.discard"; draftId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "activity.list" };
 export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "provider-login"; accountId: string; challenge: ProviderLoginChallenge; snapshot: DesktopSnapshot }
@@ -58,6 +73,10 @@ export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "enrolled"; snapshot: DesktopSnapshot; contactId: string; historyCount: number; historyOmittedCount: number; historyShortenedCount: number; historyInitialized: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "snapshot"; snapshot: DesktopSnapshot }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "memory"; contactId: string; revision: string; content: string }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "replies"; scannedAt: string; checked: number; unreadable: number; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-suggestion"; draft: ReplyDraftView | null; pending: PendingReplyItem }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-sent"; contactId: string; runId: string; state: "submitted" | "failed" | "partial" | "indeterminate" | "cancelled"; detail: string }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-discarded"; discarded: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: false; code: "disconnected" | "invalid-request" | "conflict" | "capacity" | "unavailable"; message: string };
 export interface DesktopControlPort { request(request: ControlRequest): Promise<ControlResponse> }
 
@@ -67,7 +86,9 @@ export const DEFAULT_CONTACT_SETTINGS: ContactSettings = {
 };
 export function disclosurePreview(settings: ContactSettings, text = "Hello, this is my response."): string {
   const { character, begin, end } = settings.disclosure;
-  return `${character}${begin} ${text} ${end}`;
+  const left = `${character}${begin}`;
+  if (!left && !end) return text;
+  return `${left ? `${left} ` : ""}${text}${end ? ` ${end}` : ""}`;
 }
 export function validateContactSettings(settings: ContactSettings): string | null {
   if (settings.accountId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(settings.accountId)) return "Choose a configured account.";
@@ -77,9 +98,11 @@ export function validateContactSettings(settings: ContactSettings): string | nul
     || /[\p{Cc}\p{Cf}]/u.test(settings.keyword)) return "Use a keyword between 1 and 40 characters without control characters.";
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   for (const [name, symbol] of Object.entries(settings.disclosure)) {
-    if (typeof symbol !== "string" || symbol.length > 16 || [...segmenter.segment(symbol)].length !== 1
+    if (typeof symbol !== "string" || symbol.length > 16) return `Use one visible symbol for ${name}, or clear it. Emoji sequences count as one symbol.`;
+    if (symbol === "") continue;
+    if ([...segmenter.segment(symbol)].length !== 1
       || /[\p{White_Space}\p{Cc}]/u.test(symbol) || /[\u202A-\u202E\u2066-\u2069]/u.test(symbol) || /^[\p{Default_Ignorable_Code_Point}\p{Mark}]+$/u.test(symbol)) {
-      return `Use one visible symbol for ${name}. Emoji sequences count as one symbol.`;
+      return `Use one visible symbol for ${name}, or clear it. Emoji sequences count as one symbol.`;
     }
   }
   return null;
@@ -131,6 +154,24 @@ function list(value: unknown, limit: number): unknown[] {
   if (!Array.isArray(value) || value.length > limit) throw new Error("Control response exceeds its list limit.");
   return value;
 }
+function pendingReplyItem(value: unknown): PendingReplyItem {
+  const row = record(value);
+  return { contactId: text(row.contactId, 256), name: text(row.name, 256), provider: oneOf(row.provider, ["imessage", "whatsapp", "beeper", "none"]),
+    enabled: bool(row.enabled), pendingCount: integer(row.pendingCount, 0, 20),
+    lastInboundAt: row.lastInboundAt === null ? null : text(row.lastInboundAt, 64),
+    preview: row.preview === null ? null : text(row.preview, 512), sendable: bool(row.sendable),
+    reason: row.reason === null ? null : text(row.reason, 512) };
+}
+function replyDraftView(value: unknown): ReplyDraftView {
+  const row = record(value);
+  return { id: text(row.id, 120), contactId: text(row.contactId, 256), name: text(row.name, 256), summary: text(row.summary, 512),
+    preview: text(row.preview, 512), actionCount: integer(row.actionCount, 0, 8), expiresAt: text(row.expiresAt, 64) };
+}
+function repliesView(value: unknown): RepliesView {
+  const row = record(value);
+  return { scannedAt: row.scannedAt === null ? null : text(row.scannedAt, 64),
+    pending: list(row.pending, 200).map(pendingReplyItem), drafts: list(row.drafts, 64).map(replyDraftView) };
+}
 function settings(value: unknown): ContactSettings {
   const row = record(value); const symbols = record(row.disclosure);
   const result: ContactSettings = {
@@ -171,6 +212,20 @@ export function parseControlResponse(value: unknown): ControlResponse {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "enrolled", snapshot: response.snapshot, contactId, historyCount: integer(row.historyCount, 0, 200), historyOmittedCount: integer(row.historyOmittedCount, 0, 200), historyShortenedCount: integer(row.historyShortenedCount, 0, 200), historyInitialized: bool(row.historyInitialized) };
   }
   if (row.kind === "memory") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "memory", contactId: text(row.contactId, 256), revision: digest(row.revision), content: text(row.content, 65_536) };
+  if (row.kind === "replies") {
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "replies", scannedAt: text(row.scannedAt, 64), checked: integer(row.checked, 0, 10_000),
+      unreadable: integer(row.unreadable, 0, 10_000), pending: list(row.pending, 200).map(pendingReplyItem), drafts: list(row.drafts, 64).map(replyDraftView) };
+  }
+  if (row.kind === "reply-suggestion") {
+    const draft = row.draft === null ? null : replyDraftView(row.draft), pending = pendingReplyItem(row.pending);
+    if (draft !== null && (draft.contactId !== pending.contactId || !pending.sendable && pending.reason === null)) throw new Error("Inconsistent reply suggestion.");
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-suggestion", draft, pending };
+  }
+  if (row.kind === "reply-sent") {
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-sent", contactId: text(row.contactId, 256), runId: text(row.runId, 120),
+      state: oneOf(row.state, ["submitted", "failed", "partial", "indeterminate", "cancelled"]), detail: text(row.detail, 512) };
+  }
+  if (row.kind === "reply-discarded") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-discarded", discarded: bool(row.discarded) };
   if (row.kind !== "snapshot") throw new Error("Unknown control response kind.");
   const source = record(row.snapshot); const global = record(source.settings);
   if (source.protocol !== CONTROL_PROTOCOL) throw new Error("Incompatible snapshot protocol.");
@@ -178,7 +233,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
     protocol: CONTROL_PROTOCOL, revision: integer(source.revision), connection: oneOf(source.connection, ["connected", "disconnected", "demo"]),
     detail: text(source.detail), settings: { paused: bool(global.paused), activeContactLimit: integer(global.activeContactLimit, 1, 50) },
     contacts: list(source.contacts, 1_000).map(value => { const row = record(value); return { id: text(row.id, 256), name: text(row.name, 256), subtitle: text(row.subtitle, 512), settings: settings(row.settings),
-      ...(row.messaging === undefined ? {} : { messaging: { provider: oneOf(record(row.messaging).provider, ["imessage", "whatsapp"]), state: oneOf(record(row.messaging).state, ["active", "missing", "revocation-pending", "recovery-required"]), detail: text(record(row.messaging).detail, 512), grantExpiresAt: record(row.messaging).grantExpiresAt === null ? null : text(record(row.messaging).grantExpiresAt, 32) } }) }; }),
+      ...(row.messaging === undefined ? {} : { messaging: { provider: oneOf(record(row.messaging).provider, ["imessage", "whatsapp", "beeper"]), state: oneOf(record(row.messaging).state, ["active", "missing", "revocation-pending", "recovery-required"]), detail: text(record(row.messaging).detail, 512), grantExpiresAt: record(row.messaging).grantExpiresAt === null ? null : text(record(row.messaging).grantExpiresAt, 32) } }) }; }),
     capabilities: list(source.capabilities, 9).map(value => { const row = record(value); return { id: oneOf(row.id, ["messages", "contacts", "agent", "attachments", "reactions", "stickers", "links", "polls", "mini-apps"]), status: oneOf(row.status, ["available", "setup-required", "unsupported"]), detail: text(row.detail) }; }),
     activity: list(source.activity, 200).map(value => { const row = record(value); return { id: text(row.id, 256), at: text(row.at, 64), contactId: row.contactId === null ? null : text(row.contactId, 256), title: text(row.title, 256), detail: text(row.detail) }; }),
     ...(source.providerAccounts === undefined ? {} : { providerAccounts: list(source.providerAccounts, 10).map(value => {
@@ -194,7 +249,8 @@ export function parseControlResponse(value: unknown): ControlResponse {
         } }) };
     }) }),
     ...(source.automation === undefined ? {} : { automation: { state: oneOf(record(source.automation).state, ["running", "paused", "unavailable"]), detail: text(record(source.automation).detail, 512) } }),
-    ...(source.messagingProviders === undefined ? {} : { messagingProviders: list(source.messagingProviders, 2).map(value => oneOf(value, ["imessage", "whatsapp"])) }),
+    ...(source.messagingProviders === undefined ? {} : { messagingProviders: list(source.messagingProviders, 3).map(value => oneOf(value, ["imessage", "whatsapp", "beeper"])) }),
+    ...(source.replies === undefined ? {} : { replies: repliesView(source.replies) }),
   };
   if (new Set(snapshot.contacts.map(contact => contact.id)).size !== snapshot.contacts.length
     || new Set(snapshot.capabilities.map(capability => capability.id)).size !== snapshot.capabilities.length
