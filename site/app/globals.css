@@ -437,35 +437,6 @@ nav.message-like-me-ask-ai + footer {
   padding-top: 0;
 }
 
-.site-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem 2rem;
-  margin: 0 auto;
-  max-width: var(--measure);
-  padding: 2rem var(--gutter) 2.5rem;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-.site-footer p { margin: 0; }
-.site-footer .wordmark {
-  color: var(--ink);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.site-footer nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-}
-.site-footer nav a { color: var(--muted); }
-.site-footer nav a:hover,
-.site-footer nav a:focus-visible { color: var(--ink); }
-.site-footer a { text-decoration: none; }
-
 /* Document pages: about, sources, docs, methodology, research, not found. */
 .eyebrow {
   margin: 0 0 1rem;
@@ -807,7 +778,6 @@ nav.message-like-me-ask-ai + footer {
   .about-grid article { padding-inline: 0; }
   .about-grid article + article { padding-left: 0; border-left: 0; }
   .document-prose { margin-left: 0; }
-  .site-footer { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 32rem) {
   .mlm-marketing-hero .hraness-marketing-action,
@@ -896,5 +866,3 @@ html { scrollbar-color: var(--muted) var(--paper); }
   background-color: var(--hraness-material-warm-plane);
   color: var(--hraness-material-ink);
 }
-
-.product-brand-mark { display: inline-block; margin-inline-end: .5em; font-size: 1.25em; line-height: 1; }

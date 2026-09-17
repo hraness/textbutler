@@ -256,7 +256,7 @@ describe('supported source presentation', () => {
     expect(renderedSourcesPage).toContain(
       'https://github.com/hraness/message-like-me/blob/v0.8.11/docs/local-message-bundle-v2.md',
     );
-    expect(chrome).toContain('href="/sources"');
+    expect(chrome).toContain("{ href: '/sources', label: 'Legacy history tools' }");
     expect(sitemap).toContain("absoluteUrl('/sources')");
     expect(llms).toContain("absoluteUrl('/sources')");
     expect(readme).toContain('## Supported sources');

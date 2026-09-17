@@ -265,7 +265,7 @@ try {
           overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth,
           forms: document.querySelectorAll('form,input,textarea').length,
           headers: document.querySelectorAll('.hraness-marketing-header').length,
-          footers: document.querySelectorAll('.site-footer').length,
+          footers: document.querySelectorAll('.hraness-marketing-footer').length,
           askAi: document.querySelectorAll('.message-like-me-ask-ai').length,
           preset: document.querySelector('[data-hraness-marketing-preset]')?.getAttribute('data-hraness-marketing-preset') ?? null,
           headingFont: style.fontFamily, headingSize: Number.parseFloat(style.fontSize),
