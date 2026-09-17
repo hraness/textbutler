@@ -12,10 +12,10 @@
       },
       "note": "local JSON style-profile store; private, never leaves the device"
     },
-    "vendor:oh-archive-strict-wasm": {
+    "served:oh-archive-strict-wasm": {
       "kind": "served",
       "retention": "persistent",
-      "owner": "vendor/oh-archive-strict/README.md",
+      "owner": "src/x-archive-zip-rust.ts",
       "budget": {
         "bytesPerArtifact": 2097152
       },

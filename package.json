@@ -67,8 +67,7 @@
     "CHANGELOG.md",
     "README.md",
     "SECURITY.md",
-    "LICENSE",
-    "vendor"
+    "LICENSE"
   ],
   "scripts": {
     "build": "bun scripts/build-dist.ts",
@@ -85,6 +84,9 @@
     "prepack": "bun run check",
     "check:effect": "bun scripts/check-effect-architecture.ts",
     "check:public-graphs": "bun scripts/check-public-graphs.ts"
+  },
+  "dependencies": {
+    "@hraness/oh": "https://github.com/hraness/oh/releases/download/v0.10.3/hraness-oh-0.10.3.tgz"
   },
   "devDependencies": {
     "@hraness/agentmixer": "https://github.com/hraness/agentmixer/releases/download/v0.1.1/hraness-agentmixer-0.1.1.tgz",

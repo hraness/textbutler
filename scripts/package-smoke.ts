@@ -137,11 +137,6 @@ export async function scanPackedPackage(root: string): Promise<void> {
     if (DATABASE_EXTENSIONS.has(extension) || await startsWithSqliteHeader(path)) {
       problems.push(`${packagePath} contains a database artifact`);
     }
-    // Reviewed binary admission: vendored WASM artifacts may ship only from a
-    // single-level `vendor/<name>/<file>.wasm` path, remain subject to the
-    // file-count and byte bounds above, and skip the UTF-8 text scan because
-    // they are bytecode rather than prose.
-    if (/^vendor\/[^/]+\/[^/]+\.wasm$/u.test(packagePath)) return;
     if (!TEXT_EXTENSIONS.has(extension) && basename(path) !== "LICENSE") {
       problems.push(`${packagePath} has an unapproved public-package file type`);
       return;

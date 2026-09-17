@@ -23917,7 +23917,7 @@ function strictWasmInstance() {
   if (cachedInstance !== undefined)
     return cachedInstance;
   try {
-    const artifact = fileURLToPath2(new URL("../vendor/oh-archive-strict/oh_archive_strict_wasm.wasm", import.meta.url));
+    const artifact = fileURLToPath2(new URL(import.meta.resolve("@hraness/oh/archive-strict-wasm")));
     const bytes = readFileSync(artifact);
     const module = new WebAssembly.Module(bytes);
     cachedInstance = new WebAssembly.Instance(module, {});

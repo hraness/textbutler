@@ -10,10 +10,10 @@ import {
 /**
  * Optional Rust fast path for the strict X-archive ZIP reader.
  *
- * The vendored `oh-archive-strict` WASM artifact is produced by the `oh`
- * workspace (`rust/oh-archive-strict-wasm`) and ports this module's full
- * validation contract to Rust. When the artifact or the archive cannot be
- * handled by WASM, the reference TypeScript implementation remains
+ * The `oh-archive-strict` WASM artifact is shipped in the `@hraness/oh`
+ * release (`dist/rust-artifacts/oh-archive-strict-wasm/`) and ports this
+ * module's full validation contract to Rust. When the artifact or the archive
+ * cannot be handled by WASM, the reference TypeScript implementation remains
  * authoritative and the caller falls back to it.
  */
 
@@ -43,10 +43,7 @@ let cachedInstance: WebAssembly.Instance | null | undefined;
 function strictWasmInstance(): WebAssembly.Instance | null {
   if (cachedInstance !== undefined) return cachedInstance;
   try {
-    const artifact = fileURLToPath(new URL(
-      "../vendor/oh-archive-strict/oh_archive_strict_wasm.wasm",
-      import.meta.url,
-    ));
+    const artifact = fileURLToPath(new URL(import.meta.resolve("@hraness/oh/archive-strict-wasm")));
     const bytes = readFileSync(artifact);
     const module = new WebAssembly.Module(bytes);
     cachedInstance = new WebAssembly.Instance(module, {});
