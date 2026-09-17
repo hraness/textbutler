@@ -36,7 +36,7 @@ describe("release identity", () => {
     expect(siteRelease).toBe(packageRelease);
     expect(SOFTWARE_VERSION).toBe(packageRelease);
     expect(RELEASE_URL).toBe(
-      `https://github.com/hraness/message-like-me/releases/tag/v${packageRelease}`,
+      `https://github.com/hraness/textbutler/releases/tag/v${packageRelease}`,
     );
   });
 
