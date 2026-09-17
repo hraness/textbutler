@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [
       {
-        url: absoluteUrl('/og.png'),
+        url: absoluteUrl('/opengraph-image'),
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     title: 'Textbutler — Your personal message butler for Mac',
     description: SITE_DESCRIPTION,
     images: [{
-      url: absoluteUrl('/og.png'),
+      url: absoluteUrl('/opengraph-image'),
       alt: `${SITE_NAME} — your personal message butler for Mac.`,
     }],
   },
