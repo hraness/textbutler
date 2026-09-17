@@ -53,7 +53,7 @@ export function pageMetadata({
       title,
       description,
       images: [{
-        url: absoluteUrl('/og.png'),
+        url: absoluteUrl('/opengraph-image'),
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -65,7 +65,7 @@ export function pageMetadata({
       title,
       description,
       images: [{
-        url: absoluteUrl('/og.png'),
+        url: absoluteUrl('/opengraph-image'),
         alt: `${SITE_NAME} — your personal message butler for Mac.`,
       }],
     },
