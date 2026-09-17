@@ -10,8 +10,8 @@ import {
 } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
+import { extractXArchiveFileAuto } from "./x-archive-zip-rust.ts";
 import {
-  extractXArchiveFile,
   MAX_X_ZIP_ARCHIVE_BYTES,
   MAX_X_ZIP_MEMBER_BYTES,
   type ExtractedXArchiveMember,
@@ -1057,7 +1057,7 @@ export async function readXArchive(path: unknown): Promise<XArchiveEvidence> {
     }
     const size = Number(before.size);
     const digest = sha256Descriptor(descriptor, size);
-    const members = extractXArchiveFile(descriptor, size);
+    const members = extractXArchiveFileAuto(descriptor, size);
     const parsed = parseXArchiveMembers(members);
     const after = fstatSync(descriptor, { bigint: true });
     const pathAfter = lstatSync(path, { bigint: true });

@@ -42,4 +42,30 @@ describe("packed public privacy boundary", () => {
       }
     }
   });
+
+  test("admits vendored WASM only at single-level vendor paths", async () => {
+    const wasm = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+    for (const [name, accepted] of [
+      ["vendor/oh-archive-strict/module.wasm", true],
+      ["vendor/nested/deep/module.wasm", false],
+      ["dist/module.wasm", false],
+      ["module.wasm", false],
+    ] as const) {
+      const root = await fixture();
+      try {
+        const target = join(root, name);
+        await mkdir(join(target, ".."), { recursive: true });
+        await writeFile(target, wasm);
+        if (accepted) {
+          await expect(scanPackedPackage(root)).resolves.toBeUndefined();
+        } else {
+          await expect(scanPackedPackage(root)).rejects.toThrow(
+            "unapproved public-package file type",
+          );
+        }
+      } finally {
+        await rm(root, { force: true, recursive: true });
+      }
+    }
+  });
 });

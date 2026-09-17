@@ -67,7 +67,8 @@
     "CHANGELOG.md",
     "README.md",
     "SECURITY.md",
-    "LICENSE"
+    "LICENSE",
+    "vendor"
   ],
   "scripts": {
     "build": "bun scripts/build-dist.ts",

@@ -11,6 +11,15 @@
         "bytesPerAccountMonth": 1048576
       },
       "note": "local JSON style-profile store; private, never leaves the device"
+    },
+    "vendor:oh-archive-strict-wasm": {
+      "kind": "served",
+      "retention": "persistent",
+      "owner": "vendor/oh-archive-strict/README.md",
+      "budget": {
+        "bytesPerArtifact": 2097152
+      },
+      "note": "optional WASM fast path for the strict X-archive reader; TypeScript remains authoritative"
     }
   },
   "exempt": []
