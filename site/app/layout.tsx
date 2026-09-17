@@ -51,6 +51,7 @@ export const metadata: Metadata = {
         url: absoluteUrl('/og.png'),
         width: 1200,
         height: 630,
+        type: 'image/png',
         alt: `${SITE_NAME} — your personal message butler for Mac.`,
       },
     ],
@@ -76,9 +77,16 @@ export const viewport: Viewport = {
 
 const websiteId = `${absoluteUrl('/')}#website`;
 const applicationId = `${absoluteUrl('/')}#application`;
+const organizationId = 'https://hraness.com/#organization';
 const structuredData = {
   '@context': 'https://schema.org',
   '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': organizationId,
+      name: 'Hraness',
+      url: 'https://hraness.com',
+    },
     {
       '@type': 'WebSite',
       '@id': websiteId,
@@ -86,6 +94,7 @@ const structuredData = {
       url: absoluteUrl('/'),
       description: SITE_DESCRIPTION,
       inLanguage: 'en-US',
+      publisher: { '@id': organizationId },
     },
     {
       '@type': 'SoftwareApplication',
@@ -96,6 +105,7 @@ const structuredData = {
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'macOS',
       sameAs: GITHUB_URL,
+      author: { '@id': organizationId },
       featureList: [
         'macOS menu-bar companion and local daemon controls',
         'Contact-specific guidance and editable memory',
@@ -114,6 +124,7 @@ const structuredData = {
       programmingLanguage: 'TypeScript',
       runtimePlatform: 'Bun 1.3.14 or newer on macOS',
       license: 'https://opensource.org/license/mit',
+      author: { '@id': organizationId },
       targetProduct: { '@id': applicationId },
     },
   ],
