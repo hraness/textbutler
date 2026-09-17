@@ -1,7 +1,7 @@
-import { constants } from "node:fs";
-import { link, lstat, mkdir, open, realpath, rename, unlink } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { createPrivateFileOnce, publishPrivateFile } from "@hraness/local-custody/atomic-publish";
+import { ensurePrivateDirectory, readPrivateFile } from "@hraness/local-custody/private-paths";
 import type { ControlRequest, ControlResponse, DesktopSnapshot } from "../../control/src/index.ts";
 import { configureContact, newContact, DEFAULT_ACTIVE_LIMIT, parseSettings, type ContactSettings, type Settings } from "./config.ts";
 import { ContactWorkspace } from "./workspace.ts";
@@ -104,25 +104,15 @@ export function parseControlRequest(value: unknown): ControlRequest {
 }
 
 /** Creates only the last component; symlinked or non-private existing roots fail closed. */
-export async function ensurePrivateDirectory(path: string): Promise<string> {
-  const absolute = resolve(path);
-  const parent = dirname(absolute);
-  if (await realpath(parent) !== parent) throw new Error("Data directory parent must be physical");
-  try { await mkdir(absolute, { mode: 0o700 }); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
-  const info = await lstat(absolute);
-  if (await realpath(absolute) !== absolute || !info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0) throw new Error("Data directory must be physical, owned, and private");
-  return absolute;
-}
+export { ensurePrivateDirectory };
 async function privateText(path: string): Promise<string> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
-    const info = await handle.stat();
-    if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0 || info.size > MAX_SETTINGS_BYTES) throw new Error("Unsafe owner settings file");
-    const data = Buffer.alloc(MAX_SETTINGS_BYTES + 1);
-    const { bytesRead } = await handle.read(data, 0, data.length, 0);
-    if (bytesRead > MAX_SETTINGS_BYTES) throw new Error("Owner settings exceeds size bound");
-    return new TextDecoder("utf-8", { fatal: true }).decode(data.subarray(0, bytesRead));
-  } finally { await handle.close(); }
+    return new TextDecoder("utf-8", { fatal: true }).decode(await readPrivateFile(path, MAX_SETTINGS_BYTES));
+  } catch (error) {
+    if (error instanceof Error && error.message === "Private file exceeds its size bound.") throw new Error("Owner settings exceeds size bound");
+    if (error instanceof Error && error.message === "Unsafe private file.") throw new Error("Unsafe owner settings file");
+    throw error;
+  }
 }
 export type OwnerBinding = ConversationBinding | AutomationBinding;
 export type OwnerRuntimeState = Readonly<{ settings: Settings; bindings: Readonly<Record<string, OwnerBinding>>; grants: Readonly<Record<string, AutomationGrant>> }>;
@@ -162,16 +152,7 @@ export async function initializeOwnerState(dataDir: string, initialSettings?: Se
   await ensurePrivateDirectory(join(root, "contacts"));
   const settingsPath = join(state, "settings.json");
   const initial = parseOwnerState({ schemaVersion: 1, revision: 1, settings: initialSettings ?? { schemaVersion: 1, paused: true, maxActiveContacts: DEFAULT_ACTIVE_LIMIT, contacts: [] } });
-  try { await lstat(settingsPath); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    const staged = join(state, `.settings-init-${randomUUID()}`);
-    const handle = await open(staged, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-    try {
-      await handle.writeFile(`${JSON.stringify(initial, null, 2)}\n`); await handle.sync(); await handle.close();
-      try { await link(staged, settingsPath); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
-    } finally { await handle.close().catch(() => {}); await unlink(staged); }
-  }
+  await createPrivateFileOnce(state, "settings.json", `${JSON.stringify(initial, null, 2)}\n`);
   parseOwnerState(JSON.parse(await privateText(settingsPath)));
   return { dataDir: root, settingsPath };
 }
@@ -317,16 +298,12 @@ export class TextbutlerControlService {
     if (current.state.revision >= Number.MAX_SAFE_INTEGER) fail("unavailable", "Settings revision capacity is exhausted.");
     const bytes = `${JSON.stringify(parseOwnerState({ schemaVersion: 1, revision: current.state.revision + 1, settings, bindings, grants }), null, 2)}\n`;
     if (Buffer.byteLength(bytes) > MAX_SETTINGS_BYTES) fail("capacity", "Settings exceed the private storage limit.");
-    const staged = join(dirname(this.settingsPath), `.settings-${randomUUID()}`);
-    const handle = await open(staged, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-    try {
-      await handle.writeFile(bytes); await handle.sync(); await handle.close();
-      if (hash(await privateText(this.settingsPath)) !== hash(current.bytes)) fail("conflict", "Settings changed. Reload before saving.");
-      await rename(staged, this.settingsPath);
-      this.notifySettings(settings);
-      const directory = await open(dirname(this.settingsPath), constants.O_RDONLY);
-      try { await directory.sync(); } finally { await directory.close(); }
-    } catch (error) { await handle.close().catch(() => {}); await unlink(staged).catch(() => {}); throw error; }
+    await publishPrivateFile(dirname(this.settingsPath), "settings.json", bytes, {
+      beforeCommit: async () => {
+        if (hash(await privateText(this.settingsPath)) !== hash(current.bytes)) fail("conflict", "Settings changed. Reload before saving.");
+      },
+    });
+    this.notifySettings(settings);
   }
   private serial<T>(work: () => Promise<T>): Promise<T> {
     const result = this.queue.catch(() => {}).then(work); this.queue = result; return result;
