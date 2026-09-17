@@ -44,7 +44,7 @@ export function createAutomationOwnerPort(options: { client: GhostgetAutomationC
   const client = options.client, providers = [...options.providers], now = options.now ?? Date.now;
   const statuses = new Map<AutomationProvider, { status: AutomationStatus; observedAt: number }>();
   const remember = (status: AutomationStatus) => { statuses.set(status.identity.provider, { status: structuredClone(status), observedAt: now() }); };
-  if (!providers.length || providers.length > 2 || new Set(providers).size !== providers.length || providers.some(value => value !== "imessage" && value !== "whatsapp")) throw new Error("Invalid owner messaging networks");
+  if (!providers.length || providers.length > 3 || new Set(providers).size !== providers.length || providers.some(value => value !== "imessage" && value !== "whatsapp" && value !== "beeper")) throw new Error("Invalid owner messaging networks");
   const validate = async (binding: AutomationBinding, signal: AbortSignal) => {
     const expected = parseAutomationBinding(binding); signal.throwIfAborted();
     if (!providers.includes(expected.identity.provider)) throw new Error("Messaging provider is not configured");

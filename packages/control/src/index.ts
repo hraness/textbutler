@@ -11,7 +11,7 @@ export interface ContactSettings {
   disclosure: { character: string; begin: string; end: string };
 }
 export interface Contact { id: string; name: string; subtitle: string; settings: ContactSettings;
-  messaging?: { provider: "imessage" | "whatsapp"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
+  messaging?: { provider: "imessage" | "whatsapp" | "beeper"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
 export interface Activity { id: string; at: string; contactId: string | null; title: string; detail: string }
 export interface ProviderAccountDiagnostic {
   id: string; label: string; provider: "claude" | "codex"; route: "claude-api" | "claude-code" | "codex";
@@ -24,7 +24,7 @@ export type ProviderLoginChallenge =
   | { type: "chatgptDeviceCode"; loginId: string; verificationUrl: string; userCode: string };
 /** An enrolled conversation whose tail still awaits an owner answer. */
 export interface PendingReplyItem {
-  contactId: string; name: string; provider: "imessage" | "whatsapp" | "none"; enabled: boolean;
+  contactId: string; name: string; provider: "imessage" | "whatsapp" | "beeper" | "none"; enabled: boolean;
   pendingCount: number; lastInboundAt: string | null; preview: string | null;
   sendable: boolean; reason: string | null;
 }
@@ -42,7 +42,7 @@ export interface DesktopSnapshot {
   activity: Activity[];
   providerAccounts?: readonly ProviderAccountDiagnostic[];
   automation?: { state: "running" | "paused" | "unavailable"; detail: string };
-  messagingProviders?: readonly ("imessage" | "whatsapp")[];
+  messagingProviders?: readonly ("imessage" | "whatsapp" | "beeper")[];
   replies?: RepliesView;
 }
 export interface ConversationCandidate { id: string; name: string; subtitle: string; eligible: boolean; reason: string }
@@ -55,7 +55,7 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.login.start"; accountId: string; method: "chatgpt" | "chatgptDeviceCode" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.login.cancel"; accountId: string; loginId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.logout"; accountId: string }
-  | { protocol: typeof CONTROL_PROTOCOL; command: "messaging.start"; provider: "imessage" | "whatsapp" }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "messaging.start"; provider: "imessage" | "whatsapp" | "beeper" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.settings.update"; contactId: string; expectedRevision: number; settings: ContactSettings }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.read"; contactId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.write"; contactId: string; expectedRevision: string; content: string }
@@ -156,7 +156,7 @@ function list(value: unknown, limit: number): unknown[] {
 }
 function pendingReplyItem(value: unknown): PendingReplyItem {
   const row = record(value);
-  return { contactId: text(row.contactId, 256), name: text(row.name, 256), provider: oneOf(row.provider, ["imessage", "whatsapp", "none"]),
+  return { contactId: text(row.contactId, 256), name: text(row.name, 256), provider: oneOf(row.provider, ["imessage", "whatsapp", "beeper", "none"]),
     enabled: bool(row.enabled), pendingCount: integer(row.pendingCount, 0, 20),
     lastInboundAt: row.lastInboundAt === null ? null : text(row.lastInboundAt, 64),
     preview: row.preview === null ? null : text(row.preview, 512), sendable: bool(row.sendable),
@@ -233,7 +233,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
     protocol: CONTROL_PROTOCOL, revision: integer(source.revision), connection: oneOf(source.connection, ["connected", "disconnected", "demo"]),
     detail: text(source.detail), settings: { paused: bool(global.paused), activeContactLimit: integer(global.activeContactLimit, 1, 50) },
     contacts: list(source.contacts, 1_000).map(value => { const row = record(value); return { id: text(row.id, 256), name: text(row.name, 256), subtitle: text(row.subtitle, 512), settings: settings(row.settings),
-      ...(row.messaging === undefined ? {} : { messaging: { provider: oneOf(record(row.messaging).provider, ["imessage", "whatsapp"]), state: oneOf(record(row.messaging).state, ["active", "missing", "revocation-pending", "recovery-required"]), detail: text(record(row.messaging).detail, 512), grantExpiresAt: record(row.messaging).grantExpiresAt === null ? null : text(record(row.messaging).grantExpiresAt, 32) } }) }; }),
+      ...(row.messaging === undefined ? {} : { messaging: { provider: oneOf(record(row.messaging).provider, ["imessage", "whatsapp", "beeper"]), state: oneOf(record(row.messaging).state, ["active", "missing", "revocation-pending", "recovery-required"]), detail: text(record(row.messaging).detail, 512), grantExpiresAt: record(row.messaging).grantExpiresAt === null ? null : text(record(row.messaging).grantExpiresAt, 32) } }) }; }),
     capabilities: list(source.capabilities, 9).map(value => { const row = record(value); return { id: oneOf(row.id, ["messages", "contacts", "agent", "attachments", "reactions", "stickers", "links", "polls", "mini-apps"]), status: oneOf(row.status, ["available", "setup-required", "unsupported"]), detail: text(row.detail) }; }),
     activity: list(source.activity, 200).map(value => { const row = record(value); return { id: text(row.id, 256), at: text(row.at, 64), contactId: row.contactId === null ? null : text(row.contactId, 256), title: text(row.title, 256), detail: text(row.detail) }; }),
     ...(source.providerAccounts === undefined ? {} : { providerAccounts: list(source.providerAccounts, 10).map(value => {
@@ -249,7 +249,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
         } }) };
     }) }),
     ...(source.automation === undefined ? {} : { automation: { state: oneOf(record(source.automation).state, ["running", "paused", "unavailable"]), detail: text(record(source.automation).detail, 512) } }),
-    ...(source.messagingProviders === undefined ? {} : { messagingProviders: list(source.messagingProviders, 2).map(value => oneOf(value, ["imessage", "whatsapp"])) }),
+    ...(source.messagingProviders === undefined ? {} : { messagingProviders: list(source.messagingProviders, 3).map(value => oneOf(value, ["imessage", "whatsapp", "beeper"])) }),
     ...(source.replies === undefined ? {} : { replies: repliesView(source.replies) }),
   };
   if (new Set(snapshot.contacts.map(contact => contact.id)).size !== snapshot.contacts.length

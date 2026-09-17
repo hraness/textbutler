@@ -17,7 +17,7 @@ import type { MessageEvent } from "./decision.ts";
 export interface PendingReplyItem {
   readonly contactId: string;
   readonly name: string;
-  readonly provider: "imessage" | "whatsapp" | "none";
+  readonly provider: "imessage" | "whatsapp" | "beeper" | "none";
   readonly enabled: boolean;
   readonly pendingCount: number;
   readonly lastInboundAt: string | null;

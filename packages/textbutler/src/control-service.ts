@@ -11,7 +11,7 @@ import type { ProviderHost } from "./provider-host.ts";
 import type { AccountLeaseStore } from "@hraness/agentmixer";
 import { selectButlerModel } from "./routed-agent.ts";
 import { parseAutomationBinding, type AutomationBinding, type AutomationCandidate, type OwnerAutomationPort } from "./automation-owner.ts";
-import { automationBindingDigest, parseAutomationGrant, type AutomationGrant, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
+import { automationBindingDigest, parseAutomationGrant, type AutomationGrant, type AutomationProvider, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { OwnerReplies, type PendingObservation } from "./owner-replies.ts";
 import { Hooks } from "./hooks.ts";
 
@@ -40,6 +40,7 @@ function text(value: unknown, max = 256): string {
 }
 function contactId(value: unknown): string { const id = text(value, 80); if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/u.test(id)) fail("invalid-request", "Invalid contact identifier."); return id; }
 function bool(value: unknown): boolean { if (typeof value !== "boolean") fail("invalid-request", "Invalid control flag."); return value; }
+function providerName(provider: AutomationProvider): string { return provider === "imessage" ? "iMessage" : provider === "beeper" ? "Beeper" : "WhatsApp"; }
 function parseUiSettings(value: unknown) {
   const settings = record(value); exact(settings, ["enabled", "responseMode", "keyword", "provider", "disclosure", ...(settings.accountId === undefined ? [] : ["accountId"])]);
   const disclosure = record(settings.disclosure); exact(disclosure, ["character", "begin", "end"]);
@@ -97,7 +98,7 @@ export function parseControlRequest(value: unknown): ControlRequest {
   }
   if (item.command === "messaging.start") {
     exact(item, ["protocol", "command", "provider"]);
-    if (item.provider !== "imessage" && item.provider !== "whatsapp") fail("invalid-request", "Choose a configured messaging provider.");
+    if (item.provider !== "imessage" && item.provider !== "whatsapp" && item.provider !== "beeper") fail("invalid-request", "Choose a configured messaging provider.");
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, provider: item.provider };
   }
   if (item.command === "contact.enroll") {
@@ -380,12 +381,12 @@ export class TextbutlerControlService {
       const supported = observed.filter(value => value.status.connected && actions.some(action => value.status.actions[action].available));
       const unavailable = observed.map(value => {
         const reasons = [...new Set(actions.map(action => value.status.actions[action].reason).filter((reason): reason is string => typeof reason === "string" && reason.length > 0))];
-        return `${value.status.identity.provider === "imessage" ? "iMessage" : "WhatsApp"}: ${reasons.join(" ") || "This feature is unavailable on the checked connection."}`;
+        return `${providerName(value.status.identity.provider)}: ${reasons.join(" ") || "This feature is unavailable on the checked connection."}`;
       });
       const combined = unavailable.join(" ");
       const unavailableDetail = combined.length <= 4096 ? combined : `${combined.slice(0, 4000).replace(/[\uD800-\uDBFF]$/u, "")}… Details shortened.`;
       return { id, status: supported.length ? "available" as const : observed.length ? "unsupported" as const : "setup-required" as const,
-        detail: supported.length ? `Last confirmed by ${supported.map(value => value.status.identity.provider === "imessage" ? "iMessage" : "WhatsApp").join(" and ")}. The selected contact's grant and current provider capability are checked before sending.`
+        detail: supported.length ? `Last confirmed by ${supported.map(value => providerName(value.status.identity.provider)).join(" and ")}. The selected contact's grant and current provider capability are checked before sending.`
           : observed.length ? unavailableDetail : "Connect messaging to check this feature's availability." };
     };
     const activity = state.settings.contacts.flatMap(contact => this.journal.recent(contact.id, 50)).sort((a, b) => b.startedAt - a.startedAt).slice(0, 200).map(run => ({ id: run.id, at: new Date(run.updatedAt).toISOString(), contactId: run.contactId, title: run.state, detail: run.reason }));
@@ -396,7 +397,7 @@ export class TextbutlerControlService {
       ...(this.automation ? { messagingProviders: this.automation.providers() } : {}),
       settings: { paused: state.settings.paused, activeContactLimit: state.settings.maxActiveContacts },
       contacts: state.settings.contacts.map(contact => { const binding = state.bindings[contact.id], grant = state.grants[contact.id], recovering = this.grantFailures.has(contact.id) || this.pendingGrant(contact.id); return { id: contact.id, name: contact.label,
-        subtitle: binding?.version === 2 ? `${binding.identity.provider === "imessage" ? "iMessage" : "WhatsApp"} · ${contact.enabled && grant && Date.parse(grant.expiresAt) > Date.now() && !recovering ? "Contact grant active" : "Butler off or grant unavailable"}` : binding ? "Selected Messages conversation · sending unavailable" : "Owner-configured workspace · sending unavailable",
+        subtitle: binding?.version === 2 ? `${providerName(binding.identity.provider)} · ${contact.enabled && grant && Date.parse(grant.expiresAt) > Date.now() && !recovering ? "Contact grant active" : "Butler off or grant unavailable"}` : binding ? "Selected Messages conversation · sending unavailable" : "Owner-configured workspace · sending unavailable",
         ...(binding?.version !== 2 ? {} : { messaging: { provider: binding.identity.provider,
           state: this.grantWork.has(contact.id) ? "revocation-pending" as const : recovering || !contact.enabled && grant ? "recovery-required" as const : contact.enabled && grant && Date.parse(grant.expiresAt) > Date.now() ? "active" as const : "missing" as const,
           detail: this.grantWork.has(contact.id) ? "The messaging grant is changing. New dispatches wait until it settles."
@@ -565,10 +566,10 @@ export class TextbutlerControlService {
           const duplicate = Object.values(current.state.bindings).some(binding => binding.version === 2 && binding.bindingDigest === automationBindingDigest(candidate.identity, candidate.conversation));
           const id = randomUUID(); this.automationCandidates.set(id, { candidate, expires: Date.now() + 300_000 });
           return { id, name: candidate.conversation.title ?? candidate.conversation.participants.join(", "),
-            subtitle: `${candidate.identity.provider === "imessage" ? "iMessage" : "WhatsApp"} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
+            subtitle: `${providerName(candidate.identity.provider)} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
             eligible: !duplicate, reason: duplicate ? "Already added" : "Ready to add" };
         });
-        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows, detail: "Choose an exact one-to-one iMessage or WhatsApp conversation. Adding a contact keeps its butler disabled." };
+        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows, detail: "Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled." };
       });
       if (!this.enrollment) fail("unavailable", "Messages selection is not configured. Set up the owner-installed Ghostget CLI in Textbutler's host configuration, then restart the daemon.");
       return this.startJob(async signal => {

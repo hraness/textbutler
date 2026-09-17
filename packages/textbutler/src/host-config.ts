@@ -3,7 +3,7 @@ import { assertOwnedPath, readOwnedFileStable } from "@hraness/local-custody/pri
 import { parseClaudePriceCatalog, type ClaudePriceCatalog } from "@hraness/agentmixer";
 
 export type GhostgetHostConfig = Readonly<{ executable: string; runtimeExecutable?: string; authId: string; stateHome?: string;
-  automationAccounts?: readonly Readonly<{ provider: "imessage" | "whatsapp"; authId: string }>[] }>;
+  automationAccounts?: readonly Readonly<{ provider: "imessage" | "whatsapp" | "beeper"; authId: string }>[] }>;
 export type ProviderAccountConfig = Readonly<{ id: string; label: string }> & (
   | Readonly<{ route: "claude-api"; credentialFile: string; replyModel: string; prices: ClaudePriceCatalog; maxBudgetUsd: number }>
   | Readonly<{ route: "claude-code" | "codex" }>
@@ -33,10 +33,10 @@ export function parseHostConfig(value: unknown): HostConfig {
   if (Object.keys(ghostget).some(key => !["executable", "runtimeExecutable", "authId", "stateHome", "automationAccounts"].includes(key)) || typeof ghostget.authId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(ghostget.authId)) return invalid();
   let automationAccounts: GhostgetHostConfig["automationAccounts"];
   if (ghostget.automationAccounts !== undefined) {
-    if (!Array.isArray(ghostget.automationAccounts) || ghostget.automationAccounts.length < 1 || ghostget.automationAccounts.length > 2) return invalid();
+    if (!Array.isArray(ghostget.automationAccounts) || ghostget.automationAccounts.length < 1 || ghostget.automationAccounts.length > 3) return invalid();
     automationAccounts = Object.freeze(ghostget.automationAccounts.map(value => {
       const account = record(value);
-      if (Object.keys(account).sort().join(",") !== "authId,provider" || account.provider !== "imessage" && account.provider !== "whatsapp"
+      if (Object.keys(account).sort().join(",") !== "authId,provider" || account.provider !== "imessage" && account.provider !== "whatsapp" && account.provider !== "beeper"
         || typeof account.authId !== "string" || !/^[a-z][a-z0-9-]{0,47}$/u.test(account.authId)) return invalid();
       return Object.freeze({ provider: account.provider, authId: account.authId });
     }));

@@ -4,8 +4,8 @@ import { createHash } from "node:crypto";
 /** Versioned public Ghostget wire contract. No provider internals or credentials. */
 export const AUTOMATION_PROTOCOL = "ghostget.messaging-automation/1" as const;
 export const AUTOMATION_ACTIONS = ["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"] as const;
-export type AutomationProvider = "imessage" | "whatsapp";
-export type AutomationCoordinate = { provider: "imessage"; chatGuid: string; service: "iMessage"; observedChatRowId: number } | { provider: "whatsapp"; conversationJid: string };
+export type AutomationProvider = "imessage" | "whatsapp" | "beeper";
+export type AutomationCoordinate = { provider: "imessage"; chatGuid: string; service: "iMessage"; observedChatRowId: number } | { provider: "whatsapp"; conversationJid: string } | { provider: "beeper"; accountId: string; conversationId: string };
 export interface AutomationIdentity { provider: AutomationProvider; authId: string; accountIdentity: string; accountSubject: string; implementationIdentity: string; sourceGeneration: string }
 export interface AutomationConversation { coordinate: AutomationCoordinate; title: string | null; kind: "single"; participants: readonly string[] }
 export interface AutomationEnrollment { id: string; identity: AutomationIdentity; conversation: AutomationConversation; bindingDigest: string; revision: number; ready: boolean; reason: string | null }
@@ -29,7 +29,7 @@ export const automationHash = (value: unknown): string => createHash("sha256").u
 export const automationBindingDigest = (identity: AutomationIdentity, conversation: AutomationConversation): string => automationHash({ identity, conversation: { ...conversation, title: null } });
 export function automationRecord(value: unknown, keys: readonly string[]): Record<string, unknown> { const r = object(value); exact(r, keys); return r; }
 export function automationId(value: unknown): string { const result = string(value, 256); if (!/^[A-Za-z0-9._:-]+$/u.test(result)) throw new Error("Invalid automation ID"); return result; }
-export function automationProvider(value: unknown): AutomationProvider { if (value !== "imessage" && value !== "whatsapp") throw new Error("Unknown messaging network"); return value; }
+export function automationProvider(value: unknown): AutomationProvider { if (value !== "imessage" && value !== "whatsapp" && value !== "beeper") throw new Error("Unknown messaging network"); return value; }
 export function automationBoolean(value: unknown): boolean { if (typeof value !== "boolean") throw new Error("Expected automation flag"); return value; }
 const nullable = (value: unknown, maximum = 1024): string | null => value === null ? null : string(value, maximum);
 export function parseAutomationCoordinate(value: unknown): AutomationCoordinate {
@@ -39,6 +39,10 @@ export function parseAutomationCoordinate(value: unknown): AutomationCoordinate 
     const chatGuid = string(r.chatGuid, 1024);
     if (r.service !== "iMessage" || !chatGuid.startsWith("iMessage;")) throw new Error("Invalid iMessage coordinate");
     return { provider, chatGuid, service: "iMessage", observedChatRowId: integer(r.observedChatRowId, 1, Number.MAX_SAFE_INTEGER) };
+  }
+  if (provider === "beeper") {
+    exact(r, ["provider", "accountId", "conversationId"]);
+    return { provider, accountId: string(r.accountId, 512), conversationId: string(r.conversationId, 2048) };
   }
   exact(r, ["provider", "conversationJid"]);
   const conversationJid = string(r.conversationJid, 256);
