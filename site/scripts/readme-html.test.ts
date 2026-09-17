@@ -13,10 +13,10 @@ describe("renderReadmeHtml", () => {
     ].join("\n"));
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(html).toContain(
-      'href="https://github.com/hraness/message-like-me/blob/main/SECURITY.md"',
+      'href="https://github.com/hraness/textbutler/blob/main/SECURITY.md"',
     );
     expect(html).toContain(
-      'src="https://raw.githubusercontent.com/hraness/message-like-me/main/docs/architecture.png"',
+      'src="https://raw.githubusercontent.com/hraness/textbutler/main/docs/architecture.png"',
     );
     expect(html).not.toContain("<img src=x");
   });

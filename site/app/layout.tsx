@@ -8,6 +8,7 @@ import {
   SITE_NAME,
   SITE_ORIGIN,
 } from './_lib/site';
+import { FoilController } from './_components/foil-controller';
 import '@hraness/design-kit/fonts.css';
 import './globals.css';
 
@@ -142,6 +143,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
         />
         {children}
+        <FoilController />
       </body>
     </html>
   );

@@ -1,5 +1,5 @@
-const REPOSITORY_BLOB_ROOT = "https://github.com/hraness/message-like-me/blob/main/";
-const REPOSITORY_RAW_ROOT = "https://raw.githubusercontent.com/hraness/message-like-me/main/";
+const REPOSITORY_BLOB_ROOT = "https://github.com/hraness/textbutler/blob/main/";
+const REPOSITORY_RAW_ROOT = "https://raw.githubusercontent.com/hraness/textbutler/main/";
 
 function decodeCharacterReferences(value: string): string {
   return value

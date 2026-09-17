@@ -248,13 +248,13 @@ describe('supported source presentation', () => {
       'ghostget beeper export-message-like-me --auth &lt;id&gt; --output /absolute/private/path/beeper-bundle',
     );
     expect(renderedSourcesPage).toContain(
-      'https://github.com/hraness/message-like-me/blob/v0.8.11/docs/local-message-bundle-v1.md',
+      'https://github.com/hraness/textbutler/blob/v0.8.11/docs/local-message-bundle-v1.md',
     );
     expect(renderedSourcesPage).toContain(
       'ghostget whatsapp export-message-like-me --auth &lt;id&gt; --output /absolute/private/path/whatsapp-bundle',
     );
     expect(renderedSourcesPage).toContain(
-      'https://github.com/hraness/message-like-me/blob/v0.8.11/docs/local-message-bundle-v2.md',
+      'https://github.com/hraness/textbutler/blob/v0.8.11/docs/local-message-bundle-v2.md',
     );
     expect(chrome).toContain("{ href: '/sources', label: 'Legacy history tools' }");
     expect(sitemap).toContain("absoluteUrl('/sources')");
