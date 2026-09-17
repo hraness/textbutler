@@ -877,7 +877,7 @@ profile to a fixture.
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change.
 
 The canonical repository is
-[`hraness/message-like-me`](https://github.com/hraness/message-like-me).
+[`hraness/textbutler`](https://github.com/hraness/textbutler).
 The informational project page is
 [`messagelikeme.com`](https://messagelikeme.com). The CLI does not connect to
 the site, and the site never receives message or contact data.
