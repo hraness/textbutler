@@ -56,6 +56,7 @@ export function pageMetadata({
         url: absoluteUrl('/og.png'),
         width: 1200,
         height: 630,
+        type: 'image/png',
         alt: `${SITE_NAME} — your personal message butler for Mac.`,
       }],
     },
