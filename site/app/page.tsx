@@ -21,6 +21,14 @@ import {
   SOFTWARE_VERSION,
 } from './_lib/site';
 
+function TopicIcon({ slug }: Readonly<{ slug: string }>) {
+  // Decorative local SVG; next/image cannot optimize vector sources.
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="textbutler-topic-icon" src={`/icons/${slug}.svg`} alt="" aria-hidden="true" width="44" height="44" loading="lazy" decoding="async" />
+  );
+}
+
 export const metadata = pageMetadata({
   title: 'Textbutler — Your personal message butler for Mac',
   description: SITE_DESCRIPTION,
@@ -116,6 +124,7 @@ export default function Home() {
           </div>
 
           <MarketingSection heading="A butler for each relationship" headingId="contacts-title" id="how-it-works" label="" summary="Choose the contacts it can help. Keep their context separate. Pause one conversation or every conversation whenever you need.">
+            <TopicIcon slug="butler" />
             <MarketingFlow ariaLabel="How contact-based assistance is designed to work" steps={[
               { label: 'Choose a contact', detail: 'Choose one direct conversation from a configured connection. New contacts start disabled; the default active limit is five.' },
               { label: 'Give it context', detail: 'Optionally import recent history as context. Guidance, preferences, and dated memories live in an ordinary folder you can read and edit.' },
@@ -125,10 +134,12 @@ export default function Home() {
           </MarketingSection>
 
           <MarketingSection heading="Memory you can read and change" headingId="memory-title" id="memory" label="" layout="split" summary="The butler’s context belongs in ordinary files. Add what it should know, correct an assumption, or remove a stale note. It is designed to learn from conversation without turning its guesses into facts.">
+            <TopicIcon slug="memory" />
             <div className="workspace-example"><pre aria-label="Example contact workspace"><code>{`contact/\n├── AGENTS.md\n├── ABOUT.md\n├── MEMORY.md\n├── STYLE.md\n├── history/\n├── notes/\n├── attachments/\n└── outbox/`}</code></pre><p>One contact workspace. Settings, credentials, and permission grants stay outside the agent’s files.</p><Link href="/methodology">Read the legacy evidence methodology</Link></div>
           </MarketingSection>
 
           <MarketingSection heading="Small parts with clear jobs" headingId="architecture-title" id="architecture" label="" summary="A local daemon handles the work while the menu companion gives you the controls. Hooks and adapters provide room to extend the experience without handing an agent unrestricted access.">
+            <TopicIcon slug="architecture" />
             <dl className="architecture-rows">
               <div><dt>Textbutler</dt><dd>Contacts, response timing, visible disclosure, scoped memory, pause, and action policy.</dd></div>
               <div><dt>Ghostget</dt><dd>iMessage and WhatsApp connections, account permissions, conversation identity, and available message actions.</dd></div>
@@ -145,6 +156,7 @@ export default function Home() {
           ]} />
 
           <MarketingSection heading="Build it. Set it up. Keep control." headingId="development-title" id="development" label="" summary="The CLI, menu companion, and daemon are implemented in source. Setup is explicit, and no windowed app download is provided.">
+            <TopicIcon slug="control" />
             <div className="development-status"><div><h3>Ready to inspect and build</h3><p>Mac controls, background service, iMessage and WhatsApp enrollment, optional history import, editable memory, hooks, and a guarded reply loop. New installations start paused.</p><a href={`${GITHUB_URL}/tree/main/apps/macos`}>Inspect the menu companion source</a></div><div><h3>Setup before replies</h3><p>Configure Ghostget and its permissions, check an explicit Claude API account, then enable a contact and resume. Native Claude Code and Codex remain unavailable. Live delivery and rich actions still need verification on your account.</p><a href={ARCHITECTURE_URL}>See the integration boundaries</a></div></div>
             <p className="legacy-note">Looking for the original history tools? <a href={RELEASE_URL}>Message Like Me v{SOFTWARE_VERSION}</a> remains available as a legacy release. It does not install Textbutler or enable automatic replies. <Link href="/sources">View legacy history sources.</Link></p>
           </MarketingSection>
