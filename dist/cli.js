@@ -15561,6 +15561,40 @@ var MESSAGE_BUNDLE_SCHEMA_VERSIONS = Object.freeze([
 
 // src/sqlite-snapshot.ts
 import { createRequire } from "module";
+
+// node_modules/@hraness/oh/dist/rust-fallback.js
+var MAX_FALLBACK_TAGS = 32;
+var MAX_FALLBACK_NOTICES_PER_TAG = 4;
+var DIAGNOSTIC_FIELD = /^[A-Za-z0-9._-]{1,64}$/u;
+var emittedNotices = new Map;
+function boundedField(value) {
+  return DIAGNOSTIC_FIELD.test(value) ? value : "other";
+}
+function emitOhRustFallback(notice) {
+  const tag = boundedField(notice.tag);
+  const reason = boundedField(notice.reason);
+  const inputClass = notice.inputClass === undefined ? undefined : boundedField(notice.inputClass);
+  const diagnostic = inputClass === undefined ? reason : `${reason}:${inputClass}`;
+  let seen = emittedNotices.get(tag);
+  if (seen === undefined) {
+    if (emittedNotices.size >= MAX_FALLBACK_TAGS)
+      return;
+    seen = new Set;
+    emittedNotices.set(tag, seen);
+  }
+  if (seen.has(diagnostic) || seen.size >= MAX_FALLBACK_NOTICES_PER_TAG)
+    return;
+  seen.add(diagnostic);
+  try {
+    if (typeof process !== "undefined" && typeof process.stderr?.write === "function") {
+      const detail = inputClass === undefined ? reason : `${reason} input=${inputClass}`;
+      process.stderr.write(`[${tag}] ${detail}
+`);
+    }
+  } catch {}
+}
+
+// src/sqlite-snapshot.ts
 import { mkdtempSync as mkdtempSync2, rmSync as rmSync2 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
 import { isAbsolute as isAbsolute2, join as join4 } from "path";
@@ -16357,6 +16391,7 @@ function temporaryDirectory() {
 function isolateMessageSource(source, maximumBytes) {
   const loader = loadOhLoader();
   if (loader === null) {
+    emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "loader-unavailable" });
     return isolateSource(source, maximumBytes);
   }
   const outputDirectory = temporaryDirectory();
@@ -16375,6 +16410,7 @@ function isolateMessageSource(source, maximumBytes) {
   } catch (error) {
     rmSync2(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
+      emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "sidecar-missing" });
       return isolateSource(source, maximumBytes);
     }
     throw error;
@@ -16383,6 +16419,7 @@ function isolateMessageSource(source, maximumBytes) {
 function isolateContactsSource(source, maximumBytes) {
   const loader = loadOhLoader();
   if (loader === null) {
+    emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "loader-unavailable" });
     return isolateSource2(source, maximumBytes);
   }
   const outputDirectory = temporaryDirectory();
@@ -16401,6 +16438,7 @@ function isolateContactsSource(source, maximumBytes) {
   } catch (error) {
     rmSync2(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
+      emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "sidecar-missing" });
       return isolateSource2(source, maximumBytes);
     }
     throw error;
@@ -23996,7 +24034,6 @@ function extractXArchiveFile(descriptor3, archiveSize) {
 var SELECTED_PATTERN = "^(?:[^/]+/)?data/(?:manifest|account|direct-message(?:-group)?-headers|direct-messages(?:-group)?[^/]*|tweets|deleted-tweets|community-tweet)\\.js$";
 var MAX_WASM_ARCHIVE_BYTES = 512 * 1024 * 1024;
 var MAX_STRICT_ENTRIES = 1e5;
-var emittedFallbackNotices = new Set;
 var cachedInstance;
 function strictWasmInstance() {
   if (cachedInstance !== undefined)
@@ -24164,17 +24201,7 @@ function extractXArchiveFileRust(descriptor3, archiveSize) {
   }
 }
 function emitXArchiveRustFallback(reason) {
-  if (emittedFallbackNotices.has(reason))
-    return;
-  emittedFallbackNotices.add(reason);
-  try {
-    if (typeof process !== "undefined" && process.stderr?.write) {
-      process.stderr.write(`[oh-archive-rust-fallback] ${reason}
-`);
-    }
-  } catch {
-    return;
-  }
+  emitOhRustFallback({ tag: "oh-archive-rust-fallback", reason });
 }
 function extractXArchiveFileAuto(descriptor3, archiveSize) {
   if (archiveSize <= MAX_WASM_ARCHIVE_BYTES && strictWasmInstance() !== null) {

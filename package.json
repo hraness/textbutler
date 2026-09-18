@@ -86,7 +86,7 @@
     "check:public-graphs": "bun scripts/check-public-graphs.ts"
   },
   "dependencies": {
-    "@hraness/oh": "https://github.com/hraness/oh/releases/download/v0.10.7/hraness-oh-0.10.7.tgz"
+    "@hraness/oh": "https://github.com/hraness/oh/releases/download/v0.10.8/hraness-oh-0.10.8.tgz"
   },
   "devDependencies": {
     "@hraness/agentmixer": "https://github.com/hraness/agentmixer/releases/download/v0.1.1/hraness-agentmixer-0.1.1.tgz",
