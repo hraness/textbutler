@@ -22,6 +22,7 @@ import {
   type CorpusSnapshot,
   type MessageKind,
 } from "./types.ts";
+import { isolateMessageSource } from "./sqlite-snapshot.ts";
 
 export const DEFAULT_IMESSAGE_DATABASE = join(
   homedir(),
@@ -53,12 +54,12 @@ const NSSTRING_MARKER = new TextEncoder().encode("NSString");
 type SqlBinding = string | number | bigint | Uint8Array | null;
 type SqlRow = Record<string, unknown>;
 
-type SourceFile = Readonly<{
+export type SourceFile = Readonly<{
   path: string;
   stats: BigIntStats;
 }>;
 
-type SourceSnapshot = Readonly<{
+export type SourceSnapshot = Readonly<{
   source: SourceFile;
   path: string;
   temporaryDirectory: string;
@@ -287,7 +288,7 @@ function sameSnapshotMembers(
  * only on a stable private clone so the source database and all sidecars remain
  * byte-for-byte untouched.
  */
-function isolateSource(source: SourceFile, maximumBytes: number): SourceSnapshot {
+export function isolateSource(source: SourceFile, maximumBytes: number): SourceSnapshot {
   const temporaryRoot = tmpdir();
   if (!isAbsolute(temporaryRoot)) return fail("requires an absolute temporary directory");
   const temporaryDirectory = mkdtempSync(join(temporaryRoot, "message-like-me-source-"));
@@ -917,7 +918,7 @@ export function readIMessageDatabase(
   );
   const pageSize = boundedInteger(options.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE, "pageSize");
   const requestedSource = inspectSource(path, maximumDatabaseBytes);
-  const isolated = isolateSource(requestedSource, maximumDatabaseBytes);
+  const isolated = isolateMessageSource(requestedSource, maximumDatabaseBytes);
   const source = isolated.source;
   let database: Database | null = null;
   let transactionOpen = false;
