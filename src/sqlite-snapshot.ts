@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import {
@@ -77,6 +77,7 @@ export function isolateMessageSource(source: MessageSourceFile, maximumBytes: nu
       temporaryDirectory: outputDirectory,
     });
   } catch (error) {
+    rmSync(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
       return isolateMessageSourceTs(source, maximumBytes);
     }
@@ -109,6 +110,7 @@ export function isolateContactsSource(source: ContactsSourceFile, maximumBytes: 
       temporaryDirectory: outputDirectory,
     });
   } catch (error) {
+    rmSync(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
       return isolateContactsSourceTs(source, maximumBytes);
     }

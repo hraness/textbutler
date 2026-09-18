@@ -15535,7 +15535,7 @@ import {
   mkdtempSync as mkdtempSync3,
   readdirSync,
   realpathSync as realpathSync2,
-  rmSync as rmSync2
+  rmSync as rmSync3
 } from "fs";
 import { homedir as homedir2, tmpdir as tmpdir3 } from "os";
 import { basename as basename2, dirname, isAbsolute as isAbsolute3, join as join5, resolve as resolve2 } from "path";
@@ -15561,7 +15561,7 @@ var MESSAGE_BUNDLE_SCHEMA_VERSIONS = Object.freeze([
 
 // src/sqlite-snapshot.ts
 import { createRequire } from "module";
-import { mkdtempSync as mkdtempSync2 } from "fs";
+import { mkdtempSync as mkdtempSync2, rmSync as rmSync2 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
 import { isAbsolute as isAbsolute2, join as join4 } from "path";
 
@@ -16373,6 +16373,7 @@ function isolateMessageSource(source, maximumBytes) {
       temporaryDirectory: outputDirectory
     });
   } catch (error) {
+    rmSync2(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
       return isolateSource(source, maximumBytes);
     }
@@ -16398,6 +16399,7 @@ function isolateContactsSource(source, maximumBytes) {
       temporaryDirectory: outputDirectory
     });
   } catch (error) {
+    rmSync2(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
       return isolateSource2(source, maximumBytes);
     }
@@ -16614,11 +16616,11 @@ function isolateSource2(source, maximumBytes) {
           temporaryDirectory: temporaryDirectory2
         });
       }
-      rmSync2(attemptDirectory, { recursive: true, force: true });
+      rmSync3(attemptDirectory, { recursive: true, force: true });
     }
     return fail11(`changed during ${SNAPSHOT_ATTEMPTS} snapshot attempts`);
   } catch (error) {
-    rmSync2(temporaryDirectory2, { recursive: true, force: true });
+    rmSync3(temporaryDirectory2, { recursive: true, force: true });
     throw error;
   }
 }
@@ -16997,7 +16999,7 @@ function readStore(source, key, maximumBytes, maximumContacts, pageSize) {
     try {
       database?.close();
     } finally {
-      rmSync2(isolated.temporaryDirectory, { recursive: true, force: true });
+      rmSync3(isolated.temporaryDirectory, { recursive: true, force: true });
     }
   }
 }
