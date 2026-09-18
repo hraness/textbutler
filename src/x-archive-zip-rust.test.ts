@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +9,7 @@ import {
   type XArchiveMembers,
 } from "./x-archive-zip.ts";
 import {
+  emitXArchiveRustFallback,
   extractXArchiveFileAuto,
   extractXArchiveFileRust,
 } from "./x-archive-zip-rust.ts";
@@ -251,5 +252,19 @@ describe("strict Rust X-archive reader", () => {
     ]));
     expect(() => extractXArchiveFile(descriptor, size)).toThrow();
     expect(() => extractXArchiveFileRust(descriptor, size)).toThrow();
+  });
+
+  test("fallback diagnostics are emitted once per bounded reason", () => {
+    const write = spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      emitXArchiveRustFallback("archive-too-large-or-no-artifact");
+      emitXArchiveRustFallback("archive-too-large-or-no-artifact");
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(String(write.mock.calls[0]?.[0])).toBe(
+        "[oh-archive-rust-fallback] archive-too-large-or-no-artifact\n",
+      );
+    } finally {
+      write.mockRestore();
+    }
   });
 });

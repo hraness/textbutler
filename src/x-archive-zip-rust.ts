@@ -20,9 +20,11 @@ import {
 const SELECTED_PATTERN =
   "^(?:[^/]+/)?data/(?:manifest|account|direct-message(?:-group)?-headers|direct-messages(?:-group)?[^/]*|tweets|deleted-tweets|community-tweet)\\.js$";
 
-// wasm32 memories are bounded at 4 GiB; the reader copies the archive into the
-// module's linear memory, so archives near that bound take the TypeScript path.
-const MAX_WASM_ARCHIVE_BYTES = 3 * 1024 * 1024 * 1024;
+// The strict raw-WASM ABI admits at most 512 MiB. Larger archives stay on the
+// TypeScript path without first copying their full bytes into linear memory.
+const MAX_WASM_ARCHIVE_BYTES = 512 * 1024 * 1024;
+const MAX_STRICT_ENTRIES = 100_000;
+const emittedFallbackNotices = new Set<string>();
 
 type StrictWasmExports = {
   memory: WebAssembly.Memory;
@@ -73,34 +75,49 @@ function readArchive(descriptor: number, archiveSize: number): Buffer {
 
 function parseStrictResult(exports: StrictWasmExports, pointer: number): StrictMember[] {
   if (pointer === 0) throw new Error("X ZIP WASM call failed");
-  const view = new DataView(exports.memory.buffer);
-  const capacity = view.getUint32(pointer, true);
-  const status = view.getUint32(pointer + 4, true);
-  const payloadLength = view.getUint32(pointer + 8, true);
-  const payload = new Uint8Array(exports.memory.buffer, pointer + 12, payloadLength);
+  let resultCapacity = 0;
   try {
-    if (status !== 0) {
-      throw new Error(new TextDecoder().decode(payload.slice()));
+    const memoryLength = exports.memory.buffer.byteLength;
+    if (pointer > memoryLength - 12) throw new Error("X ZIP WASM result header is out of bounds");
+    const view = new DataView(exports.memory.buffer, pointer, 12);
+    const capacity = view.getUint32(0, true);
+    const status = view.getUint32(4, true);
+    const payloadLength = view.getUint32(8, true);
+    if (capacity < 12 || capacity > memoryLength - pointer || payloadLength > capacity - 12) {
+      throw new Error("X ZIP WASM result is out of bounds");
     }
+    resultCapacity = capacity;
+    const payload = new Uint8Array(exports.memory.buffer, pointer + 12, payloadLength);
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    if (status !== 0) throw new Error(decoder.decode(payload.slice()));
+    if (payloadLength < 4) throw new Error("X ZIP WASM result is truncated");
     const entries: StrictMember[] = [];
     let cursor = 0;
     const entryView = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
     const count = entryView.getUint32(cursor, true);
     cursor += 4;
+    if (count > MAX_STRICT_ENTRIES) throw new Error("X ZIP WASM result has too many entries");
     for (let index = 0; index < count; index += 1) {
+      if (cursor > payloadLength - 4) throw new Error("X ZIP WASM result is truncated");
       const nameLength = entryView.getUint32(cursor, true);
       cursor += 4;
-      const name = new TextDecoder().decode(payload.subarray(cursor, cursor + nameLength));
+      if (nameLength > payloadLength - cursor) throw new Error("X ZIP WASM result is truncated");
+      const name = decoder.decode(payload.subarray(cursor, cursor + nameLength));
       cursor += nameLength;
+      if (cursor > payloadLength - 8) throw new Error("X ZIP WASM result is truncated");
       const dataLength = Number(entryView.getBigUint64(cursor, true));
       cursor += 8;
+      if (!Number.isSafeInteger(dataLength) || dataLength > payloadLength - cursor) {
+        throw new Error("X ZIP WASM member is out of bounds");
+      }
       const bytes = payload.slice(cursor, cursor + dataLength);
       cursor += dataLength;
       entries.push({ name, bytes });
     }
+    if (cursor !== payloadLength) throw new Error("X ZIP WASM result has trailing bytes");
     return entries;
   } finally {
-    exports.oh_archive_free(pointer, capacity);
+    if (resultCapacity > 0) exports.oh_archive_free(pointer, resultCapacity);
   }
 }
 
@@ -188,9 +205,15 @@ export function extractXArchiveFileRust(descriptor: number, archiveSize: number)
 }
 
 /** Emit a non-fatal telemetry notice when the Rust engine falls back to TS. */
-export function emitXArchiveRustFallback(reason: string): void {
-  if (typeof process !== "undefined" && process.stderr?.write) {
-    process.stderr.write(`[oh-archive-rust-fallback] ${reason}\n`);
+export function emitXArchiveRustFallback(reason: "rust-read-failed" | "archive-too-large-or-no-artifact"): void {
+  if (emittedFallbackNotices.has(reason)) return;
+  emittedFallbackNotices.add(reason);
+  try {
+    if (typeof process !== "undefined" && process.stderr?.write) {
+      process.stderr.write(`[oh-archive-rust-fallback] ${reason}\n`);
+    }
+  } catch {
+    return;
   }
 }
 

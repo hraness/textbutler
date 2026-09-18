@@ -23992,7 +23992,9 @@ function extractXArchiveFile(descriptor3, archiveSize) {
 
 // src/x-archive-zip-rust.ts
 var SELECTED_PATTERN = "^(?:[^/]+/)?data/(?:manifest|account|direct-message(?:-group)?-headers|direct-messages(?:-group)?[^/]*|tweets|deleted-tweets|community-tweet)\\.js$";
-var MAX_WASM_ARCHIVE_BYTES = 3 * 1024 * 1024 * 1024;
+var MAX_WASM_ARCHIVE_BYTES = 512 * 1024 * 1024;
+var MAX_STRICT_ENTRIES = 1e5;
+var emittedFallbackNotices = new Set;
 var cachedInstance;
 function strictWasmInstance() {
   if (cachedInstance !== undefined)
@@ -24028,34 +24030,58 @@ function readArchive(descriptor3, archiveSize) {
 function parseStrictResult(exports, pointer) {
   if (pointer === 0)
     throw new Error("X ZIP WASM call failed");
-  const view = new DataView(exports.memory.buffer);
-  const capacity = view.getUint32(pointer, true);
-  const status = view.getUint32(pointer + 4, true);
-  const payloadLength = view.getUint32(pointer + 8, true);
-  const payload = new Uint8Array(exports.memory.buffer, pointer + 12, payloadLength);
+  let resultCapacity = 0;
   try {
-    if (status !== 0) {
-      throw new Error(new TextDecoder().decode(payload.slice()));
+    const memoryLength = exports.memory.buffer.byteLength;
+    if (pointer > memoryLength - 12)
+      throw new Error("X ZIP WASM result header is out of bounds");
+    const view = new DataView(exports.memory.buffer, pointer, 12);
+    const capacity = view.getUint32(0, true);
+    const status = view.getUint32(4, true);
+    const payloadLength = view.getUint32(8, true);
+    if (capacity < 12 || capacity > memoryLength - pointer || payloadLength > capacity - 12) {
+      throw new Error("X ZIP WASM result is out of bounds");
     }
+    resultCapacity = capacity;
+    const payload = new Uint8Array(exports.memory.buffer, pointer + 12, payloadLength);
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    if (status !== 0)
+      throw new Error(decoder.decode(payload.slice()));
+    if (payloadLength < 4)
+      throw new Error("X ZIP WASM result is truncated");
     const entries2 = [];
     let cursor = 0;
     const entryView = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
     const count = entryView.getUint32(cursor, true);
     cursor += 4;
+    if (count > MAX_STRICT_ENTRIES)
+      throw new Error("X ZIP WASM result has too many entries");
     for (let index = 0;index < count; index += 1) {
+      if (cursor > payloadLength - 4)
+        throw new Error("X ZIP WASM result is truncated");
       const nameLength = entryView.getUint32(cursor, true);
       cursor += 4;
-      const name = new TextDecoder().decode(payload.subarray(cursor, cursor + nameLength));
+      if (nameLength > payloadLength - cursor)
+        throw new Error("X ZIP WASM result is truncated");
+      const name = decoder.decode(payload.subarray(cursor, cursor + nameLength));
       cursor += nameLength;
+      if (cursor > payloadLength - 8)
+        throw new Error("X ZIP WASM result is truncated");
       const dataLength = Number(entryView.getBigUint64(cursor, true));
       cursor += 8;
+      if (!Number.isSafeInteger(dataLength) || dataLength > payloadLength - cursor) {
+        throw new Error("X ZIP WASM member is out of bounds");
+      }
       const bytes = payload.slice(cursor, cursor + dataLength);
       cursor += dataLength;
       entries2.push({ name, bytes });
     }
+    if (cursor !== payloadLength)
+      throw new Error("X ZIP WASM result has trailing bytes");
     return entries2;
   } finally {
-    exports.oh_archive_free(pointer, capacity);
+    if (resultCapacity > 0)
+      exports.oh_archive_free(pointer, resultCapacity);
   }
 }
 function logicalName2(name) {
@@ -24136,9 +24162,16 @@ function extractXArchiveFileRust(descriptor3, archiveSize) {
   }
 }
 function emitXArchiveRustFallback(reason) {
-  if (typeof process !== "undefined" && process.stderr?.write) {
-    process.stderr.write(`[oh-archive-rust-fallback] ${reason}
+  if (emittedFallbackNotices.has(reason))
+    return;
+  emittedFallbackNotices.add(reason);
+  try {
+    if (typeof process !== "undefined" && process.stderr?.write) {
+      process.stderr.write(`[oh-archive-rust-fallback] ${reason}
 `);
+    }
+  } catch {
+    return;
   }
 }
 function extractXArchiveFileAuto(descriptor3, archiveSize) {
