@@ -24054,11 +24054,21 @@ function extractXArchiveFileRust(descriptor3, archiveSize) {
       exports.oh_archive_free(optionsPointer, options.length);
   }
 }
+function emitXArchiveRustFallback(reason) {
+  if (typeof process !== "undefined" && process.stderr?.write) {
+    process.stderr.write(`[oh-archive-rust-fallback] ${reason}
+`);
+  }
+}
 function extractXArchiveFileAuto(descriptor3, archiveSize) {
   if (archiveSize <= MAX_WASM_ARCHIVE_BYTES && strictWasmInstance() !== null) {
     try {
       return extractXArchiveFileRust(descriptor3, archiveSize);
-    } catch {}
+    } catch {
+      emitXArchiveRustFallback("rust-read-failed");
+    }
+  } else {
+    emitXArchiveRustFallback("archive-too-large-or-no-artifact");
   }
   return extractXArchiveFile(descriptor3, archiveSize);
 }
