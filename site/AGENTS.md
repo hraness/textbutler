@@ -3,7 +3,7 @@
 The owner authorized replacing the unused Message Like Me product with
 Textbutler at `textbutler.app`. The current rebrand overrides historical product
 name, description, and drafts-only marketing instructions below. Describe the
-new Mac app, daemon, contact-scoped memory, selected coding agent, and disclosed
+new menu companion, daemon, contact-scoped memory, selected coding agent, and disclosed
 responses, with exact development/qualification status. Do not advertise live
 autoresponses, rich transport support, or a signed download before verified.
 Retained Message Like Me source documentation describes the legacy history

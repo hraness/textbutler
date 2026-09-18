@@ -28,9 +28,11 @@ test('renders Textbutler with the shared grammar and honest development status',
   const html = renderToStaticMarkup(<Home />);
   expect(html.match(/<h1\b/gu)).toHaveLength(1);
   expect(html).toContain('>A little help in your conversations</h1>');
-  for (const role of ['header', 'hero', 'proof-frame', 'section', 'flow', 'trust', 'questions', 'cta']) {
+  for (const role of ['header', 'hero', 'proof-frame', 'section', 'flow', 'trust', 'questions', 'cta', 'footer']) {
     expect(html).toContain(`data-hraness-marketing="${role}"`);
   }
+  expect(html).toContain('hraness-marketing-header__brand');
+  expect(html).toContain('data-foil=""');
   expect(html).toContain('Textbutler');
   expect(html).toContain('See what’s ready');
   expect(html).toContain('New installations start paused');
@@ -39,7 +41,7 @@ test('renders Textbutler with the shared grammar and honest development status',
   expect(html).toContain('It is billed separately from a Claude Code subscription');
   expect(html).toContain('an explicitly selected ready agent account');
   expect(html).toContain('Live delivery and rich actions still need verification on your account.');
-  expect(html).toContain('A signed Mac download is not available yet');
+  expect(html).toContain('No windowed app download is provided');
   expect(html).toContain(`Message Like Me v${SOFTWARE_VERSION}`);
   expect(html).toContain('It does not install Textbutler or enable automatic replies.');
   expect(html).toContain('No. textbutler.app is informational');
@@ -78,7 +80,7 @@ test('shows synthetic contact context and disclosure without claiming transport 
   expect(html).toContain('under its own data policies');
 });
 
-test('binds Design Kit v0.6.3 to the portable Paper palette', async () => {
+test('binds Design Kit v0.10.0 to the portable Paper palette', async () => {
   const [layout, css, manifestSource, paper] = await Promise.all([
     readFile(resolve(siteRoot, 'app/layout.tsx'), 'utf8'),
     readFile(resolve(siteRoot, 'app/globals.css'), 'utf8'),
@@ -90,7 +92,7 @@ test('binds Design Kit v0.6.3 to the portable Paper palette', async () => {
   };
 
   expect(manifest.dependencies?.['@hraness/design-kit'])
-    .toBe('github:hraness/design-kit#v0.6.3');
+    .toBe('github:hraness/design-kit#v0.10.0');
   expect(manifest.dependencies?.['@hraness/ui'])
     .toBe('github:hraness/ui#v0.5.13');
   expect(css).toContain("@import '@hraness/design-kit/styles.css';");
@@ -110,10 +112,12 @@ test('binds Design Kit v0.6.3 to the portable Paper palette', async () => {
 
 test('admits the released finite marketing snapshot and scopes it to the landing', async () => {
   const snapshot = await checkMarketingSnapshot();
-  expect(snapshot.source.commit).toBe('898d80364085a41c858350f1b492ac28b5a0384b');
-  expect(snapshot.files['product-marketing-preset.css'].sha256).toBe('e1474dbfa5dcb17e840ecd48e2b767e88e808a1f6124cd9bb8fe720e1076a4a7');
+  expect(snapshot.source.commit).toBe('0e089bc18f9a0409f0e74b1fb7192f468956e386');
+  expect(snapshot.files['product-marketing-preset.css'].sha256).toBe('221fd555f9c9c15e26fc8d7d8ad3a536e3dfb138df699b449adb9c45919e66cb');
   const html = renderToStaticMarkup(<Home />);
-  expect(html).toStartWith('<div class="textbutler-marketing" data-hraness-marketing-preset="editorial" data-hraness-material="lantern">');
+  // React hoists the product icon's preload ahead of the document root.
+  expect(html.replace(/^(?:<link\b[^>]*>\s*)+/u, ''))
+    .toStartWith('<div class="textbutler-marketing" data-hraness-marketing-preset="editorial" data-hraness-material="lantern">');
   expect(html).toContain('<div class="hraness-material-wall">');
   expect(renderToStaticMarkup(<About />)).not.toContain('data-hraness-marketing-preset');
   expect(renderToStaticMarkup(<Preview />)).not.toContain('data-hraness-marketing-preset');
@@ -127,7 +131,7 @@ test('keeps machine-readable setup and unavailable choices consistent with the l
   const discovery = await getDiscoveryText().text();
   expect(discovery).toContain('New installations start paused and new contacts start disabled.');
   expect(discovery).toContain('native Claude Code and Codex remain unavailable');
-  expect(discovery).toContain('There is no signed Textbutler Mac download yet.');
+  expect(discovery).toContain('Textbutler CLI and menu companion source is available; there is no published Textbutler package or windowed app download.');
   expect(discovery).toContain('App Clips, mini apps, and Linq integration remain unavailable.');
   expect(discovery).toContain('Live delivery still needs verification on the selected account.');
 });

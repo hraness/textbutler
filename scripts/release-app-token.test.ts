@@ -37,7 +37,7 @@ const revocationReceipt = Object.freeze({
 });
 const environment = Object.freeze({
   GITHUB_API_URL: "https://api.github.com",
-  GITHUB_REPOSITORY: "hraness/message-like-me",
+  GITHUB_REPOSITORY: "hraness/textbutler",
   GITHUB_REPOSITORY_ID: String(MESSAGE_LIKE_ME_REPOSITORY_ID),
   GITHUB_REPOSITORY_OWNER: "hraness",
   MLM_RELEASE_APP_CLIENT_ID: "Iv1.messageLikeMeRelease",
@@ -52,9 +52,9 @@ function tokenResponse(overrides: Readonly<Record<string, unknown>> = {}) {
     expires_at: expiresAt,
     permissions: { ...exactPermissions },
     repositories: [{
-      full_name: "hraness/message-like-me",
+      full_name: "hraness/textbutler",
       id: MESSAGE_LIKE_ME_REPOSITORY_ID,
-      name: "message-like-me",
+      name: "textbutler",
       owner: { login: "hraness" },
     }],
     repository_selection: "selected",
@@ -89,9 +89,9 @@ function installationIdentity(overrides: Readonly<Record<string, unknown>> = {})
 
 const repositoryBody = Object.freeze({
   repositories: [{
-    full_name: "hraness/message-like-me",
+    full_name: "hraness/textbutler",
     id: MESSAGE_LIKE_ME_REPOSITORY_ID,
-    name: "message-like-me",
+    name: "textbutler",
     owner: { login: "hraness" },
   }],
   repository_selection: "selected",
@@ -399,6 +399,25 @@ describe("release App token transaction", () => {
     }
   });
 
+  test("requires the canonical repository name and unchanged numeric identity after rename", () => {
+    expect(() => parseReleaseAppConfiguration({
+      ...environment,
+      GITHUB_REPOSITORY: "hraness/message-like-me",
+    })).toThrow("exact repository hraness/textbutler");
+    expect(() => parseReleaseAppConfiguration({
+      ...environment,
+      GITHUB_REPOSITORY_ID: "1342143607",
+    })).toThrow("exact repository hraness/textbutler");
+    for (const repository of [
+      { full_name: "hraness/message-like-me", id: MESSAGE_LIKE_ME_REPOSITORY_ID, name: "message-like-me" },
+      { full_name: "hraness/textbutler", id: MESSAGE_LIKE_ME_REPOSITORY_ID + 1, name: "textbutler" },
+    ]) {
+      expect(() => parseReleaseAppTokenResponse(tokenResponse({
+        repositories: [{ ...repository, owner: { login: "hraness" } }],
+      }), serverDate)).toThrow("exact hraness/textbutler");
+    }
+  });
+
   test("masks, uses, and revokes the exact token around one operation", async () => {
     const calls: string[] = [];
     const result = await withReleaseAppToken({
@@ -594,7 +613,7 @@ describe("release App token transaction", () => {
   test("binds the complete helper and exercises the real three-argument environment wrapper", async () => {
     const source = await readFile(releaseAppTokenHelperUrl, "utf8");
     expect(createHash("sha256").update(source).digest("hex")).toBe(
-      "8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526",
+      "2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e",
     );
     const implementationStart = source.indexOf("function revocationIndeterminate");
     const implementationEnd = source.indexOf("\nasync function revokeWithFetch", implementationStart);

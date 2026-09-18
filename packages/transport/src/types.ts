@@ -23,7 +23,7 @@ export type ActionIntent =
 export interface PrepareRequest { readonly intentId: string; readonly conversationId: string; readonly contextId: string; readonly actions: readonly ActionIntent[] }
 export interface ActionPlan { readonly protocol: typeof TRANSPORT_PROTOCOL; readonly id: string; readonly intentId: string; readonly conversationId: string; readonly contextId: string; readonly digest: string; readonly expiresAt: string; readonly actions: readonly ActionIntent[] }
 export type SendAuthorization = { readonly mode: "owner-confirmed"; readonly planDigest: string } | { readonly mode: "delegated"; readonly grantId: string };
-export interface SendReceipt { readonly planId: string; readonly runId: string; readonly state: "submitted" | "failed" | "partial" | "indeterminate"; readonly submittedCount: number; readonly totalCount: number; readonly recordedAt: string; readonly delivery: "unknown"; readonly retryable: false }
+export interface SendReceipt { readonly planId: string; readonly runId: string; readonly state: "submitted" | "failed" | "partial" | "indeterminate"; readonly submittedCount: number; readonly totalCount: number; readonly acceptedMessageIds: readonly (string | null)[] | null; readonly recordedAt: string; readonly delivery: "unknown"; readonly retryable: false }
 export interface TextbutlerTransport {
   capabilities(): Promise<TransportResult<TransportCapabilities>>;
   conversations(): Promise<TransportResult<readonly Conversation[]>>;

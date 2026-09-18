@@ -1,11 +1,13 @@
 # Textbutler redesign scope
 
 The owner has authorized replacing the unused Message Like Me product with
-Textbutler, a macOS message-butler daemon and app at `textbutler.app`.
+Textbutler, a macOS message-butler daemon and menu companion at `textbutler.app`.
 `PRODUCT.md` and `docs/textbutler/architecture.md` define the new product.
 The historical constraints below continue to govern the legacy `src/`, `dist/`,
 published message contracts, and their existing release machinery. They do not
-prohibit the explicitly requested new runtime in `packages/` and `apps/macos/`.
+prohibit the explicitly requested new runtime in `packages/` and the menu
+companion adapter that drives the shared desktop-foundation runner. Desktop
+apps, signing, and notarization are outside the current product scope.
 
 - New agents receive only one contact's brokered files, bounded public web
   requests, and recipient-bound proposed messaging actions. Never enable shell,
@@ -21,7 +23,8 @@ prohibit the explicitly requested new runtime in `packages/` and `apps/macos/`.
 - Unqualified provider restrictions and unsupported transport operations must
   remain unavailable. Synthetic tests do not prove live delivery or sandboxing.
 - Run `bun run check:textbutler` for the new source packages as well as the
-  existing required aggregate. Native build and UI checks are additional gates.
+  existing required aggregate. Native menu-companion builds are gated by the
+  shared desktop-foundation release, not this repository.
 - Repository/package rename and website deployment must use a reviewed identity
   migration that preserves the existing release and production protections.
 - Informational site changes may use the explicit site-source promotion path in
@@ -117,9 +120,12 @@ prohibit the explicitly requested new runtime in `packages/` and `apps/macos/`.
   authentication, accounts, telemetry, analytics, synchronization, and message
   sending. The installed Agent Skill supplies semantic analysis and unsent
   drafting through the agent already running it.
-- Keep the command name `messagelikeme`, the repository and package name
-  `message-like-me`, and the Agent Skill name `message-like-me`. Treat
-  `messagelikeme.com` as an informational project page, never as a data plane.
+- Keep the command name `messagelikeme`, the package name
+  `message-like-me`, and the Agent Skill name `message-like-me`. The canonical
+  GitHub repository is `hraness/textbutler` with unchanged numeric ID
+  `1342143606`; follow the version-neutral identity migration in the publishing
+  runbook. Treat `messagelikeme.com` as an informational project page, never as
+  a data plane.
 - Keep CLI commands namespaced as `ingest imessage|x-archive|contacts|bundle`,
   `sources list|show`,
   `contacts list|show|resolve`,
@@ -150,8 +156,8 @@ prohibit the explicitly requested new runtime in `packages/` and `apps/macos/`.
   targets at user or project scope without leaving a partial pair.
 - Follow `docs/publishing.md` for the one-time production controls, stable
   release, and reviewed-`main` recovery procedure. Treat an immutable annotated
-  stable `v*` tag matching every checked version identity at a reviewed commit
-  in current `main` history as a
+  stable `v*` tag matching every checked version
+  identity at a reviewed commit in current `main` history as a
   release request. Publish only after the complete root, site, packed-consumer,
   synthetic macOS gate, and exact-tarball macOS/Linux gates pass. Build the
   package once, publish the immutable Latest GitHub Release with that tarball
@@ -208,7 +214,10 @@ prohibit the explicitly requested new runtime in `packages/` and `apps/macos/`.
   provider outcome gate to finish.
   Already-exact recovery must not enter the key environment. Recovery may
   revalidate only an existing immutable, artifact-complete Latest Release and
-  exact npm version and must never create either one. A later positive attempt
+  exact npm version and must never create either one. It may accept the
+  exact-SHA Production deployment that an earlier consumed site-route authority
+  created on that commit, never one that predates that authority's admitted
+  success. A later positive attempt
   may finish the same exact tag, commit, and tarball only when Sigstore binds
   the actual run ID and an allowed positive attempt. Keep Vercel Production
   Branch on `website-production`; `main` and pull requests are preview sources.
@@ -250,3 +259,12 @@ prohibit the explicitly requested new runtime in `packages/` and `apps/macos/`.
 - Preserve `check:effect`, `check:public-graphs`, and every existing full gate.
   Review policy and checker changes independently; do not weaken enforcement to
   silence a new implementation failure.
+
+- `costs.json` at the repository root is the checked registry of every product data surface: store, kind (`authoritative` | `derived` | `telemetry` | `served`), retention class (`ephemeral` | `ttl:<ISO-8601>` | `account` | `tombstone` | `persistent`), owner module, and budget. A new table, bucket, stream, dynamic route, blob, or provider meter fails `check:cost-surfaces` until it registers.
+- Bound every input before storage or provider I/O: request bytes, row counts, page sizes, batch sizes, retry counts, and event payloads. Unbounded input is a contract violation.
+- No writes on read paths. Reads may cache; they never mutate.
+- Derived state is rebuildable and lives in the cheapest tier that can serve it. Only authoritative state pays for transactional storage.
+- Every mutation carries an idempotency key; a retried write never double-charges storage, quota, or provider spend.
+- Analytics and metering events come from a checked allowlist with a byte ceiling per event.
+- Content bytes live in the content store; the control plane keeps references and metadata only.
+- Run `bun run check:cost-surfaces` before handoff whenever a data surface changes.

@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { SqliteAccountLeases } from "../../agentrouter/src/accounts.ts";
+import { SqliteAccountLeases } from "@hraness/agentmixer";
 import { automationId, parseAutomationGrant, type AutomationGrant } from "../../transport/src/automation-contract.ts";
 
 export type RunState = "running" | "dispatching" | "submitted" | "failed" | "partial" | "indeterminate" | "cancelled" | "ignored" | "abandoned";
@@ -24,7 +24,9 @@ export class RunJournal {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS one_active_contact ON runs(contactId) WHERE state IN ('running','dispatching');
       CREATE TABLE IF NOT EXISTS pending_grants (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS grant_intents (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, enrollmentId TEXT NOT NULL, bindingDigest TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS grant_intents (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, enrollmentId TEXT NOT NULL, bindingDigest TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS sent_messages (messageId TEXT PRIMARY KEY, contactId TEXT NOT NULL, runId TEXT NOT NULL, sentAt INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS sent_messages_contact ON sent_messages(contactId, sentAt);`);
   }
   static async open(path: string): Promise<RunJournal> {
     const absolute = resolve(path);
@@ -100,6 +102,26 @@ export class RunJournal {
   }
   hasUncertainSend(contactId: string): boolean {
     return this.database.query("SELECT 1 FROM runs WHERE contactId = ? AND state IN ('partial','indeterminate') LIMIT 1").get(contactId) !== null;
+  }
+  /** Trusted provenance for disclosure-free sends: which upstream message IDs this
+   * daemon dispatched. Cleared markers never leave butler output indistinguishable. */
+  recordSentMessages(contactId: string, runId: string, messageIds: readonly (string | null)[], now: number): void {
+    const ids = messageIds.filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 512);
+    if (!ids.length) return;
+    this.database.transaction(() => {
+      this.database.query("DELETE FROM sent_messages WHERE sentAt < ?").run(now - 90 * 86_400_000);
+      for (const id of ids.slice(0, 8)) this.database.query("INSERT OR IGNORE INTO sent_messages VALUES(?,?,?,?)").run(id, contactId, runId, now);
+      while ((this.database.query<{ count: number }, [string]>("SELECT COUNT(*) AS count FROM sent_messages WHERE contactId = ?").get(contactId)?.count ?? 0) > 2000) {
+        this.database.query("DELETE FROM sent_messages WHERE contactId = ? AND sentAt = (SELECT MIN(sentAt) FROM sent_messages WHERE contactId = ?)").run(contactId, contactId);
+      }
+    })();
+  }
+  isButlerMessage(contactId: string, messageId: string): boolean {
+    return this.database.query("SELECT 1 FROM sent_messages WHERE messageId = ? AND contactId = ? LIMIT 1").get(messageId, contactId) !== null;
+  }
+  /** Message IDs are provider-unique; bootstrap uses the global form before a contact exists. */
+  knownSentMessage(messageId: string): boolean {
+    return this.database.query("SELECT 1 FROM sent_messages WHERE messageId = ? LIMIT 1").get(messageId) !== null;
   }
   repliesSince(contactId: string, since: number): number {
     const row = this.database.query<{ count: number }, [string, number]>("SELECT COUNT(*) AS count FROM runs WHERE contactId = ? AND startedAt >= ? AND state IN ('dispatching','submitted','partial','indeterminate')").get(contactId, since);

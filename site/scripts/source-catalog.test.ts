@@ -243,20 +243,20 @@ describe('supported source presentation', () => {
       'does not expose Beeper’s raw export arguments or establish complete-history coverage',
     );
     expect(renderedSourcesPage).toContain('Every ingest path is read-only with respect to its source');
-    expect(renderedSourcesPage).toContain('Legacy reader support in v0.8.9');
+    expect(renderedSourcesPage).toContain('Legacy reader support in v0.8.11');
     expect(renderedSourcesPage).toContain(
       'ghostget beeper export-message-like-me --auth &lt;id&gt; --output /absolute/private/path/beeper-bundle',
     );
     expect(renderedSourcesPage).toContain(
-      'https://github.com/hraness/message-like-me/blob/v0.8.9/docs/local-message-bundle-v1.md',
+      'https://github.com/hraness/textbutler/blob/v0.8.11/docs/local-message-bundle-v1.md',
     );
     expect(renderedSourcesPage).toContain(
       'ghostget whatsapp export-message-like-me --auth &lt;id&gt; --output /absolute/private/path/whatsapp-bundle',
     );
     expect(renderedSourcesPage).toContain(
-      'https://github.com/hraness/message-like-me/blob/v0.8.9/docs/local-message-bundle-v2.md',
+      'https://github.com/hraness/textbutler/blob/v0.8.11/docs/local-message-bundle-v2.md',
     );
-    expect(chrome).toContain('href="/sources"');
+    expect(chrome).toContain("{ href: '/sources', label: 'Legacy history tools' }");
     expect(sitemap).toContain("absoluteUrl('/sources')");
     expect(llms).toContain("absoluteUrl('/sources')");
     expect(readme).toContain('## Supported sources');
@@ -384,14 +384,14 @@ describe('supported source presentation', () => {
     );
     expect(softwareApplication?.softwareVersion).toBeUndefined();
     expect(softwareApplication?.featureList).toEqual([
-      'Mac control panel and local daemon controls',
+      'macOS menu-bar companion and local daemon controls',
       'Contact-specific guidance and editable memory',
       'Configurable visible assistant disclosure',
       'Smart and keyword-only response controls',
       'Global pause and active contact limits',
     ]);
     expect(renderedRootLayout).not.toContain('downloadUrl');
-    expect(renderedRootLayout).toContain('In development; explicit messaging and agent setup required; no signed Mac download');
+    expect(renderedRootLayout).toContain('In development; explicit messaging and agent setup required; CLI and menu companion');
     for (const supportedSource of SUPPORTED_SOURCES) {
       expect(readme).toContain(`| ${supportedSource.name} |`);
       expect(llms).toContain(supportedSource.name);

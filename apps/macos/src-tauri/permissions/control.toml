@@ -1,9 +1,0 @@
-[[permission]]
-identifier = "allow-control-request"
-description = "Allow the bundled Textbutler window to issue bounded owner-only daemon control requests."
-commands.allow = ["control_request"]
-
-[[permission]]
-identifier = "allow-lifecycle-request"
-description = "Allow only fixed bundled CLI status, explicit install, and explicit uninstall of this owner's Textbutler LaunchAgent."
-commands.allow = ["lifecycle_request"]

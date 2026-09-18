@@ -5,9 +5,8 @@ import { basename, resolve } from "node:path";
 import { verifyNpmProvenance } from "./npm-provenance-verification";
 import { registryVersionMetadata, registryVersionUrl } from "./npm-release-policy";
 import {
-  parseNpmRelease,
-  publicPackageName,
-  releaseArchiveName,
+  releaseDistribution,
+  releasePackageForName,
   type NpmReleaseCoordinate,
 } from "./release-distribution-policy";
 
@@ -56,9 +55,9 @@ async function boundedArtifact(response: Response, label: string): Promise<Uint8
   return bytes;
 }
 
-const [argument, extra] = process.argv.slice(2);
+const [argument, manifestArgument, extra] = process.argv.slice(2);
 if (argument === undefined || extra !== undefined) {
-  throw new Error("Usage: check-npm-retry-state.ts ARTIFACT.tgz");
+  throw new Error("Usage: check-npm-retry-state.ts ARTIFACT.tgz [MANIFEST.json]");
 }
 const tarball = resolve(argument);
 const information = await stat(tarball);
@@ -67,14 +66,15 @@ if (!information.isFile() || information.size <= 0 || information.size > maximum
 }
 const bytes = await readFile(tarball);
 const manifest = JSON.parse(
-  await readFile(resolve(import.meta.dir, "..", "package.json"), "utf8"),
+  await readFile(resolve(manifestArgument ?? resolve(import.meta.dir, "..", "package.json")), "utf8"),
 ) as Readonly<{ license?: unknown; name?: unknown; version?: unknown }>;
-if (
-  manifest.name !== publicPackageName
-  || manifest.license !== "MIT"
-  || typeof manifest.version !== "string"
-  || basename(tarball) !== releaseArchiveName(manifest.version)
-) throw new Error("npm retry artifact coordinate is invalid.");
+if (typeof manifest.name !== "string" || manifest.license !== "MIT" || typeof manifest.version !== "string") {
+  throw new Error("npm retry artifact coordinate is invalid.");
+}
+const distribution = releaseDistribution(releasePackageForName(manifest.name));
+if (basename(tarball) !== distribution.releaseArchiveName(manifest.version)) {
+  throw new Error("npm retry artifact coordinate is invalid.");
+}
 
 async function metadata(url: string): Promise<Record<string, unknown> | null> {
   const response = await fetch(url, {
@@ -87,7 +87,7 @@ async function metadata(url: string): Promise<Record<string, unknown> | null> {
     redirect: "error",
     signal: AbortSignal.timeout(10_000),
   });
-  return registryVersionMetadata(response, publicPackageName, manifest.version as string);
+  return registryVersionMetadata(response, distribution.package.name, manifest.version as string);
 }
 
 type CompleteRelease = Readonly<{
@@ -95,15 +95,15 @@ type CompleteRelease = Readonly<{
   version: NpmReleaseCoordinate;
 }>;
 
-const registryBase = `https://registry.npmjs.org/${encodeURIComponent(publicPackageName)}`;
-const versionPayload = await metadata(registryVersionUrl(publicPackageName, manifest.version));
+const registryBase = `https://registry.npmjs.org/${encodeURIComponent(distribution.package.name)}`;
+const versionPayload = await metadata(registryVersionUrl(distribution.package.name, manifest.version));
 let release: CompleteRelease | null = null;
 if (versionPayload !== null) {
   const latestPayload = await metadata(`${registryBase}/latest`);
   if (latestPayload === null) throw new Error("The exact npm version exists but npm latest is absent.");
   release = Object.freeze({
-    latest: parseNpmRelease(latestPayload, manifest.version),
-    version: parseNpmRelease(versionPayload, manifest.version),
+    latest: distribution.parseNpmRelease(latestPayload, manifest.version),
+    version: distribution.parseNpmRelease(versionPayload, manifest.version),
   });
 }
 
@@ -133,6 +133,7 @@ if (release === null) {
   const maximumAttempt = Number(required("GITHUB_RUN_ATTEMPT", /^[1-9][0-9]*$/u));
   await verifyNpmProvenance(remote, {
     maximumAttempt,
+    releasePackage: distribution.package,
     requiredRunId: runId,
     verifiedSha: required("VERIFIED_SHA", /^[0-9a-f]{40}$/u),
     verifiedTag: required(

@@ -89,7 +89,7 @@ function environment(targetSha: string, controlEpochDigest = "") {
     GITHUB_API_URL: "https://api.github.com",
     GITHUB_EVENT_NAME: "workflow_dispatch",
     GITHUB_REF: "refs/heads/main",
-    GITHUB_REPOSITORY: "hraness/message-like-me",
+    GITHUB_REPOSITORY: "hraness/textbutler",
     GITHUB_REPOSITORY_ID: String(repositoryId),
     GITHUB_REPOSITORY_OWNER: "hraness",
     GITHUB_RUN_ATTEMPT: "1",
@@ -97,7 +97,7 @@ function environment(targetSha: string, controlEpochDigest = "") {
     GITHUB_SHA: targetSha,
     GITHUB_WORKFLOW: "Prove production ref writer canary",
     GITHUB_WORKFLOW_REF:
-      "hraness/message-like-me/.github/workflows/production-writer-canary.yml@refs/heads/main",
+      "hraness/textbutler/.github/workflows/production-writer-canary.yml@refs/heads/main",
     GITHUB_WORKFLOW_SHA: targetSha,
   });
 }
@@ -107,10 +107,10 @@ function ref(refName: string, sha: string) {
     object: {
       sha,
       type: "commit",
-      url: `https://api.github.com/repos/hraness/message-like-me/git/commits/${sha}`,
+      url: `https://api.github.com/repos/hraness/textbutler/git/commits/${sha}`,
     },
     ref: refName,
-    url: `https://api.github.com/repos/hraness/message-like-me/git/${refName}`,
+    url: `https://api.github.com/repos/hraness/textbutler/git/${refName}`,
   };
 }
 
@@ -122,7 +122,7 @@ function run(targetSha: string) {
     id: 9001,
     name: `Prove writer canary target ${targetSha}`,
     path: ".github/workflows/production-writer-canary.yml",
-    repository: { full_name: "hraness/message-like-me", id: repositoryId },
+    repository: { full_name: "hraness/textbutler", id: repositoryId },
     run_attempt: 1,
     workflow_id: workflowId,
   };
@@ -135,8 +135,8 @@ function apiReceipt(body: unknown, date = httpDate) {
 function lifecycleRuleset() {
   return {
     _links: {
-      html: { href: "https://github.com/hraness/message-like-me/rules/21826586" },
-      self: { href: "https://api.github.com/repos/hraness/message-like-me/rulesets/21826586" },
+      html: { href: "https://github.com/hraness/textbutler/rules/21826586" },
+      self: { href: "https://api.github.com/repos/hraness/textbutler/rulesets/21826586" },
     },
     conditions: {
       ref_name: { exclude: [], include: ["refs/heads/website-production-writer-canary"] },
@@ -147,7 +147,7 @@ function lifecycleRuleset() {
     name: "Immutable production-writer canary lifecycle",
     bypass_actors: [],
     rules: [{ type: "creation" }, { type: "deletion" }, { type: "non_fast_forward" }],
-    source: "hraness/message-like-me",
+    source: "hraness/textbutler",
     source_type: "Repository",
     target: "branch",
   };
@@ -164,8 +164,8 @@ function authorityRuleset() {
   };
   return {
     _links: {
-      html: { href: "https://github.com/hraness/message-like-me/rules/22290941" },
-      self: { href: "https://api.github.com/repos/hraness/message-like-me/rulesets/22290941" },
+      html: { href: "https://github.com/hraness/textbutler/rules/22290941" },
+      self: { href: "https://api.github.com/repos/hraness/textbutler/rulesets/22290941" },
     },
     bypass_actors: [],
     conditions: {
@@ -176,7 +176,7 @@ function authorityRuleset() {
     id: 22290941,
     name: "Message Like Me writer canary status authority",
     rules: [{ parameters, type: "required_status_checks" }],
-    source: "hraness/message-like-me",
+    source: "hraness/textbutler",
     source_type: "Repository",
     target: "branch",
   };
@@ -185,10 +185,10 @@ function authorityRuleset() {
 function effectiveRules() {
   const parameters = authorityRuleset().rules[0]?.parameters;
   return [
-    { ruleset_id: 21826586, ruleset_source: "hraness/message-like-me", ruleset_source_type: "Repository", type: "creation" },
-    { ruleset_id: 21826586, ruleset_source: "hraness/message-like-me", ruleset_source_type: "Repository", type: "deletion" },
-    { ruleset_id: 21826586, ruleset_source: "hraness/message-like-me", ruleset_source_type: "Repository", type: "non_fast_forward" },
-    { parameters, ruleset_id: 22290941, ruleset_source: "hraness/message-like-me", ruleset_source_type: "Repository", type: "required_status_checks" },
+    { ruleset_id: 21826586, ruleset_source: "hraness/textbutler", ruleset_source_type: "Repository", type: "creation" },
+    { ruleset_id: 21826586, ruleset_source: "hraness/textbutler", ruleset_source_type: "Repository", type: "deletion" },
+    { ruleset_id: 21826586, ruleset_source: "hraness/textbutler", ruleset_source_type: "Repository", type: "non_fast_forward" },
+    { parameters, ruleset_id: 22290941, ruleset_source: "hraness/textbutler", ruleset_source_type: "Repository", type: "required_status_checks" },
   ];
 }
 
@@ -244,13 +244,13 @@ function status<State extends "error" | "success">(
       ? "Exact canary authority admitted for one canary-ref attempt"
       : "Canary authority consumed after the canary-ref attempt",
     installationId: 159_058_102,
-    repository: "hraness/message-like-me",
+    repository: "hraness/textbutler",
     repositoryId: repositoryId,
     serverDate,
     state,
     statusId: id,
     statusNodeId: `SC_status_${String(id)}`,
-    statusUrl: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+    statusUrl: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
     targetSha,
   };
 }
@@ -269,8 +269,8 @@ function terminalReadback(id: number, targetSha: string, serverDate: string) {
 
 function combinedSuccess(attestation: ReturnType<typeof status>, targetSha: string) {
   return {
-    commit_url: `https://api.github.com/repos/hraness/message-like-me/commits/${targetSha}`,
-    repository: { full_name: "hraness/message-like-me", id: repositoryId },
+    commit_url: `https://api.github.com/repos/hraness/textbutler/commits/${targetSha}`,
+    repository: { full_name: "hraness/textbutler", id: repositoryId },
     sha: targetSha,
     state: "failure",
     statuses: [{
@@ -282,7 +282,7 @@ function combinedSuccess(attestation: ReturnType<typeof status>, targetSha: stri
       state: "success",
       target_url: null,
       updated_at: attestation.createdAt,
-      url: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+      url: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
     }, {
       context: "message-like-me/unrelated-check",
       created_at: attestation.createdAt,
@@ -292,17 +292,17 @@ function combinedSuccess(attestation: ReturnType<typeof status>, targetSha: stri
       state: "failure",
       target_url: null,
       updated_at: attestation.createdAt,
-      url: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+      url: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
     }],
     total_count: 2,
-    url: `https://api.github.com/repos/hraness/message-like-me/commits/${targetSha}/status`,
+    url: `https://api.github.com/repos/hraness/textbutler/commits/${targetSha}/status`,
   };
 }
 
 function combinedTerminal(consumption: ReturnType<typeof status>, targetSha: string) {
   return {
-    commit_url: `https://api.github.com/repos/hraness/message-like-me/commits/${targetSha}`,
-    repository: { full_name: "hraness/message-like-me", id: repositoryId },
+    commit_url: `https://api.github.com/repos/hraness/textbutler/commits/${targetSha}`,
+    repository: { full_name: "hraness/textbutler", id: repositoryId },
     sha: targetSha,
     state: "success",
     statuses: [{
@@ -314,7 +314,7 @@ function combinedTerminal(consumption: ReturnType<typeof status>, targetSha: str
       state: "error",
       target_url: null,
       updated_at: consumption.createdAt,
-      url: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+      url: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
     }, {
       context: "message-like-me/unrelated-check",
       created_at: consumption.createdAt,
@@ -324,10 +324,10 @@ function combinedTerminal(consumption: ReturnType<typeof status>, targetSha: str
       state: "success",
       target_url: null,
       updated_at: consumption.createdAt,
-      url: `https://api.github.com/repos/hraness/message-like-me/statuses/${targetSha}`,
+      url: `https://api.github.com/repos/hraness/textbutler/statuses/${targetSha}`,
     }],
     total_count: 2,
-    url: `https://api.github.com/repos/hraness/message-like-me/commits/${targetSha}/status`,
+    url: `https://api.github.com/repos/hraness/textbutler/commits/${targetSha}/status`,
   };
 }
 
@@ -335,7 +335,7 @@ describe("persistent production-ref writer canary", () => {
   test("binds one attempt of the literal current-main workflow", () => {
     const targetSha = "1".repeat(40);
     expect(parseWriterCanaryEnvironment(environment(targetSha))).toMatchObject({
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       repositoryId,
       runAttempt: 1,
       runId: 9001,
@@ -348,7 +348,7 @@ describe("persistent production-ref writer canary", () => {
       { GITHUB_REPOSITORY_ID: "1" },
       { GITHUB_RUN_ATTEMPT: "2" },
       { GITHUB_WORKFLOW_SHA: "2".repeat(40) },
-      { GITHUB_WORKFLOW_REF: "hraness/message-like-me/.github/workflows/other.yml@refs/heads/main" },
+      { GITHUB_WORKFLOW_REF: "hraness/textbutler/.github/workflows/other.yml@refs/heads/main" },
     ]) {
       expect(() => parseWriterCanaryEnvironment({
         ...environment(targetSha),
@@ -434,7 +434,7 @@ describe("persistent production-ref writer canary", () => {
       mode: "canary",
       previousSha: changed.oldSha,
       protectedRef: "refs/heads/website-production-writer-canary",
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       repositoryId,
       tag: CONTROL_EPOCH_CANARY_NO_TAG,
       targetSha: changed.targetSha,
@@ -474,7 +474,7 @@ describe("persistent production-ref writer canary", () => {
       mode: "canary",
       previousSha: changed.oldSha,
       protectedRef: "refs/heads/website-production-writer-canary",
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       repositoryId,
       tag: CONTROL_EPOCH_CANARY_NO_TAG,
       targetSha: changed.targetSha,
@@ -528,7 +528,7 @@ describe("persistent production-ref writer canary", () => {
       mode: "canary",
       previousSha: input.oldSha,
       protectedRef: "refs/heads/website-production-writer-canary",
-      repository: "hraness/message-like-me",
+      repository: "hraness/textbutler",
       repositoryId,
       tag: CONTROL_EPOCH_CANARY_NO_TAG,
       targetSha: input.targetSha,

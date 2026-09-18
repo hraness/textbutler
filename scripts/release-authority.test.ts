@@ -6,7 +6,7 @@ import {
   revalidateReleaseAuthority,
 } from "./release-provider-outcome.mjs";
 
-const repository = "hraness/message-like-me";
+const repository = "hraness/textbutler";
 const tag = "v0.8.0";
 const tagResolutionFixture = JSON.parse(readFileSync(
   new URL("./fixtures/github-v0.8.0-tag-resolution.json", import.meta.url),
@@ -21,6 +21,16 @@ const tagResolutionFixture = JSON.parse(readFileSync(
 }>;
 const sha = tagResolutionFixture.resolvedCommit.sha;
 const tagObjectSha = tagResolutionFixture.tagRef.object.sha;
+// Keep the archived pre-rename response unchanged; model a new canonical API
+// response using the same immutable tag-object identity and explicit URLs.
+const canonicalTagRef = {
+  ...tagResolutionFixture.tagRef,
+  url: `https://api.github.com/repos/${repository}/git/refs/tags/${tag}`,
+  object: {
+    ...tagResolutionFixture.tagRef.object,
+    url: `https://api.github.com/repos/${repository}/git/tags/${tagObjectSha}`,
+  },
+};
 const currentMainSha = "3".repeat(40);
 const workflowSha = currentMainSha;
 
@@ -88,7 +98,7 @@ function release(overrides: Readonly<Record<string, unknown>> = {}) {
 function releaseAsset(releaseTag: string, name: string, id: number) {
   return {
     browser_download_url:
-      `https://github.com/hraness/message-like-me/releases/download/${releaseTag}/${name}`,
+      `https://github.com/hraness/textbutler/releases/download/${releaseTag}/${name}`,
     digest: `sha256:${"a".repeat(64)}`,
     id,
     name,
@@ -114,8 +124,8 @@ function authorityApi(overrides: Readonly<Record<string, ApiValue>> = {}) {
       compare(sha, currentMainSha),
     ],
     [`/repos/${repository}/git/ref/tags/${tag}`]: [
-      tagResolutionFixture.tagRef,
-      tagResolutionFixture.tagRef,
+      canonicalTagRef,
+      canonicalTagRef,
     ],
     [`/repos/${repository}/git/tags/${tagObjectSha}`]: [tagObject(), tagObject()],
     [`/repos/${repository}/releases/tags/${tag}`]: [release(), release()],
@@ -204,7 +214,7 @@ describe("promotion authority revalidation", () => {
   test("rejects lightweight or moved tags, malformed releases, and a non-Latest tag", async () => {
     const lightweightTag = authorityApi({
       [`/repos/${repository}/git/ref/tags/${tag}`]: [{
-        object: { sha, type: "commit", url: tagResolutionFixture.tagRef.object.url },
+        object: { sha, type: "commit", url: canonicalTagRef.object.url },
         ref: `refs/tags/${tag}`,
       }],
     });

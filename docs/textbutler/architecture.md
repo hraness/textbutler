@@ -2,15 +2,15 @@
 
 Textbutler is a personal message butler for macOS. An owner activates a bounded set of contacts. Each contact gets a private workspace that a coding agent can read and evolve. A separate daemon decides when to invoke that agent and controls every outward action.
 
-The source includes the owner daemon, contact reply loop, versioned Ghostget automation protocol and Mac application. Synthetic tests establish their control and recovery behavior. Live provider delivery and signed distribution have separate acceptance requirements below.
+The source includes the owner daemon, contact reply loop, versioned Ghostget automation protocol and macOS menu companion. Synthetic tests establish their control and recovery behavior. Live provider delivery has separate acceptance requirements below; the companion is a CLI artifact and has no signing or notarization gate.
 
 ## Ownership
 
 ```mermaid
 flowchart LR
-  App[Mac settings app] --> Control[Owner-only control socket]
+  Menu[Menu companion] --> Control[Owner-only control socket]
   Control --> Butler[Textbutler daemon]
-  Butler --> Router[Agentrouter]
+  Butler --> Router[AgentMixer]
   Router --> Provider[Admitted agent provider]
   Provider --> Tools[Contact-bound tool broker]
   Tools --> Memory[One contact workspace]
@@ -22,9 +22,9 @@ flowchart LR
   Ghostget --> Messages[iMessage and WhatsApp]
 ```
 
-Ghostget owns native permissions, message and contact acquisition, provider actions, and receipts. Textbutler does not open chat.db or automate Messages directly. Agentrouter owns provider selection, shared-account leases, cancellation, model catalogs, qualification evidence, and a bounded tool interface. Textbutler owns conversation policy and the durable send transaction. The Mac app changes owner settings through a small local protocol; it never gives a model arbitrary Tauri commands.
+Ghostget owns native permissions, message and contact acquisition, provider actions, and receipts. Textbutler does not open chat.db or automate Messages directly. AgentMixer owns provider selection, shared-account leases, cancellation, model catalogs, qualification evidence, and a bounded tool interface. Textbutler owns conversation policy and the durable send transaction. The menu companion changes owner settings through a small local protocol; it never gives a model arbitrary local commands.
 
-The background lifecycle uses a user LaunchAgent: native messaging belongs to the signed-in Mac user, and login persistence is independent of the settings window. Installation records the exact runtime, entrypoint, data directory and generation; removal verifies its private receipt and loaded service identity. Uninstall preserves contact data. New settings start paused. A private SQLite custody lock prevents duplicate daemon ownership and permits recovery only for a dead recorded process and its exact unserved socket. A temporary live launchd install/start/uninstall test passed while preserving synthetic owner data. Signed distribution remains a separate gate.
+The background lifecycle uses a user LaunchAgent: native messaging belongs to the signed-in Mac user, and login persistence is independent of the menu companion. Installation records the exact runtime, entrypoint, data directory and generation; removal verifies its private receipt and loaded service identity. Uninstall preserves contact data. New settings start paused. A private SQLite custody lock prevents duplicate daemon ownership and permits recovery only for a dead recorded process and its exact unserved socket. A temporary live launchd install/start/uninstall test passed while preserving synthetic owner data. The CLI companion is the supported release path; desktop app packaging has been removed; the CLI companion is the only local runtime surface.
 
 The daemon serves owner controls, enrollment jobs and a reply loop through its own supervised Ghostget process. Startup, enablement and recovery establish a silent event boundary, refresh bounded history and admit only subsequent eligible inbound messages. A failed catch-up pauses the affected conversation. No provider work starts without explicit owner account configuration.
 
@@ -62,7 +62,7 @@ Directory names use opaque identifiers, not contact names or phone numbers. File
 
 The owner chooses one verified direct conversation from a bounded Ghostget list. Enrollment rechecks the account incarnation and participant identity and creates a disabled contact. History import is a separate opt-in, limited to 200 recent, explicitly scoped messages, with message ID, time, and author preserved. The import records shortening and omissions; it does not fetch media. These records are context only, and historical automation may be unobservable. A later qualified initialization run may summarize preferences, conversational style, open tasks, and useful context into memory. It must distinguish evidence from inference and retain uncertainty. Later runs correct outdated notes and record sources. Proven butler output never becomes owner-style training evidence. No global person model or cross-contact retrieval is supplied by default.
 
-The original Message Like Me corpus and profile tools remain an optional bounded bootstrap source. They do not become the live message transport. Old databases are not reset or silently migrated. There is no need to carry every previous archive/source feature into the new UI.
+The original Message Like Me corpus and profile tools remain an optional bounded bootstrap source. They do not become the live message transport. Old databases are not reset or silently migrated. There is no need to carry every previous archive/source feature into the menu companion.
 
 ## Reply admission
 
@@ -82,13 +82,27 @@ No typing signal can prove the owner is absent. The current adapters expose no t
 
 The model proposes actions. It does not dispatch them. Owner-installed hooks may shape the work or veto a reply, but all action validation, contact binding, limits, and disclosure run afterwards.
 
-Every text action is wrapped by trusted code with the contact's three symbols. Each field must be one visible grapheme; an empty or invisible disclosure is rejected. Default rendering is `🤖{ hello this is my response }`.
+Every text action is wrapped by trusted code with the contact's three symbols. Each field is either cleared (empty) or exactly one visible grapheme; invisible or multi-grapheme fields are rejected. Default rendering is `🤖{ hello this is my response }`. Clearing all three fields removes the visible wrap entirely and sends plain text.
 
-Reactions, stickers, link previews, and app cards cannot literally carry that text prefix. A disclosed text companion is therefore the first action in a nontext response, and counts toward the eight-action maximum. The provider must execute in order and stop if that companion fails. App-specific cards may additionally identify Textbutler in their content, but never remove the companion requirement.
+Clearing disclosure never makes butler output indistinguishable internally. The transport reports the provider-accepted message IDs for every submitted action, and the daemon records them in a private `sent_messages` journal table. History and attribution classify an outgoing message as butler-authored through that journal first, and through the configured visible wrap for sends that predate it. A cleared wrap simply has no visible form; provenance stays exact.
+
+Reactions, stickers, link previews, and app cards cannot literally carry that text prefix. When visible markers remain configured, a disclosed text companion is therefore the first action in a nontext response, and counts toward the eight-action maximum. With disclosure fully cleared the companion would be unexplained extra text and is not added. The provider must execute in order and stop if that companion fails. App-specific cards may additionally identify Textbutler in their content, but never remove the companion requirement.
 
 Before send, the runtime rechecks owner activity, conversation revision, current settings, capability availability, cancellation, attachment ownership, target message membership, and the contact grant. It asks the transport to prepare an exact plan with an expiry and digest. Immediately before submission, it journals the dispatch intent. The transport must atomically validate the grant, contact route, context revision, and plan digest at its own effect boundary.
 
 `submitted` is not `delivered`. Partial and indeterminate outcomes pause further automated activity for that contact until explicit reconciliation. A crash while dispatching becomes indeterminate on recovery; it never causes a blind retry. A crash before dispatch abandons the run without sending. Provider failover cannot replay a possibly submitted action.
+
+## Owner reply triage
+
+The same machinery serves an explicit owner workflow that is distinct from automatic replies. `textbutler inbox` (or the menu's **Replies → Check for replies**) runs a bounded read-only pass over every enrolled conversation and reports each trailing run of unanswered inbound messages: the contact, a bounded sanitized preview, the pending count, whether a send is currently possible, and why not when it is not. The automatic loop's live observations feed the same view, so the inbox reflects what the daemon already saw between scans.
+
+`textbutler replies suggest CONTACT` asks the contact's configured agent to draft a reply for that pending run. A suggestion is a bounded draft with a fifteen-minute expiry: summary, exact proposed actions, and the disclosed preview the send would carry. It never dispatches. Drafts bind the conversation revision and disclosure settings they were created against; a stale context, changed disclosure, or expired draft is rejected rather than silently sent.
+
+Only an explicit send command dispatches: `textbutler replies send DRAFT` sends the exact reviewed draft, and `textbutler replies send CONTACT TEXT...` sends literal owner text through the identical grant, plan, journal, disclosure and reconciliation discipline as an automatic reply. `textbutler replies discard DRAFT` drops a suggestion. The menu bar exposes scan, per-conversation suggestion, draft review, send, and discard — it never offers a free-text send; literal replies stay on the CLI.
+
+An owner send reuses the contact's live standing grant when it covers the needed action kinds with remaining quota. Otherwise the daemon issues a tightly scoped grant: only the specific action kinds, ten-minute expiry, quota equal to the action count. The scoped grant is journaled with intent and pending state, published to the conversation, and revoked after the send when the contact is disabled. One serialized work registration covers grant issuance and dispatch together so delegated renewal and disable-revocation cannot race an in-flight send. The agent never sees this surface; it has no send authority in either direction.
+
+`replies.send` returns `submitted`, `failed`, `partial`, `cancelled`, or `indeterminate`. An indeterminate owner send blocks the next reply for that contact — automatic or owner-initiated — until the journaled intent is reconciled, exactly like an automatic send.
 
 ## Hooks and plugins
 
@@ -98,25 +112,25 @@ Executable extensions are application code with the daemon's trust. They are ins
 
 The daemon reads a bounded private `plugins/extensions.json` manifest and preflights its complete inventory before importing listed TypeScript/JavaScript entry modules. Each default export must match the manifest ID/version and known hook names. Source digests appear in the loaded extension metadata. No directory scanning, package installation or hot reload occurs; changes require a full daemon process restart. The routed agent emits `memory.updated` only after a successful conditional write, with its path and committed revision. A notification failure does not undo that write or replay it.
 
-## Agentrouter
+## AgentMixer
 
-Agentrouter begins as an MIT-licensed source package independent of Textbutler's product model. Its account lease coordinates the selected provider account without embedding credentials in a contact workspace. Credential resolvers remain trusted host services. A lease cannot be stolen merely because its time elapsed while a process might still be alive.
+AgentMixer begins as an MIT-licensed source package independent of Textbutler's product model. Its account lease coordinates the selected provider account without embedding credentials in a contact workspace. Credential resolvers remain trusted host services. A lease cannot be stolen merely because its time elapsed while a process might still be alive.
 
 Provider adapters declare observed, exact-version qualification. A launch plan is not proof of a sandbox. Codex's shell-disable setting and Claude's exact tool list are useful inputs, but an adapter is not admitted until attempted shell/process calls, host file reads, inherited MCP/plugin configuration, auth-file access, alternate agents, and additional workspaces are demonstrably blocked. No bypass-permissions mode is acceptable.
 
-The source implements a pinned Claude Agent SDK adapter with explicit API-key account binding, a private verified executable snapshot, isolated runtime directories, no built-in tools or inherited settings, broker-only MCP, bounded raw output, and joined process-group termination. Its production gate requires independent qualification of the exact executable and SDK identity. Synthetic protocol and native-runtime fixtures do not activate it. The experimental Codex app-server driver verifies each model request's tool inventory through a host relay and keeps contact storage outside native scratch. It has no live account transport or production registration; native confinement and adversarial custody qualification remain incomplete. See the [Agentrouter implementation and evidence](../../packages/agentrouter/README.md).
+The source implements a pinned Claude Agent SDK adapter with explicit API-key account binding, a private verified executable snapshot, isolated runtime directories, no built-in tools or inherited settings, broker-only MCP, bounded raw output, and joined process-group termination. Its production gate requires independent qualification of the exact executable and SDK identity. Synthetic protocol and native-runtime fixtures do not activate it. The experimental Codex app-server driver verifies each model request's tool inventory through a host relay and keeps contact storage outside native scratch. It has no live account transport or production registration; native confinement and adversarial custody qualification remain incomplete. See the [AgentMixer implementation and evidence](https://github.com/hraness/agentmixer#readme).
 
 A separately selected Claude API adapter executes the bounded tool loop in the trusted host. It exposes only the six broker tools and never starts a model-selected process. Account checks bind the actual packaged runtime and private credential generation; replacing a credential invalidates old discovery and running account work. Fresh model availability and price metadata select a cheap classifier. This explicit API choice does not silently replace Claude Code or Codex and does not use their subscription authentication.
 
 The model receives a fixed contact/workspace identity and a fixed run ID. File operations are brokered and conditional. Public web requests are separately bounded and must not reach loopback, private networks, local sockets, or cloud metadata through DNS or redirects. Message tools stage recipient-free intents for the one conversation. Unknown tool names and unknown input fields fail. Credential/account services are never model tools.
 
-Oompa's existing runtime provider port and account/process-custody patterns are source references. Its ordinary workspace-write execution profile is not the requested contact-only sandbox. AI Charts is a prospective second consumer. Do not migrate either product to Agentrouter until an adapter has equivalent feature and recovery evidence; avoid changing their active work in this redesign.
+Oompa's existing runtime provider port and account/process-custody patterns are source references. Its ordinary workspace-write execution profile is not the requested contact-only sandbox. AI Charts is a prospective second consumer. Do not migrate either product to AgentMixer until an adapter has equivalent feature and recovery evidence; avoid changing their active work in this redesign.
 
 ## Ghostget contract and rich features
 
 WhatsApp follows the same Ghostget ownership boundary. Its private wacli-backed transport provides durable observations and recipient-bound actions; pairing, session state and synchronization stay in Ghostget. The [WhatsApp guide](whatsapp.md) describes setup and action support. Textbutler does not embed WPPConnect or invoke wacli directly.
 
-Current source inspection found Ghostget's Tauri 2 webview with a packaged Bun helper. That helper lives with the app, and its private socket handles approvals/control, not a public messaging subscription service. Textbutler must not couple to it.
+Ghostget owns its provider process and private control socket; Textbutler consumes only Ghostget's documented CLI and automation contracts.
 
 The older generic messaging APIs retain expiring route references and owner-confirmed previews. Automation uses a separate explicit owner protocol with durable enrollment, revocable grants and event observations. The iMessage provider negotiates attachments, reactions, stickers, rich links and polls separately; unsupported App Clips and arbitrary experiences remain unavailable. Native Contacts directory discovery is not implemented in this protocol.
 
@@ -132,17 +146,17 @@ Linq's documented iMessage API includes attachments, reactions, stickers, rich l
 
 Ghostget currently imports published Message Like Me bundle contracts. Keep that immutable package a leaf. Do not repoint it at the Textbutler runtime. Extract the neutral bundle contracts before reversing a live package dependency, or consume Ghostget's installed CLI contract without a package import in the interim. Preserve historical wire-format identifiers.
 
-## Mac application
+## macOS menu companion
 
-The app has an explicit conversation picker, optional history initialization, a contact list, per-contact activation and mode settings, disclosure preview, memory editing, activity, provider status, and global pause. Long provider reads use bounded asynchronous jobs; Pause stays available and preserves unsaved choices. Unsupported capabilities show their actual setup or transport limitation. A separate synthetic demo is clearly labeled and is not included in the native app's live data graph.
+The supported local surface is an unbundled status-item companion launched by the CLI. It exposes daemon state, contact and account readiness, capabilities, recent activity, pause/resume and status refresh. The website action opens the informational textbutler.app page. Contact enrollment, account setup and other settings remain daemon protocol capabilities without a current menu or web interface. The companion is not required to run the daemon.
 
-One narrow native command accepts the versioned control request. It connects to the private user socket, bounds requests/responses, applies timeouts, and verifies same-user ownership. The webview has no generic shell, filesystem, opener, or network plugin. The app does not inherit access to arbitrary Ghostget operations.
+One narrow native command accepts the versioned control request. It connects to the private user socket, bounds requests/responses, applies timeouts, and verifies same-user ownership. The companion has no generic shell, filesystem, opener, or network plugin and does not inherit access to arbitrary Ghostget operations.
 
 ## Admission still required
 
 1. Use the verified Ghostget 0.18.2 package, which includes the reviewed automation source and native helpers. Real account synchronization, recipient identity, rich actions and revocation still require a bounded owner-authorized live test; artifact admission and synthetic fixtures do not prove delivery.
 2. Independently qualify the native Claude SDK and Codex adapters for the requested no-shell, contact-only profile before enabling those choices. The separate Claude API path requires explicit account setup and packaged-runtime admission.
-3. Sign and notarize the exact Mac artifact with an available Apple Developer identity, then verify the final downloaded bytes and installation lifecycle. The unsigned local package and successful launchd test are not a signed release.
+3. Publish the CLI package with its pinned desktop-foundation SDK dependency. Verify the package bytes, the verified pinned runner download, singleton behavior, and the shared autostart install/uninstall lifecycle. A source checkout or missing companion must never trigger a build at launch.
 4. Keep historical repository and published package identities as compatibility and provenance anchors. The Textbutler site is assigned to `textbutler.app`; later identity migrations must preserve immutable artifacts and existing release protections.
 
 ## Sources

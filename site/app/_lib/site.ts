@@ -4,10 +4,10 @@ export const SITE_NAME = 'Textbutler';
 export const SITE_ORIGIN = 'https://textbutler.app';
 export const SITE_DESCRIPTION =
   'A personal message butler for Mac, with contact-specific memory, clearly identified replies, and guarded iMessage and WhatsApp connections. In development.';
-export const GITHUB_URL = 'https://github.com/hraness/message-like-me';
+export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 // The immutable legacy release coordinate; not a Textbutler app version.
-export const SOFTWARE_VERSION = '0.8.9';
+export const SOFTWARE_VERSION = '0.8.11';
 export const RELEASE_URL = `${GITHUB_URL}/releases/tag/v${SOFTWARE_VERSION}`;
 
 export const CANONICAL_PAGE_PATHS = [
@@ -53,9 +53,10 @@ export function pageMetadata({
       title,
       description,
       images: [{
-        url: absoluteUrl('/og.png'),
+        url: absoluteUrl('/opengraph-image'),
         width: 1200,
         height: 630,
+        type: 'image/png',
         alt: `${SITE_NAME} — your personal message butler for Mac.`,
       }],
     },
@@ -64,7 +65,7 @@ export function pageMetadata({
       title,
       description,
       images: [{
-        url: absoluteUrl('/og.png'),
+        url: absoluteUrl('/opengraph-image'),
         alt: `${SITE_NAME} — your personal message butler for Mac.`,
       }],
     },

@@ -31,7 +31,7 @@ The homepage alone opts in. Warm transmitted light and square glass seams sit
 behind the opening copy and synthetic product frame. The message frame stays
 opaque; expanded questions use warm paired paint and ink. Native reduced
 transparency and forced colors remove decorative effects. No material is applied
-to logos, documentation, the inert preview, or the Mac app. Paper retains its
+to logos, documentation, the inert preview, or the menu companion. Paper retains its
 incoming/outgoing bubble colors, links and focus.
 
 The opening pairs a direct outcome with a contact folder and visibly disclosed

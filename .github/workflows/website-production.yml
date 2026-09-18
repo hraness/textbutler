@@ -373,13 +373,13 @@ jobs:
       - name: Pin the complete production authority TCB to reviewed hashes
         id: initial_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          PRODUCTION_AUTHORITY_SHA256: 61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510
-          PROVIDER_SHA256: fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264
-          REF_AUTHORITY_SHA256: 402526c0f249536294190445fd5d14e2b5d6b92f5c56627aaa6922304675c768
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          PRODUCTION_AUTHORITY_SHA256: 6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff
+          PROVIDER_SHA256: 876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d
+          REF_AUTHORITY_SHA256: 00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -414,13 +414,13 @@ jobs:
       - name: Re-pin the complete TCB before the App-only precondition
         id: pre_precondition_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          PRODUCTION_AUTHORITY_SHA256: 61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510
-          PROVIDER_SHA256: fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264
-          REF_AUTHORITY_SHA256: 402526c0f249536294190445fd5d14e2b5d6b92f5c56627aaa6922304675c768
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          PRODUCTION_AUTHORITY_SHA256: 6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff
+          PROVIDER_SHA256: 876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d
+          REF_AUTHORITY_SHA256: 00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -447,13 +447,13 @@ jobs:
       - name: Re-pin the complete TCB before the denial writer
         id: pre_denial_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          PRODUCTION_AUTHORITY_SHA256: 61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510
-          PROVIDER_SHA256: fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264
-          REF_AUTHORITY_SHA256: 402526c0f249536294190445fd5d14e2b5d6b92f5c56627aaa6922304675c768
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          PRODUCTION_AUTHORITY_SHA256: 6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff
+          PROVIDER_SHA256: 876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d
+          REF_AUTHORITY_SHA256: 00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -480,13 +480,13 @@ jobs:
       - name: Re-pin the complete TCB after the denial writer
         id: pre_attest_pin
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          PRODUCTION_AUTHORITY_SHA256: 61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510
-          PROVIDER_SHA256: fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264
-          REF_AUTHORITY_SHA256: 402526c0f249536294190445fd5d14e2b5d6b92f5c56627aaa6922304675c768
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          PRODUCTION_AUTHORITY_SHA256: 6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff
+          PROVIDER_SHA256: 876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d
+          REF_AUTHORITY_SHA256: 00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -513,13 +513,13 @@ jobs:
         id: post_attest_pin
         if: ${{ always() && steps.workflow_range.outcome == 'success' && steps.pre_precondition_pin.outcome == 'success' && steps.precondition.outcome != 'skipped' }}
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          PRODUCTION_AUTHORITY_SHA256: 61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510
-          PROVIDER_SHA256: fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264
-          REF_AUTHORITY_SHA256: 402526c0f249536294190445fd5d14e2b5d6b92f5c56627aaa6922304675c768
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          PRODUCTION_AUTHORITY_SHA256: 6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff
+          PROVIDER_SHA256: 876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d
+          REF_AUTHORITY_SHA256: 00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -550,13 +550,13 @@ jobs:
         id: post_writer_pin
         if: ${{ always() && steps.workflow_range.outcome == 'success' && steps.pre_precondition_pin.outcome == 'success' && steps.precondition.outcome != 'skipped' }}
         env:
-          APP_TOKEN_SHA256: 8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526
-          PRODUCTION_AUTHORITY_SHA256: 61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510
-          PROVIDER_SHA256: fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264
-          REF_AUTHORITY_SHA256: 402526c0f249536294190445fd5d14e2b5d6b92f5c56627aaa6922304675c768
-          REF_WRITER_SHA256: 626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc
-          STATUS_ATTESTER_SHA256: 811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7
-          WORKFLOW_RANGE_SHA256: 22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3
+          APP_TOKEN_SHA256: 2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e
+          PRODUCTION_AUTHORITY_SHA256: 6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff
+          PROVIDER_SHA256: 876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d
+          REF_AUTHORITY_SHA256: 00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e
+          REF_WRITER_SHA256: 38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591
+          STATUS_ATTESTER_SHA256: efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c
+          WORKFLOW_RANGE_SHA256: 50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7
         run: |
           set -euo pipefail
           test "$(shasum -a 256 scripts/release-app-token.mjs | cut -d ' ' -f 1)" = "$APP_TOKEN_SHA256"
@@ -1022,13 +1022,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs admit
@@ -1042,7 +1042,7 @@ jobs:
       - name: Fetch only the complete governed source and production histories
         run: |
           set -euo pipefail
-          git -c credential.helper= -c core.hooksPath=/dev/null fetch --unshallow --no-tags             https://github.com/hraness/message-like-me.git             refs/heads/main:refs/remotes/origin/main             refs/heads/website-production:refs/remotes/origin/website-production
+          git -c credential.helper= -c core.hooksPath=/dev/null fetch --unshallow --no-tags             https://github.com/hraness/textbutler.git             refs/heads/main:refs/remotes/origin/main             refs/heads/website-production:refs/remotes/origin/website-production
       - name: Require the exact reviewed workflow-control transition
         id: workflow
         if: steps.baseline.outputs.advance_required == 'true'
@@ -1092,7 +1092,7 @@ jobs:
       - name: Fetch only complete governed source and production histories
         run: |
           set -euo pipefail
-          git -c credential.helper= -c core.hooksPath=/dev/null fetch --unshallow --no-tags             https://github.com/hraness/message-like-me.git             refs/heads/main:refs/remotes/origin/main             refs/heads/website-production:refs/remotes/origin/website-production
+          git -c credential.helper= -c core.hooksPath=/dev/null fetch --unshallow --no-tags             https://github.com/hraness/textbutler.git             refs/heads/main:refs/remotes/origin/main             refs/heads/website-production:refs/remotes/origin/website-production
       - name: Re-admit source artifact and control range before any App credential
         id: admitted
         env:
@@ -1101,13 +1101,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs workflow
@@ -1123,13 +1123,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/release-production-authority.mjs consume
@@ -1142,13 +1142,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs deny
@@ -1164,13 +1164,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/release-production-authority.mjs attest
@@ -1184,13 +1184,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs promote
@@ -1209,13 +1209,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/release-production-authority.mjs consume
@@ -1263,13 +1263,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs finalize
@@ -1317,13 +1317,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs wait
@@ -1334,13 +1334,13 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check <<'SITE_AUTHORITY_HASHES'
-          8ba1f4155a7428cc924c4c8b468c38c599e52bb1760654ebc6b4056f0a6cb526  scripts/release-app-token.mjs
-          811be0f7075611b0091a39f02598ac6450f3b768af6cb4278d8ffeb83c0e66f7  scripts/release-status-attester.mjs
-          61a5068c8c1465a51e4150c031dfa520c4d3a3dc2799a6ed448be5f7c1cb9510  scripts/release-production-authority.mjs
-          fb16fe4bdd7fdab0a3b507ea7f33a52945bba9c8da684123e97d3bad749fa264  scripts/release-provider-outcome.mjs
-          626d9db276e98a477e10d08d6e26b7924a44bebbefc325512839892589f62afc  scripts/release-ref-writer.mjs
-          22f6c56d4bd98d31288ed60c47f22ee652ac9065784981013f50613fcf8fdca3  scripts/release-workflow-range.mjs
-          b27f2ac83ad4d24e13a1ee5db5e9b3f10793900e24b754657a5c872eb115e43b  scripts/site-production-subject.mjs
+          2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e  scripts/release-app-token.mjs
+          efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c  scripts/release-status-attester.mjs
+          6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff  scripts/release-production-authority.mjs
+          876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
+          38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
+          50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
+          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs qualify

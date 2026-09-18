@@ -9,9 +9,10 @@ import { daemonSocketPath } from "./daemon.ts";
 import { acquireOwnerDatabase } from "./daemon-custody.ts";
 
 export const LAUNCH_AGENT_LABEL = "app.textbutler.daemon";
+type LaunchAgentLabel = typeof LAUNCH_AGENT_LABEL;
 const MAX_BYTES = 65_536;
 type Phase = "prepared" | "installing" | "installed" | "removing" | "uncertain-install" | "uncertain-remove";
-type Receipt = { schemaVersion: 1; label: typeof LAUNCH_AGENT_LABEL; uid: number; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string; phase: Phase; servicePid: number | null };
+type Receipt = { schemaVersion: 1; label: LaunchAgentLabel; uid: number; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string; phase: Phase; servicePid: number | null };
 type FileSnapshot = { text: string; dev: number; ino: number };
 export type LaunchctlResult = { outcome: "completed" | "indeterminate"; exitCode: number | null; stdout: string; stderr: string };
 export interface LaunchAgentHost {
@@ -25,7 +26,7 @@ export interface LaunchAgentHost {
   processState(pid: number): "alive" | "dead" | "unknown";
 }
 export interface LaunchAgentStatus {
-  readonly label: typeof LAUNCH_AGENT_LABEL;
+  readonly label: LaunchAgentLabel;
   readonly installation: "absent" | "installed" | "conflict" | "indeterminate" | "unsupported";
   readonly service: "not-loaded" | "loaded" | "running" | "unknown";
   readonly plistPath: string;
@@ -48,15 +49,17 @@ function xml(value: string): string { return value.replaceAll("&", "&amp;").repl
 function argsFor(receipt: Receipt): readonly string[] {
   return ["/usr/bin/env", "-i", `HOME=${receipt.home}`, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", `TEXTBUTLER_LAUNCH_AGENT_GENERATION=${receipt.generation}`, receipt.runtime, "--no-env-file", receipt.entrypoint, "daemon", "run", "--data-dir", receipt.dataDir];
 }
-function plistPath(home: string): string { return join(home, "Library", "LaunchAgents", `${LAUNCH_AGENT_LABEL}.plist`); }
+function plistPath(home: string, label: LaunchAgentLabel = LAUNCH_AGENT_LABEL): string { return join(home, "Library", "LaunchAgents", `${label}.plist`); }
 function render(receipt: Receipt): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${LAUNCH_AGENT_LABEL}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n<key>WorkingDirectory</key><string>${xml(receipt.dataDir)}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>15</integer>\n<key>ProcessType</key><string>Background</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n<key>WorkingDirectory</key><string>${xml(receipt.dataDir)}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>15</integer>\n<key>ProcessType</key><string>Background</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
 }
+
 function parseReceipt(text: string, host: LaunchAgentHost, dataDir: string): Receipt {
   const item: unknown = JSON.parse(text);
   if (!item || typeof item !== "object" || Array.isArray(item)) fail("Invalid LaunchAgent receipt.");
   const r = item as Record<string, unknown>;
-  if (Object.keys(r).sort().join(",") !== "dataDir,entrypoint,generation,home,label,phase,runtime,schemaVersion,servicePid,uid" || r.schemaVersion !== 1 || r.label !== LAUNCH_AGENT_LABEL || r.uid !== host.uid || r.home !== host.home || r.dataDir !== dataDir || typeof r.generation !== "string" || !/^[0-9a-f-]{36}$/u.test(r.generation) || !["prepared", "installing", "installed", "removing", "uncertain-install", "uncertain-remove"].includes(String(r.phase)) || r.servicePid !== null && (!Number.isSafeInteger(r.servicePid) || Number(r.servicePid) < 1 || Number(r.servicePid) > 2 ** 31 - 1)) fail("The LaunchAgent receipt does not match this owner and data directory.");
+  const label = LAUNCH_AGENT_LABEL;
+  if (Object.keys(r).sort().join(",") !== "dataDir,entrypoint,generation,home,label,phase,runtime,schemaVersion,servicePid,uid" || r.schemaVersion !== 1 || r.label !== label || r.uid !== host.uid || r.home !== host.home || r.dataDir !== dataDir || typeof r.generation !== "string" || !/^[0-9a-f-]{36}$/u.test(r.generation) || !["prepared", "installing", "installed", "removing", "uncertain-install", "uncertain-remove"].includes(String(r.phase)) || r.servicePid !== null && (!Number.isSafeInteger(r.servicePid) || Number(r.servicePid) < 1 || Number(r.servicePid) > 2 ** 31 - 1)) fail("The LaunchAgent receipt does not match this owner and data directory.");
   path(r.home); path(r.dataDir); path(r.runtime); path(r.entrypoint);
   return r as unknown as Receipt;
 }
@@ -109,12 +112,13 @@ function parseJob(result: LaunchctlResult, receipt: Receipt | null, host: Launch
   const absent = { state: "absent", running: false, pid: null } as const;
   const unknown = { state: "unknown", running: false, pid: null } as const;
   if (result.outcome !== "completed" || Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) > MAX_BYTES) return unknown;
-  if (result.exitCode === 113 && result.stdout === "" && result.stderr === `Bad request.\nCould not find service "${LAUNCH_AGENT_LABEL}" in domain for user gui: ${host.uid}\n`) return absent;
-  if (result.exitCode !== 0 || !receipt || !result.stdout.startsWith(`gui/${host.uid}/${LAUNCH_AGENT_LABEL} = {\n`)) return unknown;
+  const label = receipt?.label ?? LAUNCH_AGENT_LABEL;
+  if (result.exitCode === 113 && result.stdout === "" && result.stderr === `Bad request.\nCould not find service "${label}" in domain for user gui: ${host.uid}\n`) return absent;
+  if (result.exitCode !== 0 || !receipt || !result.stdout.startsWith(`gui/${host.uid}/${label} = {\n`)) return unknown;
   const lines = result.stdout.split("\n").map(line => line.trim());
   const field = (key: string): string | null => { const values = lines.filter(line => line.startsWith(`${key} = `)); return values.length === 1 ? values[0]!.slice(key.length + 3) : null; };
   const start = lines.indexOf("arguments = {"); const end = lines.indexOf("}", start + 1);
-  if (field("path") !== plistPath(host.home) || field("program") !== "/usr/bin/env" || start === -1 || end === -1 || JSON.stringify(lines.slice(start + 1, end)) !== JSON.stringify(argsFor(receipt))) return unknown;
+  if (field("path") !== plistPath(host.home, label) || field("program") !== "/usr/bin/env" || start === -1 || end === -1 || JSON.stringify(lines.slice(start + 1, end)) !== JSON.stringify(argsFor(receipt))) return unknown;
   const pidText = field("pid"); const pid = pidText !== null && /^[1-9][0-9]*$/u.test(pidText) ? Number(pidText) : null;
   if (pid !== null && (!Number.isSafeInteger(pid) || pid > 2 ** 31 - 1)) return unknown;
   return { state: "owned", running: field("state") === "running" && pid !== null, pid };
@@ -140,8 +144,9 @@ export function defaultLaunchAgentHost(): LaunchAgentHost {
 }
 
 export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunchAgentHost()): LaunchAgentLifecycle {
-  const target = `gui/${host.uid}/${LAUNCH_AGENT_LABEL}`, plist = plistPath(host.home);
-  const view = (installation: LaunchAgentStatus["installation"], job: Job, detail: string): LaunchAgentStatus => ({ label: LAUNCH_AGENT_LABEL, installation, service: job.state === "absent" ? "not-loaded" : job.state === "unknown" ? "unknown" : job.running ? "running" : "loaded", plistPath: plist, pid: job.pid, detail, automaticReplies: "unavailable" });
+  const label = LAUNCH_AGENT_LABEL;
+  const target = `gui/${host.uid}/${label}`, plist = plistPath(host.home, label);
+  const view = (installation: LaunchAgentStatus["installation"], job: Job, detail: string): LaunchAgentStatus => ({ label, installation, service: job.state === "absent" ? "not-loaded" : job.state === "unknown" ? "unknown" : job.running ? "running" : "loaded", plistPath: plist, pid: job.pid, detail, automaticReplies: "unavailable" });
   const inspect = async (dataDir: string) => {
     path(host.home); path(dataDir); await directory(host.home, host.uid, false);
     for (const parent of [join(host.home, "Library"), dirname(plist), dataDir, join(dataDir, "state")]) {
@@ -190,7 +195,7 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
       return await locked(dataDir, async () => {
         const state = await inspect(dataDir);
         if (state.job.state === "unknown") fail("Existing LaunchAgent service ownership cannot be verified.");
-        let receipt = state.receipt ?? { schemaVersion: 1, label: LAUNCH_AGENT_LABEL, uid: host.uid, home: host.home, dataDir, runtime: host.runtime, entrypoint: host.entrypoint, generation: randomUUID(), phase: "prepared", servicePid: null } satisfies Receipt;
+        let receipt = state.receipt ?? { schemaVersion: 1, label, uid: host.uid, home: host.home, dataDir, runtime: host.runtime, entrypoint: host.entrypoint, generation: randomUUID(), phase: "prepared", servicePid: null } satisfies Receipt;
         if (receipt.runtime !== host.runtime || receipt.entrypoint !== host.entrypoint) fail("The installed LaunchAgent uses another runtime or entrypoint. Uninstall it before changing its launch identity.");
         if (state.job.state === "owned") {
           if (!state.installed || !state.stored) fail("The loaded service is missing its exact installation artifacts.");

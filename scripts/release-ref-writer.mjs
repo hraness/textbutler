@@ -8,11 +8,11 @@ import { createHash } from "node:crypto";
 
 import { MAXIMUM_WORKFLOW_RANGE_COMMITS } from "./release-workflow-range.mjs";
 
-const EXPECTED_REPOSITORY = "hraness/message-like-me";
+const EXPECTED_REPOSITORY = "hraness/textbutler";
 const PRODUCTION_REF = "refs/heads/website-production";
 const CANARY_REF = "refs/heads/website-production-writer-canary";
 const MAIN_REF = "refs/heads/main";
-const FIXED_REMOTE = "https://github.com/hraness/message-like-me.git";
+const FIXED_REMOTE = "https://github.com/hraness/textbutler.git";
 const GIT_EXECUTABLE = "/usr/bin/git";
 const FIXED_PATH = "/usr/bin:/bin";
 const SHA = /^[0-9a-f]{40}$/u;

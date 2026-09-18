@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { configureContact, DEFAULT_ACTIVE_LIMIT, disclose, newContact, parseDisclosure, parseSettings } from "./config.ts";
+import { configureContact, DEFAULT_ACTIVE_LIMIT, disclose, disclosedText, disclosureMarkers, newContact, parseDisclosure, parseSettings } from "./config.ts";
 import { decideReply, keywordPresent, type ConversationState, type MessageEvent } from "./decision.ts";
 
 const now = 1_800_000_000_000;
@@ -19,7 +19,19 @@ describe("contact settings", () => {
   test("disclosure accepts grapheme symbols, always adds wrapper, rejects invisible fields", () => {
     expect(disclose("hello this is my response")).toBe("🤖{ hello this is my response }");
     expect(disclose("hi", { character: "🧑‍💼", begin: "[", end: "]" })).toBe("🧑‍💼[ hi ]");
-    for (const character of ["", " ", "a b", "\u202e", "\n", "\u200b", "\u2060", "\u0301"]) expect(() => parseDisclosure({ character, begin: "{", end: "}" })).toThrow();
+    for (const character of [" ", "a b", "\u202e", "\n", "\u200b", "\u2060", "\u0301"]) expect(() => parseDisclosure({ character, begin: "{", end: "}" })).toThrow();
+  });
+  test("disclosure fields may be cleared; only the fully cleared wrap disappears", () => {
+    const cleared = parseDisclosure({ character: "", begin: "", end: "" });
+    expect(disclosureMarkers(cleared)).toBeNull();
+    expect(disclose("hello this is my response", cleared)).toBe("hello this is my response");
+    expect(disclosedText("hello this is my response", cleared)).toBe(false);
+    // Each field clears independently; a partial wrap still marks the reply.
+    expect(disclose("hi", { character: "", begin: "{", end: "}" })).toBe("{ hi }");
+    expect(disclose("hi", { character: "\ud83e\udd16", begin: "", end: "" })).toBe("\ud83e\udd16 hi");
+    expect(disclose("hi", { character: "", begin: "", end: "}" })).toBe("hi }");
+    expect(disclosedText("{ hi }", { character: "", begin: "{", end: "}" })).toBe(true);
+    expect(disclosedText("hi }", { character: "", begin: "", end: "}" })).toBe(true);
   });
   test("rejects duplicate routes and path traversal contact IDs", () => {
     expect(() => newContact("../outside", "Example", "r")).toThrow();

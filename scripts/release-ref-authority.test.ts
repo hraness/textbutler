@@ -14,7 +14,7 @@ import {
   verifyReleaseRefAuthority,
 } from "./release-ref-authority";
 
-const repositoryUrl = "https://github.com/hraness/message-like-me.git";
+const repositoryUrl = "https://github.com/hraness/textbutler.git";
 const temporaryRoots: string[] = [];
 
 afterEach(() => {
@@ -233,6 +233,25 @@ describe("bounded remote ref inventory", () => {
       [tag, "refs/tags/v1.2.3"],
       [tag, "refs/tags/v1.2.4"],
     ), "v1.2.3")).toThrow("newest advertised stable tag");
+  });
+
+  test("rejects foreign tag namespaces in the governed inventory", () => {
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/agentmixer-v0.1.0"],
+      [tag, "refs/tags/agentmixer-v0.2.0-rc.1"],
+    ), "agentmixer-v0.1.0")).toThrow("canonical stable version");
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/agentmixer-v0.2.0"],
+      [tag, "refs/tags/v0.1.0"],
+    ), "v0.1.0")).toThrow("unexpected ref");
+    expect(() => parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/v0.1.0"],
+      [tag, "refs/tags/v9.9.9"],
+    ), "v0.1.0")).toThrow("newest advertised stable tag");
+    const parsed = parseRemoteSnapshot(inventory(
+      [tag, "refs/tags/v0.1.0"],
+    ), "v0.1.0");
+    expect(parsed.requestedTagOid).toBe(tag);
   });
 
   test("bounds the combined main and tag inventory", () => {

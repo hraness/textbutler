@@ -4,14 +4,16 @@ import { basename, resolve } from "node:path";
 
 import {
   assertReleaseAssetBytes,
-  parseGitHubRelease,
-  publicPackageName,
   publicRepository,
-  releaseArchiveName,
+  releaseDistribution,
+  releasePackageForName,
 } from "./release-distribution-policy";
 import { assertReviewedMainComparison } from "./release-ref-authority";
 
 const maximumJsonBytes = 512 * 1_024;
+// The reviewed-main ancestry comparison carries per-file patches for up to 300
+// changed files, so it shares the pinned provider helper's 8 MiB response bound.
+const maximumComparisonBytes = 8 * 1_024 * 1_024;
 const maximumArtifactBytes = 32 * 1_024 * 1_024;
 
 function required(name: string, pattern?: RegExp): string {
@@ -56,6 +58,7 @@ async function fetchJson(
   url: string,
   label: string,
   headers: Readonly<Record<string, string>>,
+  maximumBytes: number = maximumJsonBytes,
 ): Promise<unknown> {
   const response = await fetch(url, {
     cache: "no-store",
@@ -64,7 +67,7 @@ async function fetchJson(
     signal: AbortSignal.timeout(20_000),
   });
   if (response.status !== 200) throw new Error(`${label} returned HTTP ${String(response.status)}.`);
-  const bytes = await readBounded(response, label, maximumJsonBytes);
+  const bytes = await readBounded(response, label, maximumBytes);
   try {
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown;
   } catch {
@@ -83,9 +86,9 @@ async function fetchArtifact(url: string, label: string): Promise<Uint8Array> {
   return readBounded(response, label, maximumArtifactBytes);
 }
 
-const [tarballArgument, checksumArgument, extra] = process.argv.slice(2);
+const [tarballArgument, checksumArgument, manifestArgument, extra] = process.argv.slice(2);
 if (tarballArgument === undefined || checksumArgument === undefined || extra !== undefined) {
-  throw new Error("Usage: check-github-release.ts ARTIFACT.tgz SHA256SUMS");
+  throw new Error("Usage: check-github-release.ts ARTIFACT.tgz SHA256SUMS [MANIFEST.json]");
 }
 if (required("GITHUB_REPOSITORY") !== publicRepository) {
   throw new Error(`GitHub release admission must run in ${publicRepository}.`);
@@ -116,14 +119,15 @@ const [tarballBytes, checksumBytes] = await Promise.all([
   readFile(checksumPath),
 ]);
 const manifest = JSON.parse(
-  await readFile(resolve(import.meta.dir, "..", "package.json"), "utf8"),
+  await readFile(resolve(manifestArgument ?? resolve(import.meta.dir, "..", "package.json")), "utf8"),
 ) as Readonly<{ license?: unknown; name?: unknown; version?: unknown }>;
+if (typeof manifest.name !== "string" || manifest.license !== "MIT" || typeof manifest.version !== "string") {
+  throw new Error("GitHub release admission coordinate is invalid.");
+}
+const distribution = releaseDistribution(releasePackageForName(manifest.name));
 if (
-  manifest.name !== publicPackageName
-  || manifest.license !== "MIT"
-  || typeof manifest.version !== "string"
-  || verifiedTag !== `v${manifest.version}`
-  || basename(tarballPath) !== releaseArchiveName(manifest.version)
+  verifiedTag !== `${distribution.package.tagPrefix}${manifest.version}`
+  || basename(tarballPath) !== distribution.releaseArchiveName(manifest.version)
   || basename(checksumPath) !== "SHA256SUMS"
 ) throw new Error("GitHub release admission coordinate is invalid.");
 
@@ -166,6 +170,7 @@ const comparison = await fetchJson(
   `${apiBase}/compare/${verifiedSha}...${branchSha}`,
   "GitHub reviewed-main ancestry",
   headers,
+  maximumComparisonBytes,
 ) as Readonly<{
   [key: string]: unknown;
 }>;
@@ -191,7 +196,7 @@ const [releasePayload, latestPayload] = await Promise.all([
 if ((latestPayload as Readonly<{ tag_name?: unknown }>).tag_name !== verifiedTag) {
   throw new Error("Latest GitHub Release does not match the admitted annotated tag.");
 }
-const release = parseGitHubRelease(releasePayload, manifest.version);
+const release = distribution.parseGitHubRelease(releasePayload, manifest.version);
 const [publishedTarball, publishedChecksum] = await Promise.all([
   fetchArtifact(release.tarball.browserDownloadUrl, "GitHub Release tarball"),
   fetchArtifact(release.checksum.browserDownloadUrl, "GitHub Release checksum"),

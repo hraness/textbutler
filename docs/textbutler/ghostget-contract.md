@@ -4,7 +4,7 @@ Textbutler owns reply policy and contact memory. Ghostget owns messaging
 accounts, native permissions, synchronization, event storage and outward
 actions. Textbutler communicates with its own Ghostget owner process through
 `ghostget messaging automation serve --stdio`; it does not share the Ghostget
-Mac app's private helper or open provider databases.
+menu companion's private helper or open provider databases.
 
 [Ghostget 0.18.2](https://github.com/hraness/ghostget/releases/tag/v0.18.2) is the
 verified published dependency for this contract. Its package includes both
@@ -66,8 +66,12 @@ account and managed permission admit them. Message targets must belong to the
 enrolled conversation. Attachment and sticker paths are resolved by Textbutler's
 contact file broker; Ghostget receives admitted bytes, not arbitrary paths.
 
-Every response starts with disclosed text. For a nontext response, Textbutler
-inserts a companion such as `🤖{ … }` before the rich actions. Execution stops
+Every response starts with disclosed text while disclosure markers remain
+configured. For a nontext response, Textbutler inserts a companion such as
+`🤖{ … }` before the rich actions; when the owner clears all three disclosure
+fields no companion is added and butler authorship is carried by the accepted
+message IDs the run receipt returns to Textbutler's journal instead of by
+visible text. Execution stops
 when a preceding action fails or the conversation changes. An accepted receipt
 does not claim delivery.
 

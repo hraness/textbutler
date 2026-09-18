@@ -1,5 +1,0 @@
-out/
-src-tauri/target/
-src-tauri/gen/
-.impeccable/*
-!.impeccable/design.json

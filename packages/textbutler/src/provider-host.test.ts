@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AgentStoppedError, createClaudeApiAdapter, createToolBroker, type ClaudeApiAdapterOptions, type ModelCatalog } from "../../agentrouter/src/index.ts";
+import { AgentStoppedError, createClaudeApiAdapter, createToolBroker, type ClaudeApiAdapterOptions, type ModelCatalog } from "@hraness/agentmixer";
 import { createProviderHost, type ProviderHost } from "./provider-host.ts";
 import { parseHostConfig } from "./host-config.ts";
 import { RunJournal } from "./journal.ts";

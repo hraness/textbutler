@@ -6,7 +6,10 @@
 
 web
 
-The product is a macOS-only desktop application with a Tauri webview and a separate user-session daemon. This platform marker describes the renderer; it does not imply Windows, Linux, iOS, or browser-hosted messaging support. The public website is informational.
+The product is a macOS-only CLI with a separate user-session daemon and an
+unbundled native menu-bar companion. There is no desktop window or app bundle. This platform marker does not
+imply Windows, Linux, iOS, or browser-hosted messaging support. The public
+website is informational.
 
 ## Users
 
@@ -22,7 +25,7 @@ The owner brings Codex or Claude Code and their account. Ghostget owns access to
 
 ## Operating Context
 
-The Mac must be awake and signed in for local messaging. Closing the settings window should leave the separately installed user agent running. A global pause is always available. Contacts are selected explicitly; smart response is the default mode after activation. The keyword defaults to `butler`. The three disclosure fields default to `🤖`, `{`, and `}` and produce `🤖{ hello this is my response }`.
+The Mac must be awake and signed in for local messaging. Quitting the menu companion leaves the separately installed user agent running. A global pause is always available. Contacts are selected explicitly; smart response is the default mode after activation. The keyword defaults to `butler`. The three disclosure fields default to `🤖`, `{`, and `}` and produce `🤖{ hello this is my response }`. Each field may be cleared individually or together; cleared fields remove the visible wrap while the daemon still attributes butler output through its send journal.
 
 ## Capabilities and Constraints
 
@@ -31,11 +34,14 @@ The Mac must be awake and signed in for local messaging. Closing the settings wi
 - Human activity, global pause, contact pause, deduplication, and rate limits take precedence over an LLM decision. The cheap classifier can choose silence; it cannot expand authority.
 - Rich actions include files, reactions, stickers, links, and mini-app experiences when the transport explicitly supports them. Unsupported capabilities are visible rather than silently imitated.
 - History bootstrapping never triggers sends. Owner-authored text provides owner-style evidence; incoming messages and butler output do not.
+- A separate owner workflow answers "what do I need to reply to?": the inbox scan lists conversations with unanswered inbound runs, `replies suggest` drafts a reviewable reply, and `replies send` dispatches only an explicit owner choice. Suggestions never send themselves.
 - Message Like Me was an unused product spike. Its wire contracts and published artifacts still have downstream consumers and must not be changed in place.
 
 ## Brand Commitments
 
-Name: Textbutler. Domain: textbutler.app. The owner explicitly permits redesigning the previous product. Ghostget is the reference for a Mac application with a webview and a clean native boundary.
+Name: Textbutler. Domain: textbutler.app. The owner explicitly permits
+redesigning the previous product. Ghostget is the reference for the native
+provider seam; Textbutler's supported surface is the CLI and status item.
 
 ## Product Principles
 
@@ -47,8 +53,13 @@ Name: Textbutler. Domain: textbutler.app. The owner explicitly permits redesigni
 
 ## Evidence on Hand
 
-The existing repository contains bounded history ingestion, provenance-aware profiles, and frozen shared message contracts. New source packages contain the Textbutler runtime, provider-independent transport, and Agentrouter foundations. Automated fixtures are synthetic. They are not evidence of live provider qualification, actual message delivery, or a signed/notarized Mac release.
+The existing repository contains bounded history ingestion, provenance-aware
+profiles, and frozen shared message contracts. New source packages contain the
+Textbutler runtime, provider-independent transport, and Agentrouter foundations.
+Automated fixtures are synthetic. They are not evidence of live provider
+qualification or actual message delivery. Desktop app packaging has been removed. The CLI and menu-bar companion are the
+only local runtime surfaces.
 
 ## Open Decisions and Working Defaults
 
-The user delegated implementation judgment. The initial activation limit is five contacts, configurable from one to fifty. Smart response uses an eight-second message-burst delay, five-minute owner cooldown, twelve responses per contact per hour, and a classifier confidence threshold of 0.85. These are tunable initial defaults, not measured ideal values. A quiet Mac settings interface is the working design direction. Optional Linq transport remains a proposed extension; Ghostget is the required primary boundary.
+The user delegated implementation judgment. The initial activation limit is five contacts, configurable from one to fifty. Smart response uses an eight-second message-burst delay, five-minute owner cooldown, twelve responses per contact per hour, and a classifier confidence threshold of 0.85. These are tunable initial defaults, not measured ideal values. A compact native menu and explicit CLI commands are the working interface direction. Optional Linq transport remains a proposed extension; Ghostget is the required primary boundary.

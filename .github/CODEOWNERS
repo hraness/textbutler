@@ -1,6 +1,5 @@
 /.github/workflows/** @0thernet
 /.github/CODEOWNERS @0thernet
-/apps/macos/distribution/** @0thernet
 /scripts/check-github-release.ts @0thernet
 /scripts/check-npm-retry-state.ts @0thernet
 /scripts/check-npm-trusted-publishing.ts @0thernet

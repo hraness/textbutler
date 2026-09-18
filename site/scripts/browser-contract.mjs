@@ -5,6 +5,19 @@ export function browserCases() {
     ['/', '/docs', '/sources', '/preview'].map((path) => ({ width, theme, path }))));
 }
 
+// Pin the synthetic presentation state instead of inheriting host accessibility
+// preferences. The browser gate separately exercises the reduced fallback.
+export function browserMediaFeatures(theme, transparency = 'no-preference') {
+  assert.ok(['light', 'dark'].includes(theme));
+  assert.ok(['no-preference', 'reduce'].includes(transparency));
+  return [
+    { name: 'prefers-color-scheme', value: theme },
+    { name: 'prefers-reduced-motion', value: 'reduce' },
+    { name: 'forced-colors', value: 'none' },
+    { name: 'prefers-reduced-transparency', value: transparency },
+  ];
+}
+
 // The source-owned README badge is external; this offline gate substitutes only
 // its exact image request, never a document, API, script, or another asset.
 export function isSyntheticBadge(request) {
@@ -154,9 +167,12 @@ export function assertPresentation(value, sample) {
     assert.notEqual(value.frameBackground, 'rgba(0, 0, 0, 0)');
     assert.ok(value.actionHeights.length >= 5, 'The header, hero and closing actions must all remain styled.');
     assert.ok(value.actionHeights.every((height) => height >= (sample.width < 500 ? 44 : 42)));
-    assert.ok(value.actionRadii.every((radius) => radius === '4px'));
+    assert.ok(value.actionRadii.every((radius) => radius === '8px'), 'Material controls retain their shared 8px radius.');
     assert.equal(value.headerBackdrop, 'blur(20px) saturate(1.1)');
-    assert.equal((value.fieldBackground.match(/gradient\(/gu) ?? []).length, 4);
-    assert.ok(!value.fieldBackground.includes('url('), 'Lantern is native CSS; no texture over content.');
+    assert.equal((value.fieldBackground.match(/gradient\(/gu) ?? []).length, 2);
+    assert.equal((value.fieldBackground.match(/url\(/gu) ?? []).length, 2);
+    assert.ok(!value.fieldBackground.includes('repeating-linear-gradient('), 'Wall seams come from the shaded cells.');
+    const tile = sample.width < 761 ? 576 : 768;
+    assert.equal(value.fieldBackgroundSize, `64px 64px, ${tile}px ${tile}px, 100% 100%, 100% 100%`);
   }
 }

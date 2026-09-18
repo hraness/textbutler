@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { unwatchFile, watchFile } from "node:fs";
 import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { GHOSTGET_OWNER_CLEANUP_GRACE_MS, GHOSTGET_OWNER_CUSTODY_FILE, createGhostgetOwnerReadPort } from "./ghostget-owner-read.ts";
@@ -17,6 +18,7 @@ test("public R1 CLI uses exact coordinates, incarnation before/after, and never 
   let calls = (await readFile(join(stateHome, "calls.jsonl"), "utf8")).trim().split("\n").map(value => JSON.parse(value));
   expect(calls).toHaveLength(6);
   expect(calls.every(call => call.runtimeArgs.includes("--no-env-file"))).toBe(true);
+  expect(calls.every(call => call.supportAudience === "off" && call.supportEmail === "off")).toBe(true);
   expect(calls.every(call => !call.args.includes("messaging.read") && !call.args.includes("messaging.send"))).toBe(true);
   expect(calls[3].input).toEqual({ chat_guid: "synthetic-chat", observed_chat_row_id: 42, service: "iMessage" });
   const history = await port.read(binding, true, signal);
@@ -44,15 +46,27 @@ test("abort settles the owned process before reporting failure", async () => {
 
 test("an interrupted uncertain read retains a private fence across a fresh adapter and starts no replacement child", async () => {
   const { port, stateHome } = await fixture("slow"); const controller = new AbortController();
-  const pending = port.list(controller.signal); const timer = setTimeout(() => controller.abort(), 80);
-  await expect(pending).rejects.toThrow("owner recovery"); clearTimeout(timer);
-  const marker = JSON.parse(await readFile(join(stateHome, GHOSTGET_OWNER_CUSTODY_FILE), "utf8"));
-  expect(marker).toMatchObject({ schemaVersion: 1, status: "in-flight-or-unreconciled", operation: "messaging.list", identityOnly: true });
-  expect(Object.keys(marker).some(key => /auth|input|message|credential/i.test(key))).toBe(false);
-  const calls = await readFile(join(stateHome, "calls.jsonl"), "utf8");
-  const fresh = createGhostgetOwnerReadPort({ executable: resolve(import.meta.dir, "../test-fixtures/ghostget-owner.ts"), runtimeExecutable: process.execPath, authId: "synthetic", stateHome, custodyDirectory: stateHome });
-  await expect(fresh.list(new AbortController().signal)).rejects.toThrow("owner recovery");
-  expect(await readFile(join(stateHome, "calls.jsonl"), "utf8")).toBe(calls);
+  let markReady!: () => void;
+  const ready = new Promise<void>(resolve => { markReady = resolve; });
+  const readyPath = join(stateHome, "slow-ready");
+  watchFile(readyPath, { interval: 10 }, current => { if (current.size > 0) markReady(); });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Synthetic child readiness timed out")), 1500); });
+  const pending = port.list(controller.signal);
+  try {
+    await Promise.race([ready, deadline, pending.then(() => { throw new Error("Synthetic slow child completed before interruption"); })]);
+    controller.abort();
+    await expect(pending).rejects.toThrow("owner recovery");
+    const marker = JSON.parse(await readFile(join(stateHome, GHOSTGET_OWNER_CUSTODY_FILE), "utf8"));
+    expect(marker).toMatchObject({ schemaVersion: 1, status: "in-flight-or-unreconciled", operation: "messaging.list", identityOnly: true });
+    expect(Object.keys(marker).some(key => /auth|input|message|credential/i.test(key))).toBe(false);
+    const calls = await readFile(join(stateHome, "calls.jsonl"), "utf8");
+    const fresh = createGhostgetOwnerReadPort({ executable: resolve(import.meta.dir, "../test-fixtures/ghostget-owner.ts"), runtimeExecutable: process.execPath, authId: "synthetic", stateHome, custodyDirectory: stateHome });
+    await expect(fresh.list(new AbortController().signal)).rejects.toThrow("owner recovery");
+    expect(await readFile(join(stateHome, "calls.jsonl"), "utf8")).toBe(calls);
+  } finally {
+    clearTimeout(timer); unwatchFile(readyPath); controller.abort(); await pending.catch(() => {});
+  }
 });
 
 test("documented cleanup grace allows the public CLI to reap its detached child before settlement", async () => {

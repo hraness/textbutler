@@ -4,10 +4,10 @@ import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  AgentRouter, CONTACT_TOOL_PROFILE, SqliteAccountLeases, parseClassification,
+  AgentMixer, CONTACT_TOOL_PROFILE, SqliteAccountLeases, parseClassification,
   type AgentAdapter, type AgentProvider, type AgentRunRequest, type ModelCatalog,
   type RuntimeQualification, type ToolBroker,
-} from "../../agentrouter/src/index.ts";
+} from "@hraness/agentmixer";
 import { newContact, type ContactSettings } from "./config.ts";
 import { createRoutedButlerAgent } from "./routed-agent.ts";
 import type { AgentRequest } from "./runtime.ts";
@@ -68,7 +68,7 @@ async function setup(options: {
       return { output, processStopped: true };
     },
   };
-  const router = new AgentRouter({ adapters: [adapter], leases, now: () => NOW });
+  const router = new AgentMixer({ adapters: [adapter], leases, now: () => NOW });
   const agent = createRoutedButlerAgent({ router, now: () => NOW,
     ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
     selection: async () => ({ qualification: options.selectionQualification ?? qualified, modelCatalog, defaultReplyModel: "default-expensive" }),

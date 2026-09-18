@@ -4,16 +4,17 @@ import { resolve } from "node:path";
 
 import {
   assertReleaseAssetBytes,
-  parseGitHubRelease,
-  parseNpmRelease,
-  publicPackageName,
   publicRepository,
-  releaseVersionForCurrentAdmission,
+  releaseDistribution,
+  releasePackageForName,
 } from "./release-distribution-policy";
 import { verifyNpmProvenance } from "./npm-provenance-verification";
 import { assertReviewedMainComparison } from "./release-ref-authority";
 
 const maximumJsonBytes = 512 * 1_024;
+// The reviewed-main ancestry comparison carries per-file patches for up to 300
+// changed files, so it shares the pinned provider helper's 8 MiB response bound.
+const maximumComparisonBytes = 8 * 1_024 * 1_024;
 const maximumArtifactBytes = 32 * 1_024 * 1_024;
 
 function requireEnvironment(name: string, pattern?: RegExp): string {
@@ -54,13 +55,17 @@ async function readBounded(response: Response, label: string, maximumBytes: numb
   return bytes;
 }
 
-async function readJson(response: Response, label: string): Promise<unknown> {
+async function readJson(
+  response: Response,
+  label: string,
+  maximumBytes: number = maximumJsonBytes,
+): Promise<unknown> {
   if (response.status !== 200) throw new Error(`${label} returned HTTP ${String(response.status)}.`);
   const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
   if (contentType !== "application/json" && contentType !== "application/vnd.github+json") {
     throw new Error(`${label} did not return JSON.`);
   }
-  const bytes = await readBounded(response, label, maximumJsonBytes);
+  const bytes = await readBounded(response, label, maximumBytes);
   try {
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown;
   } catch {
@@ -68,13 +73,18 @@ async function readJson(response: Response, label: string): Promise<unknown> {
   }
 }
 
-async function fetchJson(url: string, label: string, headers: HeadersInit = {}): Promise<unknown> {
+async function fetchJson(
+  url: string,
+  label: string,
+  headers: HeadersInit = {},
+  maximumBytes: number = maximumJsonBytes,
+): Promise<unknown> {
   return readJson(await fetch(url, {
     cache: "no-store",
     headers: { Accept: "application/json", "Cache-Control": "no-cache", ...headers },
     redirect: "error",
     signal: AbortSignal.timeout(20_000),
-  }), label);
+  }), label, maximumBytes);
 }
 
 async function fetchArtifact(url: string, label: string): Promise<Uint8Array> {
@@ -93,20 +103,26 @@ if (repository !== publicRepository) throw new Error(`Public release admission m
 const token = requireEnvironment("GITHUB_TOKEN");
 const verifiedSha = requireEnvironment("VERIFIED_SHA", /^[0-9a-f]{40}$/u);
 const verifiedTag = requireEnvironment("VERIFIED_TAG", /^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u);
-const releaseVersion = releaseVersionForCurrentAdmission(
-  JSON.parse(await readFile(resolve(import.meta.dir, "..", "package.json"), "utf8")),
-  verifiedTag,
+const [manifestArgument, extraArgument] = process.argv.slice(2);
+if (extraArgument !== undefined) throw new Error("Usage: check-public-release.ts [MANIFEST.json]");
+const releaseManifest = JSON.parse(
+  await readFile(resolve(manifestArgument ?? resolve(import.meta.dir, "..", "package.json")), "utf8"),
 );
+const releasePackage = releasePackageForName(
+  (releaseManifest as Readonly<{ name?: unknown }>).name as string,
+);
+const distribution = releaseDistribution(releasePackage);
+const releaseVersion = distribution.releaseVersionForCurrentAdmission(releaseManifest, verifiedTag);
 
-const encodedPackage = encodeURIComponent(publicPackageName);
+const encodedPackage = encodeURIComponent(releasePackage.name);
 const registryBase = `https://registry.npmjs.org/${encodedPackage}`;
 const versionPayload = await fetchJson(
   `${registryBase}/${encodeURIComponent(releaseVersion)}`,
   "npm exact version",
 );
 const latestPayload = await fetchJson(`${registryBase}/latest`, "npm latest version");
-const npmVersion = parseNpmRelease(versionPayload, releaseVersion);
-const npmLatest = parseNpmRelease(latestPayload, releaseVersion);
+const npmVersion = distribution.parseNpmRelease(versionPayload, releaseVersion);
+const npmLatest = distribution.parseNpmRelease(latestPayload, releaseVersion);
 if (npmLatest.integrity !== npmVersion.integrity || npmLatest.shasum !== npmVersion.shasum) {
   throw new Error("npm latest does not resolve to the exact verified version bytes.");
 }
@@ -151,6 +167,7 @@ if (
   || [preNpmState !== undefined, laterRunConstraint, writerConstraint].filter(Boolean).length > 1
 ) throw new Error("Public release admission received conflicting or invalid run constraints.");
 await verifyNpmProvenance(npmTarball, {
+  releasePackage,
   ...(preNpmState === "exact_same_run"
     ? { maximumAttempt: constrainedAttempt as number, requiredRunId: constrainedRunId as string }
     : {}),
@@ -220,6 +237,7 @@ const comparison = await fetchJson(
   `${apiBase}/compare/${verifiedSha}...${branchSha}`,
   "GitHub reviewed-main ancestry",
   githubHeaders,
+  maximumComparisonBytes,
 ) as Readonly<{
   [key: string]: unknown;
 }>;
@@ -248,7 +266,7 @@ const [releasePayload, githubLatestPayload] = await Promise.all([
 if ((githubLatestPayload as Readonly<{ tag_name?: unknown }>).tag_name !== verifiedTag) {
   throw new Error("Latest GitHub Release does not match the admitted annotated tag.");
 }
-const release = parseGitHubRelease(releasePayload, releaseVersion);
+const release = distribution.parseGitHubRelease(releasePayload, releaseVersion);
 const [githubTarball, githubChecksum] = await Promise.all([
   fetchArtifact(release.tarball.browserDownloadUrl, "GitHub Release tarball"),
   fetchArtifact(release.checksum.browserDownloadUrl, "GitHub Release checksum"),
@@ -263,6 +281,6 @@ if (!Buffer.from(githubTarball).equals(Buffer.from(npmTarball))) {
   throw new Error("npm and GitHub do not expose the same exact release tarball bytes.");
 }
 
-console.log(`Public release admission passed for ${publicPackageName}@${releaseVersion}.`);
+console.log(`Public release admission passed for ${releasePackage.name}@${releaseVersion}.`);
 console.log("- npm latest: exact MIT package, cryptographically verified trusted-publisher provenance, SHA-1 and SHA-512 integrity");
 console.log("- GitHub Release: exact annotated tag, commit, tarball, SHA256SUMS, sizes, and SHA-256 digests");

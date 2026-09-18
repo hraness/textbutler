@@ -5,17 +5,20 @@ import { basename, join, resolve } from "node:path";
 
 import {
   assertReleaseAssetBytes,
-  parseGitHubRelease,
   publicRepository,
-  releaseArchiveName,
+  releaseDistribution,
+  releasePackageForName,
 } from "./release-distribution-policy.ts";
 import { parseGitHubIncludedJsonResponse } from "./release-included-response.ts";
 import { publicReleaseEnvironment } from "./release-process-environment.ts";
 import { assertReviewedMainComparison } from "./release-ref-authority.ts";
 
-const [tagArgument, tarballArgument, checksumArgument] = process.argv.slice(2);
-if (tagArgument === undefined || tarballArgument === undefined || checksumArgument === undefined) {
-  throw new Error("Usage: publish-github-release.ts TAG ARTIFACT.tgz SHA256SUMS");
+const [tagArgument, tarballArgument, checksumArgument, manifestArgument] = process.argv.slice(2);
+if (
+  tagArgument === undefined || tarballArgument === undefined || checksumArgument === undefined
+  || process.argv.length > 6
+) {
+  throw new Error("Usage: publish-github-release.ts TAG ARTIFACT.tgz SHA256SUMS [MANIFEST.json]");
 }
 if (process.env.GITHUB_REPOSITORY !== publicRepository) {
   throw new Error(`GitHub Release publication must run in ${publicRepository}.`);
@@ -31,29 +34,33 @@ if (defaultBranchValue === undefined || !/^[A-Za-z0-9._/-]+$/u.test(defaultBranc
 }
 const defaultBranch: string = defaultBranchValue;
 
-const manifest = JSON.parse(readFileSync(resolve(import.meta.dir, "..", "package.json"), "utf8")) as Readonly<{
+const manifest = JSON.parse(
+  readFileSync(resolve(manifestArgument ?? resolve(import.meta.dir, "..", "package.json")), "utf8"),
+) as Readonly<{
   name?: unknown;
   version?: unknown;
 }>;
-if (manifest.name !== "@hraness/message-like-me" || typeof manifest.version !== "string") {
+if (typeof manifest.name !== "string" || typeof manifest.version !== "string") {
   throw new Error("The public package manifest identity is invalid.");
 }
-const expectedTag = `v${manifest.version}`;
+const releasePackage = releasePackageForName(manifest.name);
+const distribution = releaseDistribution(releasePackage);
+const expectedTag = `${releasePackage.tagPrefix}${manifest.version}`;
 if (tagArgument !== expectedTag) throw new Error(`Release tag must be ${expectedTag}.`);
 const releaseTag = tagArgument;
 const releaseVersion = manifest.version;
 
 const tarball = resolve(tarballArgument);
 const checksum = resolve(checksumArgument);
-if (basename(tarball) !== releaseArchiveName(manifest.version) || basename(checksum) !== "SHA256SUMS") {
+if (basename(tarball) !== distribution.releaseArchiveName(manifest.version) || basename(checksum) !== "SHA256SUMS") {
   throw new Error("Release artifact names do not match the public package coordinate.");
 }
 const tarballBytes = readFileSync(tarball);
 const checksumBytes = readFileSync(checksum);
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
-const expectedTitle = `Message Like Me ${tagArgument}`;
+const expectedTitle = `${releasePackage.title} ${tagArgument}`;
 const expectedBody =
-  `Automated public release of @hraness/message-like-me@${manifest.version} from ${tagArgument}.`;
+  `Automated public release of ${releasePackage.name}@${manifest.version} from ${tagArgument}.`;
 // GitHub's release list lags `gh release create` by a few seconds (v0.8.1,
 // v0.8.2, and v0.8.3 each missed the draft on the first read). Bound the
 // read-after-write wait; ambiguity and shape checks in findDraft still fail closed.
@@ -295,7 +302,7 @@ async function verifyPublishedRelease(): Promise<void> {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     try {
-      const coordinate = parseGitHubRelease(await readRelease(), releaseVersion);
+      const coordinate = distribution.parseGitHubRelease(await readRelease(), releaseVersion);
       assertReleaseAssetBytes(coordinate, tarballBytes, checksumBytes, sha256);
       const directory = mkdtempSync(join(tmpdir(), "message-like-me-release-assets-"));
       try {

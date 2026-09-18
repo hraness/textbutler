@@ -3,7 +3,7 @@ import { GITHUB_URL, pageMetadata } from '../_lib/site';
 import { readmeHtml } from '../readme.generated';
 
 const description =
-  'Explore the Textbutler development architecture and the retained Message Like Me history tools, with current capability limits and verification commands.';
+  'Explore the Textbutler CLI, daemon, menu companion, and current capability limits. Compatibility history contracts are documented separately.';
 
 export const metadata = pageMetadata({
   title: 'Documentation',

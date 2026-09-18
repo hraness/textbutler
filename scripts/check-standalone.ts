@@ -1,3 +1,4 @@
+import { assertSupportFoundationInputs, isReviewedSupportRuntime } from "./support-runtime-policy.ts";
 import {
   lstat,
   open,
@@ -26,24 +27,11 @@ const SCANNED_DIRECTORIES = [
   "skills",
   "src",
   "packages",
-  "apps/macos/src",
-  "apps/macos/scripts",
-  "apps/macos/src-tauri/src",
-  "apps/macos/src-tauri/capabilities",
-  "apps/macos/src-tauri/permissions",
 ] as const;
 const SCANNED_ROOT_FILES = [
   ".gitignore",
   "AGENTS.md",
   "PRODUCT.md",
-  "apps/macos/package.json",
-  "apps/macos/PRODUCT.md",
-  "apps/macos/DESIGN.md",
-  "apps/macos/README.md",
-  "apps/macos/src-tauri/Cargo.toml",
-  "apps/macos/src-tauri/Cargo.lock",
-  "apps/macos/src-tauri/build.rs",
-  "apps/macos/src-tauri/tauri.conf.json",
   "CONTRIBUTING.md",
   "LICENSE",
   "README.md",
@@ -55,6 +43,9 @@ const SCANNED_ROOT_FILES = [
   "tsconfig.json",
 ] as const;
 const IGNORED_NAMES = new Set([".git", "node_modules"]);
+// Generated pack-time output; it is compiled from already-scanned sources and absent in a
+// clean checkout, so scanning it would only feed hand-tuned source regexes build artifacts.
+const IGNORED_PATHS = new Set<string>([]);
 const DATABASE_EXTENSIONS = new Set([".db", ".sqlite", ".sqlite3"]);
 const NON_BUN_SCRIPT_EXTENSIONS = new Set(["." + "p" + "y", "." + "p" + "yc", "." + "p" + "yo"]);
 const NON_BUN_CACHE_DIRECTORY = ["__", "py", "cache__"].join("");
@@ -69,6 +60,7 @@ const TEXT_EXTENSIONS = new Set([
   ".rs",
   ".mjs",
   ".sh",
+  ".swift",
   ".toml",
   ".ts",
   ".tsx",
@@ -111,14 +103,18 @@ const LEGACY_NON_BUN_REFERENCE = new RegExp([
   "y",
 ].join(""), "u");
 
+// The exact quoted macOS resolver socket is a public OS interface. Its parent,
+// sibling paths, suffixes and every temporary directory remain private paths.
+export const PRIVATE_TEMPORARY_PATH = /\/private\/(?:tmp\/|var\/(?!run\/mDNSResponder(?:["'`]|$)))/u;
+
 const OPACITY_RULES = [
   { label: "private package name", pattern: /@jungle\//u },
   { label: "private source-repository name", pattern: /\bjungle\b/iu },
   { label: "private source path", pattern: /(?:projects|packages)\/message-like-me/u },
   { label: "private repository identity", pattern: /0thernet\/jungle/iu },
-  { label: "private workspace dependency protocol", pattern: /(?:workspace|catalog):/u },
+  { label: "private workspace dependency protocol", pattern: /["'`](?:workspace|catalog):[^"'`\s]*["'`]/u },
   { label: "developer home path", pattern: /\/(?:Users|home)\/[A-Za-z0-9._-]+\//u },
-  { label: "private temporary path", pattern: /\/private\/(?:tmp|var)\//u },
+  { label: "private temporary path", pattern: PRIVATE_TEMPORARY_PATH },
   { label: "publication implementation detail", pattern: /OPEN_SOURCE_SYNC_/u },
 ] as const;
 
@@ -227,7 +223,9 @@ function normalizedRelative(path: string): string {
 }
 
 function ignored(path: string): boolean {
-  const parts = normalizedRelative(path).split("/");
+  const relative = normalizedRelative(path);
+  if (IGNORED_PATHS.has(relative)) return true;
+  const parts = relative.split("/");
   return parts.some((part) => IGNORED_NAMES.has(part));
 }
 
@@ -361,8 +359,8 @@ function checkPackageManifest(value: unknown): string[] {
     problems.push("package.json homepage must be https://messagelikeme.com");
   }
   const repository = record(manifest.repository, "package.json repository");
-  if (repository.url !== "git+https://github.com/hraness/message-like-me.git") {
-    problems.push("package.json repository must be hraness/message-like-me");
+  if (repository.url !== "git+https://github.com/hraness/textbutler.git") {
+    problems.push("package.json repository must be hraness/textbutler");
   }
   const bin = record(manifest.bin, "package.json bin");
   if (Object.keys(bin).length !== 1 || bin.messagelikeme !== "./dist/cli.js") {
@@ -413,7 +411,26 @@ async function checkVersionContracts(manifest: JsonRecord): Promise<string[]> {
   return problems;
 }
 
+/** Apply the opacity, credential, address, and phone text rules to one scanned
+ * source. Dependency protocols match only a complete quoted specifier such as
+ * "workspace:*" or "catalog:react18"; ordinary catalog/workspace properties and
+ * quoted keys are not specifiers. Unquoted occurrences are indistinguishable
+ * from ordinary properties and remain outside this rule. */
+export function standaloneSourceProblems(path: string, source: string): string[] {
+  const problems: string[] = [];
+  if (LEGACY_NON_BUN_REFERENCE.test(source)) {
+    problems.push(`${path} contains a legacy non-Bun Ensoul script reference`);
+  }
+  for (const rule of [...OPACITY_RULES, ...CREDENTIAL_RULES]) {
+    if (rule.pattern.test(source)) problems.push(`${path} contains ${rule.label}`);
+  }
+  problems.push(...checkEmailAddresses(path, source));
+  problems.push(...checkPhoneNumbers(path, source));
+  return problems;
+}
+
 export async function standaloneProblems(): Promise<string[]> {
+  await assertSupportFoundationInputs(PACKAGE_ROOT);
   const roots = [
     ...SCANNED_DIRECTORIES.map((path) => join(PACKAGE_ROOT, path)),
     ...SCANNED_ROOT_FILES.map((path) => join(PACKAGE_ROOT, path)),
@@ -458,17 +475,13 @@ export async function standaloneProblems(): Promise<string[]> {
     }
     if (!TEXT_EXTENSIONS.has(extension) && basename(file) !== "LICENSE") continue;
     const source = await readFile(file, "utf8");
-    if (!SELF_SCANNERS.has(path)) {
-      if (LEGACY_NON_BUN_REFERENCE.test(source)) {
-        problems.push(`${path} contains a legacy non-Bun Ensoul script reference`);
-      }
-      for (const rule of [...OPACITY_RULES, ...CREDENTIAL_RULES]) {
-        if (rule.pattern.test(source)) problems.push(`${path} contains ${rule.label}`);
-      }
-      problems.push(...checkEmailAddresses(path, source));
-      problems.push(...checkPhoneNumbers(path, source));
-    }
-    if (path.startsWith("src/") || path.startsWith("dist/")) {
+    if (!SELF_SCANNERS.has(path)) problems.push(...standaloneSourceProblems(path, source));
+    if (path === "dist/support-runtime.js") {
+      // Only the exact reviewed shared CLI bundle may contain its bounded local
+      // Git-config reader and public Accounts links. Every other runtime keeps
+      // the broad network/auth/process bans.
+      if (!isReviewedSupportRuntime(path, source)) problems.push("The reviewed CLI support runtime bytes drifted");
+    } else if (path.startsWith("src/") || path.startsWith("dist/")) {
       problems.push(...checkRuntimeSource(path, source));
     }
   }

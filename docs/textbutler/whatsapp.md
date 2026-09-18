@@ -7,7 +7,7 @@ credentials, synchronization and send implementation. Textbutler never runs
 
 ```mermaid
 flowchart LR
-  App[Textbutler Mac app] --> Butler[Textbutler daemon]
+  App[Textbutler menu companion] --> Butler[Textbutler daemon]
   Butler --> Agents[Agentrouter]
   Butler --> Ghostget[Ghostget owner process]
   Ghostget --> Messages[iMessage helper]
@@ -18,10 +18,9 @@ flowchart LR
 
 Configure the WhatsApp account and its managed automation permissions in
 Ghostget, install its verified private messaging helper, then select that
-account in Textbutler's private `state/host.json`. The Mac app's messaging setup
-explicitly starts synchronization. Choose one returned direct conversation,
-optionally import recent history, and enable it only after the selected agent
-account passes its checks. New contacts and new installations start inactive.
+account in Textbutler's private `state/host.json`. Synchronization, enrollment and activation require explicit owner protocol
+operations; the current menu shows status but does not initiate them. Enable a
+contact only after the selected agent account passes its checks. New contacts and new installations start inactive.
 See [runtime setup](../../packages/textbutler/README.md).
 
 Version 2 enrollment preserves the canonical conversation JID, exact account

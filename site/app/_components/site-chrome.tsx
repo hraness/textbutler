@@ -1,6 +1,6 @@
-import { MarketingSiteHeader } from '@hraness/design-kit/react/server';
+import { HranessSiteFooter } from '@hraness/site-footer/react';
+import { MarketingSiteFooter, MarketingSiteHeader } from '@hraness/design-kit/react/server';
 import { AskAiAboutThis } from '@hraness/ui';
-import Link from 'next/link';
 
 import {
   absoluteUrl,
@@ -9,6 +9,10 @@ import {
   ARCHITECTURE_URL,
 } from '../_lib/site';
 
+// The shared footer contract pins the canonical generated icon element exactly.
+// eslint-disable-next-line @next/next/no-img-element
+const productMark = <img alt="" height={20} src="/icon.png" width={20} />;
+
 export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>) {
   return (
     <>
@@ -16,7 +20,7 @@ export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>)
       <MarketingSiteHeader
         action={{ href: '/#development', label: 'Development status' }}
         ariaLabel="Primary navigation"
-        brand="Textbutler"
+        brand={<>{productMark}Textbutler</>}
         brandLabel="Textbutler home"
         className={lantern ? "site-header hraness-material-chrome" : "site-header"}
         links={[
@@ -39,16 +43,22 @@ export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
           url={absoluteUrl(path)}
         />
       )}
-      <footer className="site-footer">
-        <Link className="wordmark" href="/">Textbutler</Link>
+      <MarketingSiteFooter
+        ariaLabel="Textbutler"
+        brand={productMark}
+        brandHref="/"
+        brandLabel="Textbutler home"
+        links={[
+          { href: '/about', label: 'About' },
+          { href: '/sources', label: 'Legacy history tools' },
+          { href: '/docs', label: 'Docs' },
+          { href: GITHUB_URL, label: 'GitHub' },
+        ]}
+        name="Textbutler"
+      >
         <p>Built for Mac · MIT source · in development</p>
-        <nav aria-label="Footer navigation">
-          <Link href="/about">About</Link>
-          <Link href="/sources">Legacy history tools</Link>
-          <Link href="/docs">Docs</Link>
-          <a href={GITHUB_URL}>GitHub</a>
-        </nav>
-      </footer>
+      </MarketingSiteFooter>
+      <HranessSiteFooter mailingList={{ kind: "none" }} support={{"id": "message-like-me", "name": "Textbutler", "valueProposition": "Support ongoing development of local tools for your messaging workflows.", "updates": false}} />
     </>
   );
 }

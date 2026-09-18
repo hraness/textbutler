@@ -16,7 +16,7 @@ describe("site typography", () => {
     };
 
     expect(manifest.dependencies?.["@hraness/design-kit"])
-      .toBe("github:hraness/design-kit#v0.6.3");
+      .toBe("github:hraness/design-kit#v0.10.0");
     expect(layout).toContain("import '@hraness/design-kit/fonts.css';");
     expect(layout.indexOf("@hraness/design-kit/fonts.css"))
       .toBeLessThan(layout.indexOf("./globals.css"));
@@ -34,7 +34,7 @@ describe("site typography", () => {
     const components = await readFile(new URL(import.meta.resolve("@hraness/design-kit/components.css")), "utf8");
     const compiled = await readFile(new URL(import.meta.resolve("@hraness/design-kit/stylex.css")), "utf8");
     expect(styles).toContain('@import "./components.css";');
-    expect(styles).toContain('@import "./product-marketing-foundation.css";');
+    expect(styles).toContain('@import "./product-marketing.css";');
     expect(components).toContain('@import "../dist/stylex.css";');
     expect(compiled).toContain("@layer components.hraness-design-kit.priority");
   });

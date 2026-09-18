@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { automationContextId, createGhostgetAutomationTransport, type AutomationEvent, type AutomationMessage, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { assertAutomationBinding, type AutomationBinding } from "./automation-owner.ts";
+import { messageAuthor, pendingCluster } from "./attribution.ts";
 import type { OwnerRuntimeState, TextbutlerControlService } from "./control-service.ts";
 import { boundedHistory } from "./enrollment.ts";
 import type { ContactSettings, Settings } from "./config.ts";
@@ -10,7 +11,7 @@ import { ButlerRuntime, type ButlerAgent, type ConversationSnapshot } from "./ru
 import { createRoutedButlerAgent } from "./routed-agent.ts";
 import { ContactWorkspace } from "./workspace.ts";
 
-type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged">;
+type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "notePending">;
 type ContactLoop = { binding: AutomationBinding; settingsRevision: number; cursor: string | null; initialized: boolean; runtime: ButlerRuntime; pending?: MessageEvent; blocked?: string; running: boolean; lastOwnerAt: number | null; historyRevision: number | null };
 export interface ReplyLoopOptions {
   service: LoopService;
@@ -23,23 +24,21 @@ export interface ReplyLoopOptions {
   onStatus?: (value: { state: "running" | "paused" | "unavailable"; detail: string }) => void;
 }
 
-function author(message: AutomationMessage, contact: ContactSettings): MessageEvent["author"] {
-  if (message.direction === "incoming") return "contact";
-  if (message.direction !== "outgoing") return "unknown";
-  const prefix = `${contact.disclosure.character}${contact.disclosure.begin} `;
-  return message.text?.startsWith(prefix) && message.text.endsWith(` ${contact.disclosure.end}`) ? "butler" : "owner";
-}
-
 /** Polling schedules only current inbound messages. Initialization, downtime and
  * enablement each establish a silent event boundary before new replies begin. */
 export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   const { service, client, hooks } = options, now = options.now ?? Date.now;
+  const journal = service.runJournal();
+  const author = (message: AutomationMessage, contact: ContactSettings): MessageEvent["author"] => messageAuthor(message, contact, journal);
   let owner: OwnerRuntimeState = await service.runtimeState(), settings: Settings = owner.settings;
   let closed = false, settingsEpoch = 0, timer: ReturnType<typeof setTimeout> | undefined, ticking: Promise<void> | undefined;
   const contacts = new Map<string, ContactLoop>(), work = new Set<Promise<unknown>>();
   const workspace = (id: string) => ContactWorkspace.create(join(service.dataDir, "contacts", id));
   const active = (id: string, revision: number) => !closed && !settings.paused && settings.contacts.some(contact => contact.id === id && contact.enabled && contact.revision === revision && contact.pausedUntil <= now());
-  const agent = options.agent ?? (service.providers ? createRoutedButlerAgent({ router: service.providers.router, selection: contact => service.providers!.selection(contact), getWorkspace: workspace, hooks, isActive: active, now }) : {
+  const agent = options.agent ?? (service.providers ? createRoutedButlerAgent({ router: service.providers.router,
+    selection: (contact, purpose) => service.providers!.selection(contact, purpose),
+    runManagedTask: (request, broker) => service.providers!.runManagedTask(request, broker),
+    getWorkspace: workspace, hooks, isActive: active, now }) : {
     async qualified() { return false; }, async classify() { throw new Error("Agent setup required"); }, async compose() { throw new Error("Agent setup required"); },
   });
   const changed = (next: Settings) => {
@@ -58,6 +57,8 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
       await (await workspace(contact.id)).write("history/recent.json", JSON.stringify({ schemaVersion: 1, purpose: "context-only-never-trigger", messages: history }));
       state.historyRevision = page.enrollment.revision;
     }
+    const cluster = pendingCluster(page.messages, contact, journal);
+    service.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: page.enrollment.ready });
     return { contextId: automationContextId(page.enrollment), messageIds: page.messages.filter(message => message.kind === "message").map(message => message.id), state: { latestRevision: String(page.enrollment.revision), lastOwnerAt: state.lastOwnerAt, ownerTyping: "unknown", synchronizedAt: page.enrollment.ready ? now() : 0, repliesInLastHour: service.runJournal().repliesSince(contact.id, now() - 3600000) } };
   }
   function contactLoop(contact: ContactSettings, binding: AutomationBinding): ContactLoop {

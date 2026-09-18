@@ -49,7 +49,7 @@ async function run(options: GhostgetOwnerReadOptions, operation: ReadOperation, 
   signal.throwIfAborted();
   const release = await claimCustody(options, operation, identityOnly);
   const args = ["invoke", "imessage-direct", operation, "--input", "-", "--auth", options.authId, "--json", ...(identityOnly ? ["--projection-identity-only"] : [])];
-  const environment: Record<string, string> = { PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
+  const environment: Record<string, string> = { PATH: "/usr/bin:/bin:/usr/sbin:/sbin", HRANESS_SUPPORT_AUDIENCE: "off", HRANESS_SUPPORT_EMAIL: "off" };
   for (const name of ["HOME", "USER", "LOGNAME", "TMPDIR"]) if (process.env[name] !== undefined) environment[name] = process.env[name]!;
   if (options.stateHome !== undefined) environment.GHOSTGET_STATE_HOME = options.stateHome;
   // Only a validated normal successful public result releases custody. A failed,

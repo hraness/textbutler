@@ -36,11 +36,11 @@ describe("release identity", () => {
     expect(siteRelease).toBe(packageRelease);
     expect(SOFTWARE_VERSION).toBe(packageRelease);
     expect(RELEASE_URL).toBe(
-      `https://github.com/hraness/message-like-me/releases/tag/v${packageRelease}`,
+      `https://github.com/hraness/textbutler/releases/tag/v${packageRelease}`,
     );
   });
 
-  test("keeps legacy installation separate from the unreleased Mac app", async () => {
+  test("keeps legacy installation separate from the unreleased menu companion", async () => {
     const siteRoot = resolve(import.meta.dir, "..");
     const repositoryRoot = resolve(siteRoot, "..");
     const packageRelease = await packageVersion(resolve(repositoryRoot, "package.json"));

@@ -157,7 +157,7 @@ export function createGhostgetAutomationTransport(options: { client: GhostgetAut
       try {
         const result = await client.submit(known.upstream.id, authorization.grantId, signal);
         if (result.enrollmentId !== enrollmentId || result.intentId !== plan.intentId || result.totalActions !== plan.actions.length) throw new Error("Run scope changed");
-        return success({ planId: plan.id, runId: result.id, state: result.state === "accepted" ? "submitted" : result.state === "started" ? "indeterminate" : result.state, submittedCount: result.accepted.length, totalCount: result.totalActions, recordedAt: new Date(now()).toISOString(), delivery: "unknown", retryable: false });
+        return success({ planId: plan.id, runId: result.id, state: result.state === "accepted" ? "submitted" : result.state === "started" ? "indeterminate" : result.state, submittedCount: result.accepted.length, totalCount: result.totalActions, acceptedMessageIds: result.accepted.map(part => part.messageId), recordedAt: new Date(now()).toISOString(), delivery: "unknown", retryable: false });
       } catch { return failure("indeterminate", "Ghostget send outcome is uncertain. Reconcile the recorded intent before another send."); }
     },
   };

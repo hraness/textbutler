@@ -2,19 +2,21 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { AUTOMATION_ACTIONS, automationBindingDigest, createGhostgetAutomationClient, type AutomationGrant, type AutomationGrantRequest,
-  type AutomationEnrollment, type AutomationProvider } from "../../transport/src/automation.ts";
+  type AutomationEnrollment, type AutomationProvider, type AutomationCoordinate } from "../../transport/src/automation.ts";
 import { createAutomationOwnerPort, parseAutomationBinding, automationBinding } from "./automation-owner.ts";
 import { TextbutlerControlService, TEXTBUTLER_CONTROL_PROTOCOL as protocol } from "./control-service.ts";
-import { createProviderHost } from "./provider-host.ts";
+import { createProviderHost, type ProviderHost } from "./provider-host.ts";
 import { parseHostConfig } from "./host-config.ts";
 import { parseControlResponse, type ControlResponse } from "../../control/src/index.ts";
+import { contactCapabilityIdentity, type ButlerPurpose } from "./contact-capabilities.ts";
+import type { ProviderSelection } from "./routed-agent.ts";
 
 const roots: string[] = [], services: TextbutlerControlService[] = [];
 afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 function fixture(provider: AutomationProvider = "imessage") {
   const now = Date.now(), calls: string[] = [], revoked: string[] = [], grants: AutomationGrant[] = [];
   const identity = { provider, authId: "synthetic", accountIdentity: "a".repeat(64), accountSubject: "synthetic-account", implementationIdentity: "b".repeat(64), sourceGeneration: "synthetic-generation" };
-  const coordinate = provider === "imessage" ? { provider, chatGuid: "iMessage;-;synthetic", service: "iMessage" as const, observedChatRowId: 1 } : { provider, conversationJid: "12345@s.whatsapp.net" };
+  const coordinate: AutomationCoordinate = provider === "imessage" ? { provider, chatGuid: "iMessage;-;synthetic", service: "iMessage" as const, observedChatRowId: 1 } : provider === "beeper" ? { provider, accountId: "synthetic-account-id", conversationId: "synthetic-conversation" } : { provider, conversationJid: "12345@s.whatsapp.net" };
   const conversation = { coordinate, title: "Synthetic person", kind: "single" as const, participants: ["synthetic-person"] };
   const enrollment: AutomationEnrollment = { id: `enrollment:${provider}`, identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision: 0, ready: true, reason: null };
   let enrolled = false, drift = false, blockGrant: (() => Promise<void>) | undefined, revokeFails = false, loseGrant = false;
@@ -49,14 +51,37 @@ async function finish(service: TextbutlerControlService, initial: ControlRespons
   for (let count = 0; response.ok && response.kind === "job" && count < 200; count++) { await Bun.sleep(2); response = await service.request({ protocol, command: "owner.job.read", jobId: response.jobId }); }
   if (response.ok && response.kind === "job") throw new Error("Synthetic job did not finish"); return response;
 }
-async function serviceFixture(f: ReturnType<typeof fixture>) {
+async function waitForMessagingState(service: TextbutlerControlService, contactId: string, expected: "recovery-required" | "missing") {
+  const deadline = performance.now() + 2000;
+  let state;
+  do {
+    state = (await service.snapshot()).contacts.find(contact => contact.id === contactId)?.messaging?.state;
+    if (state === expected) return;
+    await Bun.sleep(5);
+  } while (performance.now() < deadline);
+  expect(state).toBe(expected);
+}
+function syntheticModels(provider: "claude" | "codex") {
+  return { provider, observedAt: Date.now(), models: [{ id: "synthetic-model", available: true, supportsStructuredOutput: true,
+    classifierEligible: true, inputUsdPerMillion: 1, outputUsdPerMillion: 2 }] };
+}
+function managedSelection(purpose: ButlerPurpose): Extract<ProviderSelection, { kind: "managed" }> {
+  const route = { id: `synthetic-codex-${purpose}`, provider: "codex" as const, authentication: "subscription" as const };
+  return { kind: "managed", route, defaultReplyModel: "synthetic-model", modelCatalog: syntheticModels("codex"),
+    qualification: { status: "qualified", route, profile: contactCapabilityIdentity(purpose), runtimeVersion: "synthetic-control-fixture",
+      runtimeDigest: "1".repeat(64), evidenceDigest: "2".repeat(64), expiresAt: Date.now() + 600_000,
+      controls: { noCommandTools: true, exactToolInventory: true, workspaceReadIsolation: true, workspaceWriteIsolation: true,
+        isolatedConfiguration: true, authOutsideWorkspace: true, hostBrokerOnly: true } } };
+}
+async function serviceFixture(f: ReturnType<typeof fixture>, selection?: ProviderHost["selection"]) {
   const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-automation-")); roots.push(dataDir);
   const config = parseHostConfig({ schemaVersion: 1, providerAccounts: [{ id: "synthetic-api", label: "Synthetic API", route: "claude-api", credentialFile: "synthetic-key", replyModel: "synthetic-model",
-    prices: { observedAt: Date.now(), models: [{ id: "synthetic-model", inputUsdPerMillion: 1, outputUsdPerMillion: 2, classifierEligible: true }] } }] });
+    prices: { observedAt: Date.now(), models: [{ id: "synthetic-model", inputUsdPerMillion: 1, outputUsdPerMillion: 2, classifierEligible: true }] } },
+    { id: "synthetic-managed", label: "Synthetic managed account", route: "codex" }] });
   const service = await TextbutlerControlService.open({ dataDir, automation: f.port, providers: leases => ({ ...createProviderHost({ dataDir, config, leases }),
-    async selection() { return { qualification: { status: "qualified", profile: "agentrouter.scoped-tools.v1", runtimeVersion: "synthetic-control-fixture", runtimeDigest: "1".repeat(64), evidenceDigest: "2".repeat(64), expiresAt: Date.now() + 60_000,
+    selection: selection ?? (async () => ({ qualification: { status: "qualified", profile: "agentmixer.scoped-tools.v1", runtimeVersion: "synthetic-control-fixture", runtimeDigest: "1".repeat(64), evidenceDigest: "2".repeat(64), expiresAt: Date.now() + 60_000,
       controls: { noCommandTools: true, exactToolInventory: true, contactReadIsolation: true, contactWriteIsolation: true, isolatedConfiguration: true, authOutsideWorkspace: true, hostBrokerOnly: true } },
-      defaultReplyModel: "synthetic-model", modelCatalog: { provider: "claude", observedAt: Date.now(), models: [] } }; },
+      defaultReplyModel: "synthetic-model", modelCatalog: syntheticModels("claude") })),
   }) }); services.push(service);
   const listing = await finish(service, await service.request({ protocol, command: "conversations.list" }));
   if (!listing.ok || listing.kind !== "conversations") throw new Error("Missing synthetic conversations");
@@ -65,8 +90,57 @@ async function serviceFixture(f: ReturnType<typeof fixture>) {
   return { service, dataDir, contactId: enrolled.contactId, initial: enrolled.snapshot.contacts[0]!.settings };
 }
 
+for (const responseMode of ["smart", "keyword"] as const) {
+  test(`${responseMode} activation validates every required purpose before granting messaging access`, async () => {
+    const f = fixture(), purposes: ButlerPurpose[] = [];
+    const { service, contactId, initial } = await serviceFixture(f, async (contact, purpose) => {
+      if (!purpose) throw Error("Readiness requires an explicit purpose");
+      expect(contact).toMatchObject({ provider: "codex", accountId: "synthetic-managed", mode: responseMode });
+      expect(f.calls).not.toContain("grant"); purposes.push(purpose);
+      return managedSelection(purpose);
+    });
+    const result = await finish(service, await service.request({ protocol, command: "contact.settings.update", contactId, expectedRevision: 2,
+      settings: { ...initial, enabled: true, responseMode, provider: "codex", accountId: "synthetic-managed" } }));
+    expect(result).toMatchObject({ ok: true, kind: "snapshot" });
+    expect(purposes).toEqual(responseMode === "smart" ? ["classify", "respond"] : ["respond"]);
+    expect(f.grants).toHaveLength(1); expect((await service.settings()).contacts[0]!.enabled).toBe(true);
+  });
+}
+
+for (const defect of ["missing-classifier", "stale-classifier", "stale-response", "wrong-classifier-profile", "wrong-response-profile",
+  "malformed-runtime-digest", "malformed-evidence-digest", "missing-runtime-version"] as const) {
+  test(`smart activation refuses ${defect} before any messaging grant or intent`, async () => {
+    const f = fixture(), purposes: ButlerPurpose[] = [];
+    const failingPurpose = defect === "stale-response" || defect === "wrong-response-profile" ? "respond" : "classify";
+    const { service, contactId, initial } = await serviceFixture(f, async (_, purpose) => {
+      if (!purpose) throw Error("Readiness requires an explicit purpose");
+      purposes.push(purpose);
+      const value = managedSelection(purpose);
+      if (purpose !== failingPurpose) return value;
+      if (defect === "missing-classifier") return { ...value, modelCatalog: { ...value.modelCatalog,
+        models: value.modelCatalog.models.map(model => ({ ...model, classifierEligible: false })) } };
+      if (defect === "stale-classifier" || defect === "stale-response") return { ...value,
+        modelCatalog: { ...value.modelCatalog, observedAt: Date.now() - 86_400_001 } };
+      if (value.qualification.status !== "qualified") throw Error("Expected qualified synthetic fixture");
+      if (defect === "wrong-classifier-profile" || defect === "wrong-response-profile") return { ...value,
+        qualification: { ...value.qualification, profile: contactCapabilityIdentity(purpose === "classify" ? "respond" : "classify") } };
+      if (defect === "malformed-runtime-digest") return { ...value, qualification: { ...value.qualification, runtimeDigest: "invalid" } };
+      if (defect === "malformed-evidence-digest") return { ...value, qualification: { ...value.qualification, evidenceDigest: "invalid" } };
+      const { runtimeVersion: _omitted, ...qualification } = value.qualification;
+      return { ...value, qualification } as unknown as ProviderSelection;
+    });
+    const result = await finish(service, await service.request({ protocol, command: "contact.settings.update", contactId, expectedRevision: 2,
+      settings: { ...initial, enabled: true, responseMode: "smart", provider: "codex", accountId: "synthetic-managed" } }));
+    expect(result.ok).toBe(false);
+    expect(purposes).toEqual(failingPurpose === "respond" ? ["classify", "respond"] : ["classify"]);
+    expect(f.calls).not.toContain("grant"); expect(f.grants).toEqual([]);
+    expect(service.runJournal().grantIntents()).toEqual([]); expect(service.runJournal().pendingGrants()).toEqual([]);
+    expect((await service.runtimeState()).grants).toEqual({}); expect((await service.settings()).contacts[0]!.enabled).toBe(false);
+  });
+}
+
 test("owner automation has explicit startup, exact network identity and opt-in context import", async () => {
-  for (const provider of ["imessage", "whatsapp"] as const) {
+  for (const provider of ["imessage", "whatsapp", "beeper"] as const) {
     const f = fixture(provider), signal = new AbortController().signal;
     expect(f.calls).toEqual([]);
     const listed = await f.port.list(signal); expect(f.calls).toEqual(["conversations"]);
@@ -100,13 +174,14 @@ test("v2 control enrollment stores identity and grants outside contact memory an
   expect(await service.delegatedGrant(selected)).toBe(f.grants[0]!.id);
   f.failRevoke();
   expect(await service.request({ protocol, command: "contact.settings.update", contactId, expectedRevision: 4, settings: { ...initial, enabled: false, provider: "claude", accountId: "synthetic-api" } })).toMatchObject({ ok: true });
-  await Bun.sleep(5);
   expect(await service.delegatedGrant(selected)).toBeNull(); expect(notifications).toContain(false);
+  await waitForMessagingState(service, contactId, "recovery-required");
   expect((await service.runtimeState()).grants[contactId]?.id).toBe(f.grants[0]!.id);
   expect((await service.snapshot()).contacts[0]?.messaging?.state).toBe("recovery-required");
   f.recoverRevoke();
-  const fresh = await service.snapshot(); await service.request({ protocol, command: "contact.settings.update", contactId, expectedRevision: fresh.revision, settings: fresh.contacts[0]!.settings });
-  await Bun.sleep(10);
+  const fresh = await service.snapshot();
+  expect(await service.request({ protocol, command: "contact.settings.update", contactId, expectedRevision: fresh.revision, settings: fresh.contacts[0]!.settings })).toMatchObject({ ok: true });
+  await waitForMessagingState(service, contactId, "missing");
   expect((await service.runtimeState()).grants).toEqual({}); expect(f.revoked).toContain(f.grants[0]!.id);
 });
 

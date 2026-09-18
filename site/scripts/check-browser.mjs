@@ -6,11 +6,35 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserOwner,
+import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
   deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
 
 // This gate serves only the built informational website. It never runs the CLI,
 // Mac application, messaging providers, account checks, or personal-data readers.
+
+// Immutable design-kit v0.8.0 assets, checked independently of the current build.
+async function assertWallAssets(context, background, origin) {
+  const expected = [
+    ['grain', 152319, 'b40c33a0e382c8e9d0518b4720321b5c262a929c28d40a190a902d07acd06553'],
+    ['cells', 17102, 'be9b12eefeae91772f024ed24ccda5be6173fb626921374b7e5270c298611b01'],
+  ];
+  const urls = [...background.matchAll(/url\("([^"]+)"\)/gu)].map(match => new URL(match[1], origin));
+  assert.equal(urls.length, expected.length);
+  const result = [];
+  for (const [index, url] of urls.entries()) {
+    const [name, size, sha256] = expected[index];
+    assert.equal(url.origin, origin); assert.equal(url.search, ''); assert.equal(url.hash, '');
+    assert.match(url.pathname, new RegExp(`^/_next/static/media/${name}\\.[a-f0-9]+\\.svg$`, 'u'));
+    const response = await context.request.get(url.href, { timeout: 5000, maxRedirects: 0 });
+    assert.equal(response.status(), 200);
+    const bytes = await response.body();
+    assert.equal(bytes.length, size);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), sha256);
+    result.push({ name, path: url.pathname, bytes: size, sha256 });
+  }
+  return result;
+}
+
 const root = fileURLToPath(new URL('../', import.meta.url));
 const executablePath = process.env.TEXTBUTLER_BROWSER_EXECUTABLE;
 const node = process.env.TEXTBUTLER_NODE_EXECUTABLE;
@@ -174,6 +198,11 @@ try {
         }
       })), 'Route interception');
       page = await deadline(context.newPage(), 'Page startup');
+      const mediaSession = await deadline(context.newCDPSession(page), 'Media fixture session');
+      const applyMedia = (transparency) => deadline(mediaSession.send('Emulation.setEmulatedMedia', {
+        features: browserMediaFeatures(sample.theme, transparency),
+      }), 'Media fixture application');
+      await applyMedia('no-preference');
       page.setDefaultTimeout(10_000);
       page.setDefaultNavigationTimeout(15_000);
       page.on('pageerror', (error) => failures.push(error.message));
@@ -228,6 +257,7 @@ try {
         };
         for (const sheet of document.styleSheets) visit(sheet.cssRules);
         return { paper: document.documentElement.dataset.hranessTheme,
+          reducedTransparency: matchMedia('(prefers-reduced-transparency: reduce)').matches,
           background: getComputedStyle(document.body).backgroundColor,
           bodyFont: getComputedStyle(document.body).fontFamily,
           bodyInk: getComputedStyle(document.body).color,
@@ -235,7 +265,7 @@ try {
           overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth,
           forms: document.querySelectorAll('form,input,textarea').length,
           headers: document.querySelectorAll('.hraness-marketing-header').length,
-          footers: document.querySelectorAll('.site-footer').length,
+          footers: document.querySelectorAll('.hraness-marketing-footer').length,
           askAi: document.querySelectorAll('.message-like-me-ask-ai').length,
           preset: document.querySelector('[data-hraness-marketing-preset]')?.getAttribute('data-hraness-marketing-preset') ?? null,
           headingFont: style.fontFamily, headingSize: Number.parseFloat(style.fontSize),
@@ -256,6 +286,7 @@ try {
               leading: Number.parseFloat(style.lineHeight), tracking: Number.parseFloat(style.letterSpacing) };
           }),
           fieldBackground: field && getComputedStyle(field).backgroundImage,
+          fieldBackgroundSize: field && getComputedStyle(field).backgroundSize,
           material: document.querySelector('[data-hraness-material]')?.getAttribute('data-hraness-material') ?? null,
           headerBackdrop: headerInner && getComputedStyle(headerInner.closest('header')).backdropFilter,
           actionHeights: [...document.querySelectorAll('.hraness-marketing-action')].map((action) => action.getBoundingClientRect().height),
@@ -272,8 +303,31 @@ try {
       await deadline(cdp.detach(), 'Font inspection detach');
       item.metrics = metrics;
       item.assets = [...assets].sort();
+      assert.equal(metrics.reducedTransparency, false);
       assertPresentation(metrics, sample);
       if (sample.path === '/') {
+        item.textures = await assertWallAssets(context, metrics.fieldBackground, origin);
+        await applyMedia('reduce');
+        await page.waitForFunction(() => matchMedia('(prefers-reduced-transparency: reduce)').matches
+          && getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter === 'none'
+          && getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage === 'none');
+        item.reducedTransparency = await deadline(page.evaluate(() => ({
+          matches: matchMedia('(prefers-reduced-transparency: reduce)').matches,
+          headerBackdrop: getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter,
+          fieldBackground: getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage,
+        })), 'Reduced transparency metrics');
+        assert.deepEqual(item.reducedTransparency, { matches: true, headerBackdrop: 'none', fieldBackground: 'none' });
+        await applyMedia('no-preference');
+        await page.waitForFunction((expected) => !matchMedia('(prefers-reduced-transparency: reduce)').matches
+          && getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter === expected.headerBackdrop
+          && getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage === expected.fieldBackground,
+        { headerBackdrop: metrics.headerBackdrop, fieldBackground: metrics.fieldBackground });
+        const restored = await deadline(page.evaluate(() => ({
+          matches: matchMedia('(prefers-reduced-transparency: reduce)').matches,
+          headerBackdrop: getComputedStyle(document.querySelector('.hraness-marketing-header')).backdropFilter,
+          fieldBackground: getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage,
+        })), 'Restored transparency metrics');
+        assert.deepEqual(restored, { matches: false, headerBackdrop: metrics.headerBackdrop, fieldBackground: metrics.fieldBackground });
         const summary = page.locator('details summary').first();
         await summary.focus();
         await summary.press('Enter');

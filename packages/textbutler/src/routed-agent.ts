@@ -1,19 +1,30 @@
 import { basename } from "node:path";
-import { AgentRouter, assertQualified, type RuntimeQualification } from "../../agentrouter/src/runtime.ts";
-import { createPublicWeb } from "../../agentrouter/src/public-web.ts";
-import { createToolBroker, type PublicWeb } from "../../agentrouter/src/broker.ts";
-import { selectClassifierModel, type ModelCatalog } from "../../agentrouter/src/models.ts";
+import { AgentMixer, assertQualified, type RuntimeQualification } from "@hraness/agentmixer";
+import { createPublicWeb } from "@hraness/agentmixer";
+import { createToolBroker, type PublicWeb } from "@hraness/agentmixer";
+import { selectClassifierModel, type ModelCatalog } from "@hraness/agentmixer";
 import { parseActionIntent, type ActionIntent } from "../../transport/src/index.ts";
 import type { ContactSettings } from "./config.ts";
 import { CLASSIFIER_INSTRUCTIONS } from "./decision.ts";
 import type { AgentRequest, ButlerAgent } from "./runtime.ts";
 import { CONTACT_GUIDANCE, ContactWorkspace } from "./workspace.ts";
 import type { Hooks } from "./hooks.ts";
+import type { CapabilityBroker } from "@hraness/agentmixer";
+import type { AgentTaskRequest, AgentTaskResult, AgentTaskRoute, TaskRuntimeQualification } from "@hraness/agentmixer";
+import { contactCapabilityIdentity, createContactCapabilityBroker, type ButlerPurpose } from "./contact-capabilities.ts";
+import { boundedText, identifier } from "@hraness/agentmixer";
 
-export type ProviderSelection = Readonly<{ qualification: RuntimeQualification; modelCatalog: ModelCatalog; defaultReplyModel: string }>;
+type SelectionModels = Readonly<{ modelCatalog: ModelCatalog; defaultReplyModel: string }>;
+export type ProviderSelection = SelectionModels & (Readonly<{ kind?: "legacy"; qualification: RuntimeQualification }>
+  | Readonly<{ kind: "managed"; route: AgentTaskRoute; qualification: TaskRuntimeQualification }>);
+const TASK_LIMITS = Object.freeze({ maxRunMs: 120_000, maxCleanupMs: 15_000, maxOutputBytes: 256 * 1024 });
+const TASK_CONTROLS = ["noCommandTools", "exactToolInventory", "workspaceReadIsolation", "workspaceWriteIsolation",
+  "isolatedConfiguration", "authOutsideWorkspace", "hostBrokerOnly"] as const;
 export type RoutedAgentOptions = Readonly<{
-  router: AgentRouter;
-  selection: (contact: ContactSettings) => Promise<ProviderSelection>;
+  router: AgentMixer;
+  selection: (contact: ContactSettings, purpose: ButlerPurpose) => Promise<ProviderSelection>;
+  /** Trusted host owns account handoff and calls the existing runTask admission. */
+  runManagedTask?: (request: AgentTaskRequest, broker: CapabilityBroker) => Promise<AgentTaskResult>;
   getWorkspace: (contactId: string) => Promise<ContactWorkspace>;
   web?: PublicWeb;
   hooks?: Hooks;
@@ -21,24 +32,43 @@ export type RoutedAgentOptions = Readonly<{
   now?: () => number;
 }>;
 
+/** Readiness binds the purpose profile and model catalog; runTask still checks
+ * the actual installed adapter and original runtime lease at admission. */
+export function selectButlerModel(selection: ProviderSelection, contact: ContactSettings, purpose: ButlerPurpose,
+  at: number, managedAvailable: boolean): string {
+  if (selection.kind === "managed") {
+    const q = selection.qualification, expected = contactCapabilityIdentity(purpose);
+    identifier(selection.route.id);
+    if (!managedAvailable || contact.provider !== "codex" || selection.route.provider !== "codex" || selection.route.authentication !== "subscription"
+    || q.status !== "qualified" || !Number.isSafeInteger(q.expiresAt) || q.expiresAt < at + TASK_LIMITS.maxRunMs + TASK_LIMITS.maxCleanupMs
+    || typeof q.runtimeDigest !== "string" || !/^[a-f0-9]{64}$/u.test(q.runtimeDigest)
+    || typeof q.evidenceDigest !== "string" || !/^[a-f0-9]{64}$/u.test(q.evidenceDigest)
+    || q.route.id !== selection.route.id || q.route.provider !== selection.route.provider || q.route.authentication !== selection.route.authentication
+    || q.profile.id !== expected.id || q.profile.version !== expected.version || q.profile.digest !== expected.digest
+    || TASK_CONTROLS.some(control => q.controls[control] !== true)) throw Error("Managed contact route is unavailable");
+    boundedText(q.runtimeVersion, 160);
+  } else assertQualified(selection.qualification, at);
+  if (selection.modelCatalog.provider !== contact.provider) throw new Error("Provider catalog mismatch");
+  if (!Number.isSafeInteger(selection.modelCatalog.observedAt) || selection.modelCatalog.observedAt > at || selection.modelCatalog.observedAt < at - 86_400_000) throw new Error("Provider catalog is stale");
+  const model = purpose === "classify" ? contact.classifierModel ?? selectClassifierModel(selection.modelCatalog, at).id : contact.replyModel ?? selection.defaultReplyModel;
+  const observed = selection.modelCatalog.models.find(candidate => candidate.id === model && candidate.available && candidate.supportsStructuredOutput && (purpose !== "classify" || candidate.classifierEligible));
+  if (!observed) throw new Error("Selected model is unavailable for this purpose");
+  return model;
+}
+
 /** Textbutler is the first concrete consumer of the generic routing and tool ports.
  * This does not qualify any provider. The same router's exact adapter still gates execution. */
 export function createRoutedButlerAgent(options: RoutedAgentOptions): ButlerAgent {
   const now = options.now ?? Date.now;
   const web = options.web ?? createPublicWeb();
   const select = async (contact: ContactSettings, purpose: "classify" | "respond") => {
-    const selection = await options.selection(contact);
-    assertQualified(selection.qualification, now());
-    if (selection.modelCatalog.provider !== contact.provider) throw new Error("Provider catalog mismatch");
-    if (!Number.isSafeInteger(selection.modelCatalog.observedAt) || selection.modelCatalog.observedAt > now() || selection.modelCatalog.observedAt < now() - 86_400_000) throw new Error("Provider catalog is stale");
-    const model = purpose === "classify" ? contact.classifierModel ?? selectClassifierModel(selection.modelCatalog, now()).id : contact.replyModel ?? selection.defaultReplyModel;
-    const observed = selection.modelCatalog.models.find(candidate => candidate.id === model && candidate.available && candidate.supportsStructuredOutput && (purpose !== "classify" || candidate.classifierEligible));
-    if (!observed) throw new Error("Selected model is unavailable for this purpose");
-    return model;
+    const selection = await options.selection(contact, purpose);
+    const model = selectButlerModel(selection, contact, purpose, now(), options.runManagedTask !== undefined);
+    return { model, selection };
   };
   async function run(request: AgentRequest, purpose: "classify" | "respond"): Promise<unknown> {
     request.signal.throwIfAborted();
-    const model = await select(request.contact, purpose);
+    const { model, selection } = await select(request.contact, purpose);
     const workspace = await options.getWorkspace(request.contact.id);
     const active = () => !request.signal.aborted && options.isActive(request.contact.id, request.contact.revision);
     if (!active()) throw new Error("Contact run revoked");
@@ -56,7 +86,9 @@ export function createRoutedButlerAgent(options: RoutedAgentOptions): ButlerAgen
         async read(id, path, signal) { signal.throwIfAborted(); if (id !== request.contact.id || !active()) throw new Error("Workspace revoked"); return workspace.readVersioned(path); },
         async write(id, path, text, revision, signal) {
           signal.throwIfAborted(); if (id !== request.contact.id || !active()) throw new Error("Workspace revoked");
-          const written = await workspace.writeVersioned(path, text, revision);
+          const written = await workspace.writeVersioned(path, text, revision, () => {
+            signal.throwIfAborted(); if (!active()) throw new Error("Workspace revoked");
+          });
           try { await options.hooks?.emit("memory.updated", { contactId: id, runId: request.runId, eventId: request.event.id, signal, changedFile: Object.freeze({ path, revision: written.revision }) }); }
           catch { /* A post-write notification cannot undo committed memory or request a replay. */ }
           return written;
@@ -91,11 +123,20 @@ export function createRoutedButlerAgent(options: RoutedAgentOptions): ButlerAgen
     ])}\nReaction action is add or remove. Files must exist in this contact workspace before submission; use the file tools to create new text attachments. Links must be HTTPS, and message targets must come from this conversation. Capability support is determined by the host; these shapes are not a promise that a connected provider supports every action.` : "";
     const prompt = `${instructions}${actionContract}\n\nUntrusted contact context and message data:\n${JSON.stringify({ context, message: { id: request.event.id, author: request.event.author, at: request.event.occurredAt, text: request.event.text }, files: purpose === "respond" ? (await workspace.list()).map(file => file.path) : [] })}`;
     if (!active()) { broker.revoke(); throw new Error("Contact run revoked"); }
-    const result = await options.router.run({
-      runId: brokerRunId, provider: request.contact.provider, accountId: request.contact.accountId,
-      workspaceId: request.contact.id, model, purpose, signal: request.signal,
-      prompt,
-    }, broker);
+    let result: { output: unknown };
+    try {
+      if (selection.kind === "managed") {
+        const capabilities = createContactCapabilityBroker({ purpose, broker, signal: request.signal, isActive: active });
+        try {
+          const task = await options.runManagedTask!({ route: selection.route, accountId: request.contact.accountId,
+            workspaceId: request.contact.id, runId: brokerRunId, profile: contactCapabilityIdentity(purpose),
+            model: { id: model, reasoningEffort: null, serviceTier: null }, purpose, prompt, limits: TASK_LIMITS, signal: request.signal }, capabilities);
+          if (task.outcome.status !== "completed" || task.output === null) throw Error("Managed contact task did not complete");
+          result = task;
+        } finally { await capabilities.close(); }
+      } else result = await options.router.run({ runId: brokerRunId, provider: request.contact.provider, accountId: request.contact.accountId,
+        workspaceId: request.contact.id, model, purpose, signal: request.signal, prompt }, broker);
+    } finally { broker.revoke(); }
     if (!active()) throw new Error("Contact run revoked");
     if (purpose === "classify") return result.output;
     const parsed: unknown = typeof result.output === "string" ? JSON.parse(result.output) : result.output;

@@ -37,6 +37,7 @@ export const releaseRestRequestBudget: Readonly<{
   providerBaseline: number;
   providerOutcome: number;
   providerPromotion: number;
+  providerRecovery: number;
   surroundingRelease: number;
   total: number;
 }>;
@@ -113,7 +114,7 @@ export interface ProductionRequiredStatusDenialReceipt {
   readonly preconditionSha256: string;
   readonly previousSha: string;
   readonly productionRef: "refs/heads/website-production";
-  readonly repository: "hraness/message-like-me";
+  readonly repository: "hraness/textbutler";
   readonly rules: unknown;
   readonly schema: "message-like-me-production-required-status-denial-v3";
   readonly verifiedSha: string;

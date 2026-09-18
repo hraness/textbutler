@@ -303,7 +303,7 @@ test("tag releases use annotated-tag authority and split exact GitHub-first and 
   expect(npmPublisher).not.toContain("process.stdout.write");
   expect(npmPublisher).not.toContain("process.stderr.write");
   expect(npmProvenance).toContain('"audit",\n      "signatures"');
-  expect(npmProvenance).toContain('workflow.path !== ".github/workflows/release.yml"');
+  expect(npmProvenance).toContain("workflow.path !== coordinate.releasePackage.workflowPath");
   expect(npmProvenance).toContain("sourceDigest.gitCommit !== coordinate.verifiedSha");
   expect(npmProvenance).toContain("await verifyReleaseSigner(provenance.bundle");
   expect(npmProvenance).toContain("invocation: provenance.invocation");
@@ -321,6 +321,12 @@ test("tag releases use annotated-tag authority and split exact GitHub-first and 
   expect(publicAdmission).toContain("requiredAttempt: Number(npmCompletionRunAttempt)");
   expect(publicAdmission).toContain("maximumAttempt: Number(npmCompletionRunAttempt)");
   expect(githubAdmission).toContain("reviewed-main ancestry");
+  for (const admission of [githubAdmission, publicAdmission]) {
+    expect(admission).toContain("const maximumComparisonBytes = 8 * 1_024 * 1_024;");
+    expect(admission).toMatch(
+      /"GitHub reviewed-main ancestry",\n\s+(?:githubHeaders|headers),\n\s+maximumComparisonBytes,\n/u,
+    );
+  }
   expect(githubAdmission).toContain("releases/latest");
   expect(githubAdmission).toContain("GitHub Release bytes differ from the reviewed workflow artifact");
   expect(githubPublisher.match(/verifyRemoteAnnotatedTag\(\);/gu)).toHaveLength(2);
@@ -354,10 +360,10 @@ test("tag releases use annotated-tag authority and split exact GitHub-first and 
     expect(source).not.toContain(".head_commit");
   }
   for (const required of [
-    "https://github.com/hraness/message-like-me.git",
+    "https://github.com/hraness/textbutler.git",
     '["ls-remote", "--refs", REPOSITORY_URL, MAIN_REF]',
-    '["ls-remote", "--refs", "--tags", REPOSITORY_URL, "refs/tags/v*"]',
-    '"refs/tags/v*"',
+    '["ls-remote", "--refs", "--tags", REPOSITORY_URL, `refs/tags/${namespace}*`]',
+    '`refs/tags/${namespace}*`',
     '`${MAIN_REF}:${LOCAL_MAIN_REF}`',
     '`${localTagRef}:${localTagRef}`',
     '"--no-tags"',
@@ -813,7 +819,6 @@ test("workflow changes have one explicit code owner", async () => {
   expect(value).toBe(
     "/.github/workflows/** @0thernet\n" +
     "/.github/CODEOWNERS @0thernet\n" +
-    "/apps/macos/distribution/** @0thernet\n" +
     "/scripts/check-github-release.ts @0thernet\n" +
     "/scripts/check-npm-retry-state.ts @0thernet\n" +
     "/scripts/check-npm-trusted-publishing.ts @0thernet\n" +
@@ -918,7 +923,7 @@ test("publishing documents the exact App, environment, canary, and ref controls"
     "`Commit statuses: Read and write`",
     "exactly `statuses:write` plus `metadata:read`",
     "no `contents` or\n  `workflows` authority",
-    "{hraness/message-like-me}",
+    "{hraness/textbutler}",
     "GitHub Actions Integration `15368`",
     "message-like-me/website-production-authority",
     "GH013: Repository rule violations found for refs/heads/website-production.",

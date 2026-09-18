@@ -1,6 +1,6 @@
-import { constants } from "node:fs";
-import { lstat, open, realpath } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { lstat } from "node:fs/promises";
+import { assertOwnedPath, readOwnedFileStable } from "@hraness/local-custody/private-paths";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Hooks, validateExtension } from "./hooks.ts";
@@ -30,27 +30,24 @@ function manifest(value: unknown): readonly Entry[] {
   });
 }
 async function privateDirectory(path: string): Promise<void> {
-  const info = await lstat(path);
-  if (await realpath(path) !== path || !info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0) throw new Error("Extension directory must be physical, owned, and private");
+  try {
+    await assertOwnedPath(path, { kind: "directory", canonical: true, ownerOnly: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw error;
+    throw new Error("Extension directory must be physical, owned, and private", { cause: error });
+  }
 }
 async function readSource(path: string, maxBytes: number): Promise<Buffer> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
-    const before = await handle.stat();
-    if (!before.isFile() || before.nlink !== 1 || before.uid !== process.getuid?.() || (before.mode & 0o077) !== 0 || before.size > maxBytes) throw new Error("Extension file must be bounded, owned, private, and unlinked");
-    const bytes = Buffer.alloc(maxBytes + 1);
-    let size = 0;
-    while (size < bytes.length) {
-      const read = await handle.read(bytes, size, bytes.length - size, size);
-      if (read.bytesRead === 0) break;
-      size += read.bytesRead;
-    }
-    const after = await handle.stat(), current = await lstat(path);
-    if (size > maxBytes || size !== before.size || before.dev !== current.dev || before.ino !== current.ino || current.isSymbolicLink() || after.nlink !== 1 || after.mode !== before.mode || after.uid !== before.uid || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) throw new Error("Extension file changed during loading");
+    const bytes = await readOwnedFileStable(path, maxBytes);
     // Reject malformed UTF-8 before an importer can execute the source.
-    new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, size));
-    return bytes.subarray(0, size);
-  } finally { await handle.close(); }
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return bytes;
+  } catch (error) {
+    if (error instanceof Error && error.message === "Private file changed during the read.") throw new Error("Extension file changed during loading");
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw error;
+    throw new Error("Extension file must be bounded, owned, private, and unlinked", { cause: error });
+  }
 }
 
 /** Explicit owner-installed application code, never a model or message plugin.

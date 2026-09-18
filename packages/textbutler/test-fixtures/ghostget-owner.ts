@@ -5,8 +5,12 @@ import { join } from "node:path";
 const args = process.argv.slice(2), operation = args[2], authId = args[args.indexOf("--auth") + 1];
 const input = JSON.parse(await Bun.stdin.text());
 const directory = process.env.GHOSTGET_STATE_HOME!;
-appendFileSync(join(directory, "calls.jsonl"), JSON.stringify({ args, input, runtimeArgs: process.execArgv }) + "\n", { mode: 0o600 });
-if (authId === "slow") await Bun.sleep(10_000);
+appendFileSync(join(directory, "calls.jsonl"), JSON.stringify({ args, input, runtimeArgs: process.execArgv, supportAudience: process.env.HRANESS_SUPPORT_AUDIENCE, supportEmail: process.env.HRANESS_SUPPORT_EMAIL }) + "\n", { mode: 0o600 });
+if (authId === "slow") {
+  // Acknowledge the completed call record before a test interrupts this process.
+  writeFileSync(join(directory, "slow-ready"), "ready\n", { mode: 0o600 });
+  await Bun.sleep(10_000);
+}
 if (authId === "graceful" && !args.includes("--projection-identity-only")) {
   const child = spawn(process.execPath, ["--no-env-file", "-e", "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"], { detached: true, stdio: "ignore", env: { PATH: "/usr/bin:/bin" } });
   await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });

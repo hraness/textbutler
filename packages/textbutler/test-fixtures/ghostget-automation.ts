@@ -1,6 +1,8 @@
 import { basename } from "node:path";
 import { AUTOMATION_PROTOCOL } from "../../transport/src/automation-contract.ts";
 
+// Every successful synthetic handshake proves the real delegated child is quiet.
+if (process.env.HRANESS_SUPPORT_AUDIENCE !== "off" || process.env.HRANESS_SUPPORT_EMAIL !== "off") process.exit(4);
 if (process.argv.slice(2).join(" ") !== "messaging automation serve --stdio") process.exit(2);
 const mode = basename(process.env.GHOSTGET_STATE_HOME ?? "normal");
 let buffer = "", sending: Record<string, unknown> | undefined;

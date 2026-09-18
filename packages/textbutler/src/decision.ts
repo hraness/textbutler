@@ -1,5 +1,5 @@
 import type { ContactSettings, Settings } from "./config.ts";
-import { parseClassification } from "../../agentrouter/src/models.ts";
+import { parseClassification } from "@hraness/agentmixer";
 
 export type MessageEvent = Readonly<{
   id: string;

@@ -6,7 +6,10 @@ import {
   parseGitHubRelease,
   parseNpmRelease,
   releaseArchiveName,
+  releaseDistribution,
+  releasePackageForName,
   releaseVersionForCurrentAdmission,
+  rootReleasePackage,
 } from "./release-distribution-policy";
 
 const version = "0.8.1";
@@ -27,7 +30,7 @@ function release(overrides: Readonly<Record<string, unknown>> = {}) {
   return {
     assets: [
       {
-        browser_download_url: `https://github.com/hraness/message-like-me/releases/download/v${version}/${releaseArchiveName(version)}`,
+        browser_download_url: `https://github.com/hraness/textbutler/releases/download/v${version}/${releaseArchiveName(version)}`,
         digest: `sha256:${tarballDigest}`,
         id: 1,
         name: releaseArchiveName(version),
@@ -35,7 +38,7 @@ function release(overrides: Readonly<Record<string, unknown>> = {}) {
         state: "uploaded",
       },
       {
-        browser_download_url: `https://github.com/hraness/message-like-me/releases/download/v${version}/SHA256SUMS`,
+        browser_download_url: `https://github.com/hraness/textbutler/releases/download/v${version}/SHA256SUMS`,
         digest: `sha256:${checksumDigest}`,
         id: 2,
         name: "SHA256SUMS",
@@ -73,6 +76,24 @@ describe("public release distribution policy", () => {
   test("derives the exact scoped npm pack filename", () => {
     expect(releaseArchiveName(version)).toBe("hraness-message-like-me-0.8.1.tgz");
     expect(() => releaseArchiveName("latest")).toThrow("release version");
+  });
+
+  test("binds the closed package descriptor to its own tag, archive, and manifest", () => {
+    expect(releasePackageForName("@hraness/message-like-me")).toBe(rootReleasePackage);
+    expect(() => releasePackageForName("@hraness/agentmixer")).toThrow("manifest identity");
+    expect(() => releasePackageForName("@hraness/other")).toThrow("manifest identity");
+    expect(() => releasePackageForName("message-like-me")).toThrow("manifest identity");
+    expect(() => releasePackageForName("constructor")).toThrow("manifest identity");
+    expect(() => releasePackageForName("hasOwnProperty")).toThrow("manifest identity");
+
+    const root = releaseDistribution(rootReleasePackage);
+    expect(root.releaseArchiveName(version)).toBe(releaseArchiveName(version));
+    expect(root.stableTag.exec(`v${version}`)?.[1]).toBe(version);
+    expect(root.stableTag.test(`agentmixer-v${version}`)).toBe(false);
+    expect(() => root.releaseVersionForCurrentAdmission({
+      license: "MIT",
+      name: "@hraness/message-like-me",
+    }, `agentmixer-v${version}`)).toThrow("canonical stable version");
   });
 
   test("requires MIT npm identity and public-repository provenance", () => {

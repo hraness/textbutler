@@ -104,12 +104,13 @@ export class ContactWorkspace {
     return { text, revision: createHash("sha256").update(text).digest("hex") };
   }
 
-  async writeVersioned(path: string, text: string, expectedRevision: string | null | undefined): Promise<{ revision: string }> {
+  async writeVersioned(path: string, text: string, expectedRevision: string | null | undefined, assertActive?: () => void): Promise<{ revision: string }> {
     if (typeof text !== "string" || Buffer.byteLength(text) > MAX_FILE_BYTES || text.includes("\0")) throw new Error("Invalid contact text");
     const destination = this.path(path);
     if (expectedRevision !== undefined && expectedRevision !== null && !/^[a-f0-9]{64}$/u.test(expectedRevision)) throw new Error("Invalid expected revision");
     const previous = ContactWorkspace.writers.get(destination) ?? Promise.resolve();
     const pending = previous.catch(() => {}).then(async () => {
+      assertActive?.();
       await this.checkParent(destination);
       let current: { text: string; revision: string } | null = null;
       try { current = await this.readVersioned(path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -128,6 +129,9 @@ export class ContactWorkspace {
         let latest: string | null = null;
         try { latest = (await this.readVersioned(path)).revision; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
         if (latest !== (current?.revision ?? null)) throw new Error("Contact file revision conflict");
+        // Recheck run authority after every staging/read wait and immediately
+        // before the atomic publication. Revocation discards only our stage.
+        assertActive?.();
         await rename(staged, destination);
       } catch (error) {
         await handle.close().catch(() => {});

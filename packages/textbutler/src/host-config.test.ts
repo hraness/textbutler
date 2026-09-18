@@ -49,9 +49,9 @@ test("provider config contains explicit routes and credential filenames, never c
   expect(() => parseHostConfig({ schemaVersion: 1, providerAccounts: [account, account] })).toThrow("Invalid private");
 });
 test("automation accounts explicitly select up to one configured account per messaging network", () => {
-  const ghostget = { executable: "/opt/ghostget", authId: "legacy", automationAccounts: [{ provider: "imessage" as const, authId: "messages" }, { provider: "whatsapp" as const, authId: "whatsapp" }] };
+  const ghostget = { executable: "/opt/ghostget", authId: "legacy", automationAccounts: [{ provider: "imessage" as const, authId: "messages" }, { provider: "whatsapp" as const, authId: "whatsapp" }, { provider: "beeper" as const, authId: "beeper-main" }] };
   expect(parseHostConfig({ schemaVersion: 1, ghostget }).ghostget?.automationAccounts).toEqual(ghostget.automationAccounts);
-  for (const automationAccounts of [[], [ghostget.automationAccounts[0], ghostget.automationAccounts[0]], [{ provider: "other", authId: "account" }], [{ provider: "whatsapp", authId: "account", credential: "never" }]]) {
+  for (const automationAccounts of [[], [ghostget.automationAccounts[0], ghostget.automationAccounts[0]], [{ provider: "other", authId: "account" }], [{ provider: "whatsapp", authId: "account", credential: "never" }], [...ghostget.automationAccounts, { provider: "beeper" as const, authId: "second-beeper" }]]) {
     expect(() => parseHostConfig({ schemaVersion: 1, ghostget: { ...ghostget, automationAccounts } })).toThrow("Invalid private");
   }
 });

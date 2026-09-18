@@ -3,7 +3,7 @@ import { existsSync, lstatSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 
-const REPOSITORY_URL = "https://github.com/hraness/message-like-me.git";
+const REPOSITORY_URL = "https://github.com/hraness/textbutler.git";
 const MAIN_BRANCH = "main";
 const MAIN_REF = `refs/heads/${MAIN_BRANCH}`;
 const LOCAL_MAIN_REF = `refs/remotes/origin/${MAIN_BRANCH}`;
@@ -141,12 +141,19 @@ function validTagRef(ref: string): boolean {
     && !name.endsWith(".lock");
 }
 
-function stableVersion(tag: string): readonly [bigint, bigint, bigint] | undefined {
+type StableVersion = Readonly<{ namespace: string; version: readonly [bigint, bigint, bigint] }>;
+
+/** A release tag carries the governed "v" namespace. Newest-tag admission
+ * compares only within the requested tag's own namespace. */
+function stableVersion(tag: string): StableVersion | undefined {
   const match = STABLE_TAG.exec(tag);
   if (match === null || match[1] === undefined || match[2] === undefined || match[3] === undefined) {
     return undefined;
   }
-  return Object.freeze([BigInt(match[1]), BigInt(match[2]), BigInt(match[3])]);
+  return Object.freeze({
+    namespace: "v",
+    version: Object.freeze([BigInt(match[1]), BigInt(match[2]), BigInt(match[3])]) as readonly [bigint, bigint, bigint],
+  });
 }
 
 function compareVersions(
@@ -233,11 +240,11 @@ export function parseRemoteSnapshot(
   for (const entry of parsed.entries) {
     if (!entry.ref.startsWith("refs/tags/")) continue;
     const tag = entry.ref.slice("refs/tags/".length);
-    const version = stableVersion(tag);
-    if (version === undefined) continue;
-    if (newestVersion === undefined || compareVersions(version, newestVersion) > 0) {
+    const stable = stableVersion(tag);
+    if (stable === undefined || stable.namespace !== requestedVersion.namespace) continue;
+    if (newestVersion === undefined || compareVersions(stable.version, newestVersion) > 0) {
       newestTag = tag;
-      newestVersion = version;
+      newestVersion = stable.version;
     }
   }
   if (newestTag !== requestedTag) {
@@ -290,9 +297,10 @@ function readSnapshot(runner: GitCommandRunner, requestedTag: string): GovernedR
     ["ls-remote", "--refs", REPOSITORY_URL, MAIN_REF],
     "Remote main-ref inventory",
   );
+  const namespace = stableVersion(requestedTag)?.namespace ?? fail("Requested release tag is not one canonical stable version.");
   const tags = command(
     runner,
-    ["ls-remote", "--refs", "--tags", REPOSITORY_URL, "refs/tags/v*"],
+    ["ls-remote", "--refs", "--tags", REPOSITORY_URL, `refs/tags/${namespace}*`],
     "Remote tag inventory",
   );
   return parseGovernedRemoteSnapshot(main, tags, requestedTag);
@@ -562,8 +570,8 @@ function main(): void {
       "Usage: release-ref-authority.ts release TAG | promotion TAG WORKFLOW_SHA [EXPECTED_RELEASE_SHA]",
     );
   }
-  if (process.env.GITHUB_REPOSITORY !== "hraness/message-like-me" || process.env.DEFAULT_BRANCH !== MAIN_BRANCH) {
-    fail("Release-ref authority must run for hraness/message-like-me on exact default branch main.");
+  if (process.env.GITHUB_REPOSITORY !== "hraness/textbutler" || process.env.DEFAULT_BRANCH !== MAIN_BRANCH) {
+    fail("Release-ref authority must run for hraness/textbutler on exact default branch main.");
   }
   const authority = verifyReleaseRefAuthority({
     mode,

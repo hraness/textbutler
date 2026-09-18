@@ -28,7 +28,7 @@ The fields are:
 | Field | Meaning |
 | --- | --- |
 | `id` | Stable local account ID, up to 80 letters, digits, `_` or `-`; start with a letter or digit. |
-| `label` | The account name shown in the app. |
+| `label` | The account name shown in the menu. |
 | `route` | Exactly `claude-api`. |
 | `credentialFile` | The filename inside `state/provider-credentials`, with no directory components. |
 | `replyModel` | Exact model ID available to this account. |
@@ -48,7 +48,7 @@ changing host configuration.
 
 ## Check and select the account
 
-With the daemon running, use **Setup → Agent accounts → Check account**, or run:
+With the daemon running, run:
 
 ```sh
 bun run textbutler providers list
@@ -58,14 +58,14 @@ bun run textbutler providers check ACCOUNT_ID
 The check verifies the exact runtime and credential, and queries Anthropic's
 Models API. It does not send a user prompt or make a paid model turn. A successful
 check lists the response and classifier models; it does not enable any contact
-or grant messaging authority. In the contact's **Behavior** settings, explicitly
-choose that Claude API account before enabling replies. API usage is billed
+or grant messaging authority. Account selection and contact activation require an explicit owner control
+client; they are not currently available in the menu. API usage is billed
 separately from coding-agent subscriptions.
 
 Model availability expires after 24 hours and is refreshed within the same
 credential generation. If the credential file changes, existing account proof
-is retired, affected work is cancelled, and another explicit **Check account**
-is required before the replacement can be used. The app shows only account
+is retired, affected work is cancelled, and another explicit provider check
+is required before the replacement can be used. The menu shows only account
 metadata, never key bytes or their private generation fingerprint. Shared
 account leases serialize use; unrelated contacts cannot inspect credentials or
 each other's folders.

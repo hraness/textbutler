@@ -1,11 +1,28 @@
 import { expect, test } from 'bun:test';
-import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserOwner,
+import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
   deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
 
 test('the native matrix covers four separate surfaces, both themes and touch', () => {
   const cases = browserCases();
   expect(cases).toHaveLength(16);
   expect(new Set(cases.map((item) => `${item.width}/${item.theme}${item.path}`)).size).toBe(16);
+});
+
+test('media fixtures isolate host transparency while preserving theme and reduced motion', () => {
+  for (const theme of ['light', 'dark']) {
+    const baseline = browserMediaFeatures(theme);
+    expect(baseline).toEqual([
+      { name: 'prefers-color-scheme', value: theme },
+      { name: 'prefers-reduced-motion', value: 'reduce' },
+      { name: 'forced-colors', value: 'none' },
+      { name: 'prefers-reduced-transparency', value: 'no-preference' },
+    ]);
+    expect(browserMediaFeatures(theme, 'reduce')).toEqual([
+      ...baseline.slice(0, -1), { name: 'prefers-reduced-transparency', value: 'reduce' },
+    ]);
+  }
+  expect(() => browserMediaFeatures('unknown')).toThrow();
+  expect(() => browserMediaFeatures('light', 'unknown')).toThrow();
 });
 
 test('browser children receive no inherited credentials or personal home', () => {
@@ -37,7 +54,7 @@ test('only preview script and manifest blocks from the verified restrictive CSP 
     { resourceType: 'stylesheet' }, { resourceType: 'fetch' }, { resourceType: 'document' }, { resourceType: 'other' },
     { url: valid.url + '?other=1' }, { url: origin + '/_next/static/chunks/unknown.js' },
     { url: policy.origin + '/script.js' }, { url: 'https://example.com/_next/static/chunks/a.js' },
-    { resourceType: 'image', url: policy.origin + '/icon.svg' }]) {
+    { resourceType: 'image', url: policy.origin + '/icon.png' }]) {
     expect(isPreviewPolicyBlock({ ...valid, ...change }, policy)).toBe(false);
   }
   expect(isPreviewPolicyBlock(valid, { ...policy, verifiedCsp: false })).toBe(false);
@@ -135,11 +152,11 @@ test('presentation admission rejects missing atoms, fallback fonts, collection a
     sections: Array.from({ length: 7 }, () => ({ font: '"Instrument Serif", serif', weight: '400', size: 52, leading: 56.16, tracking: -1.04 })),
     summarySize: 17, summaryLeading: 27.2, workspaceInk: 'rgb(28, 25, 23)', bodyInk: 'rgb(28, 25, 23)',
     workspaceBackground: 'rgb(255, 253, 249)', frameBackground: 'rgb(255, 253, 249)',
-    actionHeights: [42, 42, 42, 42, 42], actionRadii: ['4px'], fieldBackground: 'repeating-linear-gradient(red, blue), repeating-linear-gradient(red, blue), radial-gradient(red, blue), linear-gradient(red, blue)' };
+    actionHeights: [42, 42, 42, 42, 42], actionRadii: ['8px'], fieldBackground: 'url("/grain.svg"), url("/cells.svg"), radial-gradient(red, blue), linear-gradient(red, blue)', fieldBackgroundSize: '64px 64px, 768px 768px, 100% 100%, 100% 100%' };
   expect(() => assertPresentation(valid, sample)).not.toThrow();
   for (const change of [{ layers: [] }, { renderedFonts: [] }, { fontWeights: [] }, { forms: 1 },
-    { material: null }, { headerBackdrop: 'none' }, { fieldBackground: 'linear-gradient(red, blue)' },
-    { preset: null }, { headingSize: 68 }, { headerMinHeight: '56px' }, { actionRadii: ['10px'] },
+    { material: null }, { headerBackdrop: 'none' }, { fieldBackgroundSize: 'auto' }, { fieldBackground: 'linear-gradient(red, blue)' },
+    { preset: null }, { headingSize: 68 }, { headerMinHeight: '56px' }, { actionRadii: ['10px'] }, { actionRadii: ['4px'] },
     { sections: [] }, { workspaceInk: 'rgb(248, 247, 244)' }, { summaryLeading: 24.65 },
     { heroPadding: ['112px', '72px'] }, { gutter: '20px' }, { headerWidth: 1120 }]) {
     expect(() => assertPresentation({ ...valid, ...change }, sample)).toThrow();
