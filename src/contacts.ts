@@ -23,6 +23,7 @@ import {
   type ContactHandle,
   type ContactsSnapshot,
 } from "./types.ts";
+import { isolateContactsSource } from "./sqlite-snapshot.ts";
 
 export const DEFAULT_CONTACTS_DIRECTORY = join(
   homedir(),
@@ -51,7 +52,7 @@ const SNAPSHOT_ATTEMPTS = 5;
 type Binding = string | number | bigint | Uint8Array | null;
 type Row = Record<string, unknown>;
 
-type SourceFile = Readonly<{
+export type SourceFile = Readonly<{
   key: string;
   path: string;
   stats: BigIntStats;
@@ -63,7 +64,7 @@ type SnapshotMember = Readonly<{
   stats: BigIntStats;
 }>;
 
-type IsolatedSource = Readonly<{
+export type IsolatedSource = Readonly<{
   source: SourceFile;
   path: string;
   temporaryDirectory: string;
@@ -293,7 +294,7 @@ function sameMembers(left: readonly SnapshotMember[], right: readonly SnapshotMe
   });
 }
 
-function isolateSource(source: SourceFile, maximumBytes: number): IsolatedSource {
+export function isolateSource(source: SourceFile, maximumBytes: number): IsolatedSource {
   const temporaryRoot = tmpdir();
   if (!isAbsolute(temporaryRoot)) return fail("requires an absolute temporary directory");
   const temporaryDirectory = mkdtempSync(join(temporaryRoot, "message-like-me-contacts-"));
@@ -695,7 +696,7 @@ function readStore(
   maximumContacts: number,
   pageSize: number,
 ): StoreRead {
-  const isolated = isolateSource(source, maximumBytes);
+  const isolated = isolateContactsSource(source, maximumBytes);
   let database: Database | null = null;
   let transactionOpen = false;
   try {
