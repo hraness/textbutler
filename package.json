@@ -69,6 +69,9 @@
     "SECURITY.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "@hraness/oh": "https://github.com/hraness/oh/releases/download/v0.10.6/hraness-oh-0.10.6.tgz"
+  },
   "scripts": {
     "build": "bun scripts/build-dist.ts",
     "test": "bun test ./src ./scripts",
