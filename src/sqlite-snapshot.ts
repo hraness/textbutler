@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { emitOhRustFallback } from "@hraness/oh/rust-fallback";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -60,6 +61,7 @@ function temporaryDirectory(): string {
 export function isolateMessageSource(source: MessageSourceFile, maximumBytes: number): SourceSnapshot {
   const loader = loadOhLoader();
   if (loader === null) {
+    emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "loader-unavailable" });
     return isolateMessageSourceTs(source, maximumBytes);
   }
 
@@ -79,6 +81,7 @@ export function isolateMessageSource(source: MessageSourceFile, maximumBytes: nu
   } catch (error) {
     rmSync(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
+      emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "sidecar-missing" });
       return isolateMessageSourceTs(source, maximumBytes);
     }
     throw error;
@@ -93,6 +96,7 @@ export function isolateMessageSource(source: MessageSourceFile, maximumBytes: nu
 export function isolateContactsSource(source: ContactsSourceFile, maximumBytes: number): IsolatedSource {
   const loader = loadOhLoader();
   if (loader === null) {
+    emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "loader-unavailable" });
     return isolateContactsSourceTs(source, maximumBytes);
   }
 
@@ -112,6 +116,7 @@ export function isolateContactsSource(source: ContactsSourceFile, maximumBytes: 
   } catch (error) {
     rmSync(outputDirectory, { recursive: true, force: true });
     if (isSidecarMissingError(error)) {
+      emitOhRustFallback({ tag: "oh-sqlite-snapshot-fallback", reason: "sidecar-missing" });
       return isolateContactsSourceTs(source, maximumBytes);
     }
     throw error;

@@ -1,6 +1,8 @@
 import { fstatSync, readFileSync, readSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { emitOhRustFallback } from "@hraness/oh/rust-fallback";
+
 import {
   extractXArchiveFile,
   type ExtractedXArchiveMember,
@@ -24,7 +26,6 @@ const SELECTED_PATTERN =
 // TypeScript path without first copying their full bytes into linear memory.
 const MAX_WASM_ARCHIVE_BYTES = 512 * 1024 * 1024;
 const MAX_STRICT_ENTRIES = 100_000;
-const emittedFallbackNotices = new Set<string>();
 
 type StrictWasmExports = {
   memory: WebAssembly.Memory;
@@ -206,15 +207,7 @@ export function extractXArchiveFileRust(descriptor: number, archiveSize: number)
 
 /** Emit a non-fatal telemetry notice when the Rust engine falls back to TS. */
 export function emitXArchiveRustFallback(reason: "rust-read-failed" | "archive-too-large-or-no-artifact"): void {
-  if (emittedFallbackNotices.has(reason)) return;
-  emittedFallbackNotices.add(reason);
-  try {
-    if (typeof process !== "undefined" && process.stderr?.write) {
-      process.stderr.write(`[oh-archive-rust-fallback] ${reason}\n`);
-    }
-  } catch {
-    return;
-  }
+  emitOhRustFallback({ tag: "oh-archive-rust-fallback", reason });
 }
 
 /**
