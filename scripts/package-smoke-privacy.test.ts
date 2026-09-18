@@ -42,4 +42,19 @@ describe("packed public privacy boundary", () => {
       }
     }
   });
+
+  test("rejects WASM artifacts in the published package", async () => {
+    const wasm = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+    for (const name of ["vendor/oh-archive-strict/module.wasm", "dist/module.wasm", "module.wasm"]) {
+      const root = await fixture();
+      try {
+        const target = join(root, name);
+        await mkdir(join(target, ".."), { recursive: true });
+        await writeFile(target, wasm);
+        await expect(scanPackedPackage(root)).rejects.toThrow("unapproved public-package file type");
+      } finally {
+        await rm(root, { force: true, recursive: true });
+      }
+    }
+  });
 });
