@@ -15390,27 +15390,27 @@ function usageFailure(cause3) {
 import { lstat as lstat5 } from "fs/promises";
 
 // src/bundle.ts
-import { createHash as createHash2, createHmac as createHmac2 } from "crypto";
-import { constants as fsConstants2, createReadStream } from "fs";
+import { createHash as createHash3, createHmac as createHmac3 } from "crypto";
+import { constants as fsConstants3, createReadStream } from "fs";
 import { lstat, open, readdir, realpath } from "fs/promises";
-import { isAbsolute as isAbsolute2, join as join4, resolve as resolve2 } from "path";
+import { isAbsolute as isAbsolute4, join as join6, resolve as resolve3 } from "path";
 
 // src/contacts.ts
-import { Database } from "bun:sqlite";
-import { createHmac } from "crypto";
+import { Database as Database2 } from "bun:sqlite";
+import { createHmac as createHmac2 } from "crypto";
 import {
-  chmodSync,
-  constants as fsConstants,
-  copyFileSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
+  chmodSync as chmodSync2,
+  constants as fsConstants2,
+  copyFileSync as copyFileSync2,
+  lstatSync as lstatSync2,
+  mkdirSync as mkdirSync2,
+  mkdtempSync as mkdtempSync3,
   readdirSync,
-  realpathSync,
-  rmSync
+  realpathSync as realpathSync2,
+  rmSync as rmSync2
 } from "fs";
-import { homedir, tmpdir } from "os";
-import { basename, dirname, isAbsolute, join as join3, resolve } from "path";
+import { homedir as homedir2, tmpdir as tmpdir3 } from "os";
+import { basename as basename2, dirname, isAbsolute as isAbsolute3, join as join5, resolve as resolve2 } from "path";
 
 // src/message-bundle-v1-identity.ts
 var MESSAGE_BUNDLE_V1_SCHEMA_IDENTITY = 1;
@@ -15431,8 +15431,854 @@ var MESSAGE_BUNDLE_SCHEMA_VERSIONS = Object.freeze([
   MESSAGE_BUNDLE_V2_SCHEMA_IDENTITY
 ]);
 
+// src/sqlite-snapshot.ts
+import { createRequire } from "module";
+import { mkdtempSync as mkdtempSync2 } from "fs";
+import { tmpdir as tmpdir2 } from "os";
+import { isAbsolute as isAbsolute2, join as join4 } from "path";
+
+// src/imessage.ts
+import { Database } from "bun:sqlite";
+import { createHash as createHash2, createHmac } from "crypto";
+import {
+  chmodSync,
+  constants as fsConstants,
+  copyFileSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync
+} from "fs";
+import { homedir, tmpdir } from "os";
+import { basename, isAbsolute, join as join3, resolve } from "path";
+var DEFAULT_IMESSAGE_DATABASE = join3(homedir(), "Library", "Messages", "chat.db");
+var APPLE_EPOCH_MILLISECONDS = Date.UTC(2001, 0, 1);
+var DEFAULT_MAX_DATABASE_BYTES = 16 * 1024 * 1024 * 1024;
+var MAX_CONFIGURABLE_DATABASE_BYTES = 64 * 1024 * 1024 * 1024;
+var DEFAULT_MAX_MESSAGES = 5000000;
+var MAX_CONFIGURABLE_MESSAGES = 1e7;
+var DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+var MAX_CONFIGURABLE_BODY_BYTES = 16 * 1024 * 1024;
+var DEFAULT_MAX_ATTRIBUTED_BODY_BYTES = 8 * 1024 * 1024;
+var MAX_CONFIGURABLE_ATTRIBUTED_BODY_BYTES = 32 * 1024 * 1024;
+var DEFAULT_PAGE_SIZE = 5000;
+var MAX_PAGE_SIZE = 20000;
+var MAX_HANDLES = 1e6;
+var MAX_CHATS = 1e6;
+var MAX_CHAT_HANDLE_JOINS = 5000000;
+var MAX_TEXT_IDENTITY_BYTES = 4096;
+var MAX_SQLITE_SHM_BYTES = 64 * 1024 * 1024;
+var SOURCE_SNAPSHOT_ATTEMPTS = 5;
+var TYPEDSTREAM_MARKER = new TextEncoder().encode("streamtyped");
+var NSSTRING_MARKER = new TextEncoder().encode("NSString");
+var WARNING_LABELS = Object.freeze([
+  { category: "spamOrCorrupt", label: "excluded spam or corrupt messages" },
+  { category: "unsupportedTimestamp", label: "excluded messages with unsupported timestamps" },
+  { category: "missingConversation", label: "excluded messages without conversations" },
+  {
+    category: "multipleConversations",
+    label: "messages joined to multiple conversations (lowest chat ROWID selected)"
+  },
+  {
+    category: "missingSenderHandle",
+    label: "incoming messages referencing missing sender handles"
+  },
+  {
+    category: "unsupportedAttributedBody",
+    label: "unsupported or over-bound attributed bodies"
+  }
+]);
+function fail10(message) {
+  throw new Error(`iMessage source ${message}`);
+}
+function stableJson(value) {
+  if (value === null || typeof value !== "object")
+    return JSON.stringify(value);
+  if (Array.isArray(value))
+    return `[${value.map(stableJson).join(",")}]`;
+  const record = value;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
+}
+function sha2562(value) {
+  return createHash2("sha256").update(value).digest("hex");
+}
+function hmac(key, namespace, value) {
+  return createHmac("sha256", key).update(`message-like-me\x00${namespace}\x00`, "utf8").update(value, "utf8").digest("hex");
+}
+function hmacKey(value) {
+  const key = typeof value === "string" ? new TextEncoder().encode(value) : value;
+  if (!(key instanceof Uint8Array) || key.byteLength < 16 || key.byteLength > 1024) {
+    throw new Error("iMessage HMAC key must contain 16 through 1024 bytes");
+  }
+  return Uint8Array.from(key);
+}
+function boundedInteger(value, fallback, minimum, maximum, label) {
+  const result = value ?? fallback;
+  if (!Number.isSafeInteger(result) || result < minimum || result > maximum) {
+    throw new Error(`${label} must be an integer from ${minimum} through ${maximum}`);
+  }
+  return result;
+}
+function ownedByCurrentUser(stats) {
+  return typeof process.getuid !== "function" || stats.uid === BigInt(process.getuid());
+}
+function sameFile(left3, right3) {
+  return left3.dev === right3.dev && left3.ino === right3.ino;
+}
+function inspectSource(path, maximumBytes) {
+  if (!isAbsolute(path))
+    return fail10("path must be absolute");
+  const requested = resolve(path);
+  const requestedStats = lstatSync(requested, { bigint: true });
+  if (!requestedStats.isFile() || requestedStats.isSymbolicLink() || requestedStats.nlink !== 1n || !ownedByCurrentUser(requestedStats) || requestedStats.size < 1n || requestedStats.size > BigInt(maximumBytes)) {
+    return fail10("must be one current-user-owned regular non-symlink file within the configured size bound");
+  }
+  const physicalPath = realpathSync(requested);
+  const physicalStats = lstatSync(physicalPath, { bigint: true });
+  if (!sameFile(requestedStats, physicalStats)) {
+    return fail10("changed identity while its path was resolved");
+  }
+  return Object.freeze({ path: physicalPath, stats: physicalStats });
+}
+function optionalStats(path) {
+  try {
+    return lstatSync(path, { bigint: true });
+  } catch (error) {
+    if (error.code === "ENOENT")
+      return null;
+    throw error;
+  }
+}
+function validateSidecar(path, stats, maximumBytes) {
+  if (!stats.isFile() || stats.isSymbolicLink() || stats.nlink !== 1n || !ownedByCurrentUser(stats) || stats.size < 0n || stats.size > BigInt(maximumBytes)) {
+    return fail10(`sidecar ${basename(path)} must be one current-user-owned regular non-symlink file within its size bound`);
+  }
+}
+function snapshotMembers(source, maximumBytes) {
+  const current = inspectSource(source.path, maximumBytes);
+  if (!sameFile(source.stats, current.stats))
+    return fail10("changed identity before its snapshot was isolated");
+  const members = [{ suffix: "", path: current.path, stats: current.stats }];
+  for (const suffix of ["-wal", "-journal"]) {
+    const path = `${source.path}${suffix}`;
+    const stats = optionalStats(path);
+    if (stats === null)
+      continue;
+    validateSidecar(path, stats, maximumBytes);
+    members.push(Object.freeze({ suffix, path, stats }));
+  }
+  const shmPath = `${source.path}-shm`;
+  const shm = optionalStats(shmPath);
+  if (shm !== null)
+    validateSidecar(shmPath, shm, MAX_SQLITE_SHM_BYTES);
+  const totalBytes = members.reduce((total, member) => total + member.stats.size, 0n);
+  if (totalBytes > BigInt(maximumBytes) * 2n) {
+    return fail10("database and transactional sidecars exceed the configured snapshot size bound");
+  }
+  return Object.freeze(members);
+}
+function sameSnapshotMembers(left3, right3) {
+  return left3.length === right3.length && left3.every((member, index) => {
+    const other = right3[index];
+    return other !== undefined && member.suffix === other.suffix && sameFile(member.stats, other.stats) && member.stats.size === other.stats.size && member.stats.mtimeNs === other.stats.mtimeNs && member.stats.ctimeNs === other.stats.ctimeNs;
+  });
+}
+function isolateSource(source, maximumBytes) {
+  const temporaryRoot = tmpdir();
+  if (!isAbsolute(temporaryRoot))
+    return fail10("requires an absolute temporary directory");
+  const temporaryDirectory = mkdtempSync(join3(temporaryRoot, "message-like-me-source-"));
+  chmodSync(temporaryDirectory, 448);
+  try {
+    for (let attempt = 0;attempt < SOURCE_SNAPSHOT_ATTEMPTS; attempt += 1) {
+      const before2 = snapshotMembers(source, maximumBytes);
+      const attemptDirectory = join3(temporaryDirectory, `attempt-${attempt}`);
+      mkdirSync(attemptDirectory, { mode: 448 });
+      let copyFailedForRace = false;
+      try {
+        for (const member of before2) {
+          const destination = join3(attemptDirectory, `${basename(source.path)}${member.suffix}`);
+          copyFileSync(member.path, destination, fsConstants.COPYFILE_EXCL | fsConstants.COPYFILE_FICLONE);
+          chmodSync(destination, 384);
+        }
+      } catch (error) {
+        const code = error.code;
+        if (code === "ENOENT" || code === "ESTALE")
+          copyFailedForRace = true;
+        else
+          throw error;
+      }
+      const after3 = snapshotMembers(source, maximumBytes);
+      if (!copyFailedForRace && sameSnapshotMembers(before2, after3)) {
+        return Object.freeze({
+          source: Object.freeze({ path: source.path, stats: before2[0].stats }),
+          path: join3(attemptDirectory, basename(source.path)),
+          temporaryDirectory
+        });
+      }
+      rmSync(attemptDirectory, { recursive: true, force: true });
+    }
+    return fail10(`changed during ${SOURCE_SNAPSHOT_ATTEMPTS} attempts to isolate a consistent snapshot`);
+  } catch (error) {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+    throw error;
+  }
+}
+function allRows(database, sql, ...bindings) {
+  return database.query(sql).all(...bindings);
+}
+function getRow(database, sql, ...bindings) {
+  return database.query(sql).get(...bindings);
+}
+function safeInteger(value, label, nullable = false) {
+  if (nullable && value === null)
+    return null;
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+    return fail10(`${label} must be a safe integer`);
+  }
+  return value;
+}
+function flag(value, label, fallback = 0) {
+  if (value === null)
+    return fallback;
+  const parsed = safeInteger(value, label);
+  if (parsed !== 0 && parsed !== 1)
+    return fail10(`${label} must be zero or one`);
+  return parsed;
+}
+function privateText(value, label, nullable = false, allowEmpty = false) {
+  if (nullable && value === null)
+    return null;
+  if (typeof value !== "string" || !allowEmpty && value.length === 0 || Buffer.byteLength(value, "utf8") > MAX_TEXT_IDENTITY_BYTES || value.includes("\x00"))
+    return fail10(`${label} must be bounded text`);
+  return value;
+}
+function bodyText(value, label, maximumBytes) {
+  if (value === null)
+    return null;
+  if (typeof value !== "string")
+    return fail10(`${label} must be text or null`);
+  if (Buffer.byteLength(value, "utf8") > maximumBytes) {
+    return fail10(`${label} exceeds the configured body bound`);
+  }
+  return value;
+}
+function blob(value, label) {
+  if (value === null)
+    return null;
+  if (value instanceof Uint8Array)
+    return Uint8Array.from(value);
+  return fail10(`${label} must be binary data or null`);
+}
+function tableColumns(database, table) {
+  return allRows(database, `SELECT cid,name,type,"notnull",dflt_value,pk FROM pragma_table_info('${table}') ORDER BY cid`).map((row) => Object.freeze({
+    cid: safeInteger(row.cid, `${table} column ordinal`),
+    name: privateText(row.name, `${table} column name`),
+    type: privateText(row.type, `${table} column type`, false, true),
+    notnull: safeInteger(row.notnull, `${table} column nullability`),
+    dflt_value: row.dflt_value,
+    pk: safeInteger(row.pk, `${table} column primary-key position`)
+  }));
+}
+function tableNames(database) {
+  return new Set(allRows(database, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").map((row) => privateText(row.name, "table name")));
+}
+function inspectSchema(database) {
+  const names = tableNames(database);
+  const required = Object.freeze({
+    message: ["ROWID", "guid", "service", "handle_id", "date", "is_from_me"],
+    handle: ["ROWID", "id", "service"],
+    chat: ["ROWID", "guid", "style"],
+    chat_message_join: ["chat_id", "message_id"],
+    chat_handle_join: ["chat_id", "handle_id"]
+  });
+  const inspected = new Map;
+  const sets = new Map;
+  for (const [table, columns] of Object.entries(required)) {
+    if (!names.has(table))
+      return fail10(`is missing required table ${table}`);
+    const shape = tableColumns(database, table);
+    const set7 = new Set(shape.map((column) => column.name));
+    for (const column of columns) {
+      if (!set7.has(column))
+        return fail10(`${table} is missing required column ${column}`);
+    }
+    inspected.set(table, shape);
+    sets.set(table, set7);
+  }
+  const messageColumns = sets.get("message");
+  if (messageColumns === undefined || !messageColumns.has("text") && !messageColumns.has("attributedBody")) {
+    return fail10("message must expose text or attributedBody");
+  }
+  let hasAttachmentJoin = false;
+  if (names.has("message_attachment_join")) {
+    const shape = tableColumns(database, "message_attachment_join");
+    const set7 = new Set(shape.map((column) => column.name));
+    for (const column of ["message_id", "attachment_id"]) {
+      if (!set7.has(column))
+        return fail10(`message_attachment_join is missing required column ${column}`);
+    }
+    inspected.set("message_attachment_join", shape);
+    sets.set("message_attachment_join", set7);
+    hasAttachmentJoin = true;
+  }
+  const serialized = [...inspected.entries()].sort(([left3], [right3]) => left3.localeCompare(right3, "en-US")).map(([table, columns]) => ({ table, columns }));
+  return Object.freeze({ hash: sha2562(stableJson(serialized)), tables: sets, hasAttachmentJoin });
+}
+function boundedTableCount(database, table, maximum) {
+  const row = getRow(database, `SELECT count(*) AS value FROM ${table}`);
+  const count = safeInteger(row?.value, `${table} row count`);
+  if (count === null || count < 0 || count > maximum) {
+    return fail10(`${table} exceeds its supported row bound`);
+  }
+  return count;
+}
+function indexOfBytes(haystack, needle, start3) {
+  const last2 = haystack.byteLength - needle.byteLength;
+  for (let offset = Math.max(0, start3);offset <= last2; offset += 1) {
+    let match14 = true;
+    for (let index = 0;index < needle.byteLength; index += 1) {
+      if (haystack[offset + index] !== needle[index]) {
+        match14 = false;
+        break;
+      }
+    }
+    if (match14)
+      return offset;
+  }
+  return -1;
+}
+function typedstreamLength(bytes, offset, maximum) {
+  const marker = bytes[offset];
+  if (marker === undefined)
+    return null;
+  if (marker <= 127) {
+    return marker <= maximum ? Object.freeze({ length: marker, next: offset + 1 }) : null;
+  }
+  const width = marker === 129 ? 2 : marker === 130 ? 4 : marker === 131 ? 8 : 0;
+  if (width === 0 || offset + 1 + width > bytes.byteLength)
+    return null;
+  let length2 = 0n;
+  for (let index = width - 1;index >= 0; index -= 1) {
+    length2 = length2 << 8n | BigInt(bytes[offset + 1 + index]);
+  }
+  if (length2 > BigInt(maximum) || length2 > BigInt(Number.MAX_SAFE_INTEGER))
+    return null;
+  return Object.freeze({ length: Number(length2), next: offset + 1 + width });
+}
+function decodeStringPayload(payload) {
+  try {
+    if (payload.byteLength >= 2 && payload[0] === 255 && payload[1] === 254) {
+      return new TextDecoder("utf-16le", { fatal: true }).decode(payload.subarray(2));
+    }
+    if (payload.byteLength >= 2 && payload[0] === 254 && payload[1] === 255) {
+      const swapped = new Uint8Array(payload.byteLength - 2);
+      for (let index = 2;index + 1 < payload.byteLength; index += 2) {
+        swapped[index - 2] = payload[index + 1];
+        swapped[index - 1] = payload[index];
+      }
+      if (swapped.byteLength % 2 !== 0)
+        return null;
+      return new TextDecoder("utf-16le", { fatal: true }).decode(swapped);
+    }
+    return new TextDecoder("utf-8", { fatal: true }).decode(payload);
+  } catch {
+    return null;
+  }
+}
+function decodeAttributedBody(value, maximumBlobBytes = DEFAULT_MAX_ATTRIBUTED_BODY_BYTES, maximumBodyBytes = DEFAULT_MAX_BODY_BYTES) {
+  if (!(value instanceof Uint8Array) || !Number.isSafeInteger(maximumBlobBytes) || !Number.isSafeInteger(maximumBodyBytes) || maximumBlobBytes < 1 || maximumBodyBytes < 1 || value.byteLength < TYPEDSTREAM_MARKER.byteLength || value.byteLength > maximumBlobBytes || indexOfBytes(value, TYPEDSTREAM_MARKER, 0) < 0)
+    return null;
+  let searchFrom = 0;
+  for (;; ) {
+    const marker = indexOfBytes(value, NSSTRING_MARKER, searchFrom);
+    if (marker < 0)
+      return null;
+    const markerEnd = marker + NSSTRING_MARKER.byteLength;
+    const end3 = Math.min(value.byteLength - 1, markerEnd + 32);
+    const preferredTag = markerEnd + 4;
+    const tagOffsets = [
+      ...preferredTag <= end3 ? [preferredTag] : [],
+      ...Array.from({ length: Math.max(0, end3 - markerEnd + 1) }, (_unused, index) => markerEnd + index).filter((offset) => offset !== preferredTag)
+    ];
+    for (const tagOffset of tagOffsets) {
+      if (value[tagOffset] !== 43)
+        continue;
+      const length2 = typedstreamLength(value, tagOffset + 1, maximumBodyBytes);
+      if (length2 === null || length2.next + length2.length > value.byteLength)
+        continue;
+      const decoded = decodeStringPayload(value.subarray(length2.next, length2.next + length2.length));
+      if (decoded !== null && !decoded.includes("\x00") && Buffer.byteLength(decoded, "utf8") <= maximumBodyBytes)
+        return decoded;
+    }
+    searchFrom = markerEnd;
+  }
+}
+function appleTimestamp(value) {
+  if (value === null || value === "" || value === "0")
+    return null;
+  let millisecondsSinceEpoch;
+  if (/^[0-9]+$/u.test(value)) {
+    const raw = BigInt(value);
+    if (raw <= 0n || raw > 4000000000000000000n)
+      return null;
+    if (raw < 4000000000n)
+      millisecondsSinceEpoch = Number(raw * 1000n);
+    else if (raw < 4000000000000n)
+      millisecondsSinceEpoch = Number(raw);
+    else if (raw < 4000000000000000n)
+      millisecondsSinceEpoch = Number(raw / 1000n);
+    else
+      millisecondsSinceEpoch = Number(raw / 1000000n);
+  } else if (/^[0-9]+\.[0-9]+$/u.test(value)) {
+    const seconds2 = Number(value);
+    if (!Number.isFinite(seconds2) || seconds2 <= 0 || seconds2 >= 4000000000)
+      return null;
+    millisecondsSinceEpoch = Math.trunc(seconds2 * 1000);
+  } else
+    return null;
+  if (!Number.isSafeInteger(millisecondsSinceEpoch))
+    return null;
+  const result = new Date(APPLE_EPOCH_MILLISECONDS + millisecondsSinceEpoch);
+  const year = result.getUTCFullYear();
+  return year >= 2001 && year <= 2200 ? result.toISOString() : null;
+}
+function hasAppleTimestampMarker(value) {
+  if (value === null || value === "")
+    return false;
+  return !/^0+(?:\.0+)?$/u.test(value);
+}
+function columnExpression(columns, column, expression, alias) {
+  return columns.has(column) ? `${expression} AS ${alias}` : `NULL AS ${alias}`;
+}
+function boundedTextExpression(columns, column, maximumBytes) {
+  if (!columns.has(column))
+    return "NULL AS message_text, 0 AS message_text_over_bound";
+  return `CASE WHEN ${column} IS NULL OR length(CAST(${column} AS BLOB)) <= ${maximumBytes}
+    THEN ${column} ELSE NULL END AS message_text,
+    CASE WHEN ${column} IS NOT NULL AND length(CAST(${column} AS BLOB)) > ${maximumBytes}
+    THEN 1 ELSE 0 END AS message_text_over_bound`;
+}
+function boundedBlobExpression(columns, column, maximumBytes) {
+  if (!columns.has(column)) {
+    return "NULL AS attributed_body, 0 AS attributed_body_over_bound";
+  }
+  return `CASE WHEN ${column} IS NULL OR length(${column}) <= ${maximumBytes}
+    THEN ${column} ELSE NULL END AS attributed_body,
+    CASE WHEN ${column} IS NOT NULL AND length(${column}) > ${maximumBytes}
+    THEN 1 ELSE 0 END AS attributed_body_over_bound`;
+}
+function loadHandles(database, key) {
+  boundedTableCount(database, "handle", MAX_HANDLES);
+  const result = new Map;
+  for (const row of allRows(database, "SELECT ROWID,id,service FROM handle ORDER BY ROWID")) {
+    const rowId = safeInteger(row.ROWID, "handle ROWID");
+    const id = privateText(row.id, "handle identity");
+    const service3 = privateText(row.service, "handle service", true);
+    if (result.has(rowId))
+      return fail10("contains duplicate handle ROWIDs");
+    result.set(rowId, Object.freeze({
+      rowId,
+      id,
+      service: service3,
+      participantId: hmac(key, "participant", `${service3 ?? ""}\x00${id}`)
+    }));
+  }
+  return result;
+}
+function loadChats(database, schema, handles, key) {
+  boundedTableCount(database, "chat", MAX_CHATS);
+  boundedTableCount(database, "chat_handle_join", MAX_CHAT_HANDLE_JOINS);
+  const handleIds = new Map;
+  for (const row of allRows(database, "SELECT chat_id,handle_id FROM chat_handle_join ORDER BY chat_id,handle_id")) {
+    const chatId = safeInteger(row.chat_id, "chat participant chat ID");
+    const handleId = safeInteger(row.handle_id, "chat participant handle ID");
+    if (!handles.has(handleId))
+      return fail10("chat participant references a missing handle");
+    const set7 = handleIds.get(chatId) ?? new Set;
+    set7.add(handleId);
+    handleIds.set(chatId, set7);
+  }
+  const columns = schema.tables.get("chat");
+  if (columns === undefined)
+    return fail10("chat schema disappeared");
+  const rows = allRows(database, `SELECT ROWID,guid,style,
+    ${columnExpression(columns, "display_name", "display_name", "display_name")},
+    ${columnExpression(columns, "service_name", "service_name", "service_name")}
+    FROM chat ORDER BY ROWID`);
+  const result = new Map;
+  const conversationIds = new Set;
+  for (const row of rows) {
+    const rowId = safeInteger(row.ROWID, "chat ROWID");
+    const sourceKey = privateText(row.guid, "chat GUID");
+    safeInteger(row.style, "chat style", true);
+    const privateLabel = privateText(row.display_name, "chat display name", true, true);
+    const declaredService = privateText(row.service_name, "chat service", true, true);
+    const participants = [...handleIds.get(rowId) ?? new Set].sort((left3, right3) => left3 - right3).map((handleId) => handles.get(handleId)).filter((handle) => handle !== undefined);
+    const services = [...new Set(participants.map((participant) => participant.service).filter((service3) => service3 !== null))].sort();
+    const conversation = Object.freeze({
+      id: hmac(key, "conversation", sourceKey),
+      sourceKey,
+      privateLabel,
+      service: declaredService === null || declaredService === "" ? services.length === 1 ? services[0] : null : declaredService,
+      participantCount: participants.length,
+      participantIds: Object.freeze(participants.map((participant) => participant.participantId)),
+      privateParticipants: Object.freeze(participants.map((participant) => participant.id)),
+      group: participants.length > 1
+    });
+    if (result.has(rowId) || conversationIds.has(conversation.id)) {
+      return fail10("contains duplicate chat identities");
+    }
+    result.set(rowId, Object.freeze({ rowId, conversation }));
+    conversationIds.add(conversation.id);
+  }
+  return result;
+}
+function loadChatJoins(database, first, last2) {
+  const grouped = new Map;
+  for (const row of allRows(database, `SELECT message_id,chat_id
+    FROM chat_message_join WHERE message_id BETWEEN ? AND ? ORDER BY message_id,chat_id`, first, last2)) {
+    const messageId = safeInteger(row.message_id, "chat-message message ID");
+    const chatId = safeInteger(row.chat_id, "chat-message chat ID");
+    const values3 = grouped.get(messageId) ?? new Set;
+    values3.add(chatId);
+    grouped.set(messageId, values3);
+  }
+  return new Map([...grouped.entries()].map(([messageId, values3]) => [
+    messageId,
+    Object.freeze([...values3].sort((left3, right3) => left3 - right3))
+  ]));
+}
+function loadAttachmentCounts(database, schema, first, last2) {
+  if (!schema.hasAttachmentJoin)
+    return new Map;
+  const result = new Map;
+  for (const row of allRows(database, `SELECT message_id,
+    count(DISTINCT attachment_id) AS value FROM message_attachment_join
+    WHERE message_id BETWEEN ? AND ? GROUP BY message_id ORDER BY message_id`, first, last2)) {
+    const messageId = safeInteger(row.message_id, "attachment message ID");
+    const count = safeInteger(row.value, "message attachment count");
+    if (count < 0)
+      return fail10("contains a negative attachment count");
+    result.set(messageId, count);
+  }
+  return result;
+}
+function messageRows(database, schema, afterRowId, pageSize, maximumBodyBytes, maximumAttributedBodyBytes) {
+  const columns = schema.tables.get("message");
+  if (columns === undefined)
+    return fail10("message schema disappeared");
+  const rows = allRows(database, `SELECT
+    ROWID AS source_rowid,guid,service,handle_id,CAST(date AS TEXT) AS date_text,is_from_me,
+    ${boundedTextExpression(columns, "text", maximumBodyBytes)},
+    ${boundedBlobExpression(columns, "attributedBody", maximumAttributedBodyBytes)},
+    ${columnExpression(columns, "item_type", "item_type", "item_type")},
+    ${columnExpression(columns, "associated_message_type", "associated_message_type", "associated_message_type")},
+    ${columnExpression(columns, "associated_message_guid", "associated_message_guid", "associated_message_guid")},
+    ${columnExpression(columns, "thread_originator_guid", "thread_originator_guid", "thread_originator_guid")},
+    ${columnExpression(columns, "reply_to_guid", "reply_to_guid", "reply_to_guid")},
+    ${columnExpression(columns, "is_system_message", "is_system_message", "is_system_message")},
+    ${columnExpression(columns, "is_service_message", "is_service_message", "is_service_message")},
+    ${columnExpression(columns, "is_spam", "is_spam", "is_spam")},
+    ${columnExpression(columns, "is_corrupt", "is_corrupt", "is_corrupt")},
+    ${columnExpression(columns, "date_edited", "CAST(date_edited AS TEXT)", "date_edited_text")},
+    ${columnExpression(columns, "date_retracted", "CAST(date_retracted AS TEXT)", "date_retracted_text")},
+    ${columnExpression(columns, "cache_has_attachments", "cache_has_attachments", "cache_has_attachments")}
+    FROM message WHERE ROWID>? ORDER BY ROWID LIMIT ?`, afterRowId, pageSize);
+  return rows.map((row) => Object.freeze({
+    sourceRowId: safeInteger(row.source_rowid, "message ROWID"),
+    sourceGuid: privateText(row.guid, "message GUID"),
+    service: privateText(row.service, "message service", true, true),
+    handleId: safeInteger(row.handle_id, "message sender handle ID", true),
+    dateText: privateText(row.date_text, "message date", true, true),
+    isFromMe: flag(row.is_from_me, "message direction"),
+    text: bodyText(row.message_text, "message text", maximumBodyBytes),
+    textOverBound: flag(row.message_text_over_bound, "message text bound flag"),
+    attributedBody: blob(row.attributed_body, "message attributed body"),
+    attributedBodyOverBound: flag(row.attributed_body_over_bound, "message attributed-body bound flag"),
+    itemType: row.item_type === null ? 0 : safeInteger(row.item_type, "message item type"),
+    associatedMessageType: row.associated_message_type === null ? 0 : safeInteger(row.associated_message_type, "message associated-message type"),
+    associatedMessageGuid: privateText(row.associated_message_guid, "associated message GUID", true, true),
+    threadOriginatorGuid: privateText(row.thread_originator_guid, "thread originator GUID", true, true),
+    replyToGuid: privateText(row.reply_to_guid, "reply-to GUID", true, true),
+    isSystemMessage: flag(row.is_system_message, "message system flag"),
+    isServiceMessage: flag(row.is_service_message, "message service flag"),
+    isSpam: flag(row.is_spam, "message spam flag"),
+    isCorrupt: flag(row.is_corrupt, "message corrupt flag"),
+    editedDateText: privateText(row.date_edited_text, "message edited date", true, true),
+    retractedDateText: privateText(row.date_retracted_text, "message retracted date", true, true),
+    cacheHasAttachments: flag(row.cache_has_attachments, "message attachment cache flag")
+  }));
+}
+function messageBody(row, maximumAttributedBodyBytes, maximumBodyBytes) {
+  if (row.text !== null)
+    return Object.freeze({ body: row.text, bodySource: "text" });
+  if (row.attributedBody !== null) {
+    const decoded = decodeAttributedBody(row.attributedBody, maximumAttributedBodyBytes, maximumBodyBytes);
+    if (decoded !== null)
+      return Object.freeze({ body: decoded, bodySource: "attributed-body" });
+  }
+  return Object.freeze({ body: null, bodySource: "unavailable" });
+}
+function messageKind(row, body, attachmentCount) {
+  if (row.associatedMessageType !== 0 || (row.associatedMessageGuid ?? "") !== "")
+    return "reaction";
+  if (row.itemType !== 0 || row.isSystemMessage !== 0 || row.isServiceMessage !== 0)
+    return "system";
+  if (body !== null)
+    return "text";
+  if (attachmentCount > 0 || row.cacheHasAttachments === 1)
+    return "attachment";
+  return "unknown";
+}
+function sourceModifiedAt(stats) {
+  const milliseconds = Number(stats.mtimeMs);
+  if (!Number.isFinite(milliseconds))
+    return fail10("has an invalid modification time");
+  return new Date(milliseconds).toISOString();
+}
+function aggregateWarnings(counts, hasAttachmentJoin) {
+  const warnings = [];
+  if (!hasAttachmentJoin) {
+    warnings.push("message_attachment_join is unavailable; attachment counts are presence lower bounds");
+  }
+  for (const { category, label } of WARNING_LABELS) {
+    const count = counts[category];
+    if (count > 0)
+      warnings.push(`${label}: ${count}`);
+  }
+  return Object.freeze(warnings);
+}
+function readIMessageDatabase(path, options) {
+  const key = hmacKey(options.hmacKey);
+  const maximumDatabaseBytes = boundedInteger(options.maxDatabaseBytes, DEFAULT_MAX_DATABASE_BYTES, 1, MAX_CONFIGURABLE_DATABASE_BYTES, "maxDatabaseBytes");
+  const maximumMessages = boundedInteger(options.maxMessages, DEFAULT_MAX_MESSAGES, 1, MAX_CONFIGURABLE_MESSAGES, "maxMessages");
+  const maximumBodyBytes = boundedInteger(options.maxBodyBytes, DEFAULT_MAX_BODY_BYTES, 1, MAX_CONFIGURABLE_BODY_BYTES, "maxBodyBytes");
+  const maximumAttributedBodyBytes = boundedInteger(options.maxAttributedBodyBytes, DEFAULT_MAX_ATTRIBUTED_BODY_BYTES, 1, MAX_CONFIGURABLE_ATTRIBUTED_BODY_BYTES, "maxAttributedBodyBytes");
+  const pageSize = boundedInteger(options.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE, "pageSize");
+  const requestedSource = inspectSource(path, maximumDatabaseBytes);
+  const isolated = isolateMessageSource(requestedSource, maximumDatabaseBytes);
+  const source = isolated.source;
+  let database = null;
+  let transactionOpen = false;
+  try {
+    database = new Database(isolated.path, { strict: true });
+    database.exec("PRAGMA trusted_schema=OFF; PRAGMA temp_store=MEMORY; PRAGMA mmap_size=0; PRAGMA query_only=ON");
+    const queryOnly = getRow(database, "PRAGMA query_only");
+    if (queryOnly?.query_only !== 1)
+      return fail10("could not enable query-only mode");
+    database.exec("BEGIN");
+    transactionOpen = true;
+    const schema = inspectSchema(database);
+    boundedTableCount(database, "message", maximumMessages);
+    const handles = loadHandles(database, key);
+    const chats = loadChats(database, schema, handles, key);
+    const warningCounts = {
+      spamOrCorrupt: 0,
+      unsupportedTimestamp: 0,
+      missingConversation: 0,
+      multipleConversations: 0,
+      missingSenderHandle: 0,
+      unsupportedAttributedBody: 0
+    };
+    const messages = [];
+    const messageIds = new Set;
+    let afterRowId = 0;
+    for (;; ) {
+      const page = messageRows(database, schema, afterRowId, pageSize, maximumBodyBytes, maximumAttributedBodyBytes);
+      if (page.length === 0)
+        break;
+      const first = page[0]?.sourceRowId;
+      const last2 = page.at(-1)?.sourceRowId;
+      if (first === undefined || last2 === undefined || first <= afterRowId || last2 < first) {
+        return fail10("message paging order is inconsistent");
+      }
+      const joins = loadChatJoins(database, first, last2);
+      const attachments = loadAttachmentCounts(database, schema, first, last2);
+      for (const row of page) {
+        const id = hmac(key, "message", row.sourceGuid);
+        if (messageIds.has(id))
+          return fail10("contains duplicate message GUIDs");
+        if (row.isSpam === 1 || row.isCorrupt === 1) {
+          warningCounts.spamOrCorrupt += 1;
+          continue;
+        }
+        if (row.textOverBound === 1) {
+          return fail10(`message text ${id} exceeds the configured body bound`);
+        }
+        if (row.attributedBodyOverBound === 1) {
+          return fail10(`attributed body ${id} exceeds the configured attributed-body bound`);
+        }
+        const sentAt = appleTimestamp(row.dateText);
+        if (sentAt === null) {
+          warningCounts.unsupportedTimestamp += 1;
+          continue;
+        }
+        const chatIds = joins.get(row.sourceRowId) ?? [];
+        const chatId = chatIds[0];
+        if (chatId === undefined) {
+          warningCounts.missingConversation += 1;
+          continue;
+        }
+        if (chatIds.length > 1) {
+          warningCounts.multipleConversations += 1;
+        }
+        const chat = chats.get(chatId);
+        if (chat === undefined)
+          return fail10("message references a missing chat");
+        if (row.isFromMe === 0 && row.handleId !== null && !handles.has(row.handleId)) {
+          warningCounts.missingSenderHandle += 1;
+        }
+        const decodedBody = messageBody(row, maximumAttributedBodyBytes, maximumBodyBytes);
+        if (row.text === null && row.attributedBody !== null && decodedBody.body === null) {
+          warningCounts.unsupportedAttributedBody += 1;
+        }
+        const attachmentCount = attachments.get(row.sourceRowId) ?? (row.cacheHasAttachments === 1 ? 1 : 0);
+        const kind = messageKind(row, decodedBody.body, attachmentCount);
+        const retractedAt = appleTimestamp(row.retractedDateText);
+        const retainBody = !hasAppleTimestampMarker(row.retractedDateText) && kind !== "reaction" && kind !== "system";
+        const body = retainBody ? decodedBody : Object.freeze({ body: null, bodySource: "unavailable" });
+        messages.push(Object.freeze({
+          id,
+          sourceRowId: row.sourceRowId,
+          sourceGuid: row.sourceGuid,
+          conversationId: chat.conversation.id,
+          sentAt,
+          direction: row.isFromMe === 1 ? "outgoing" : "incoming",
+          body: body.body,
+          bodySource: body.bodySource,
+          kind,
+          replyToSourceGuid: (row.threadOriginatorGuid || row.replyToGuid) ?? null,
+          replyState: row.threadOriginatorGuid || row.replyToGuid ? "explicit" : "none",
+          editedAt: appleTimestamp(row.editedDateText),
+          retractedAt,
+          service: row.service === "" ? null : row.service,
+          attachmentCount
+        }));
+        messageIds.add(id);
+      }
+      afterRowId = last2;
+    }
+    messages.sort((left3, right3) => {
+      const time = left3.sentAt.localeCompare(right3.sentAt, "en-US");
+      return time !== 0 ? time : left3.sourceRowId - right3.sourceRowId || left3.id.localeCompare(right3.id, "en-US");
+    });
+    const conversations = [...chats.values()].map((chat) => chat.conversation).sort((left3, right3) => left3.id.localeCompare(right3.id, "en-US"));
+    database.exec("COMMIT");
+    transactionOpen = false;
+    const snapshotSha256 = sha2562(stableJson({
+      schemaVersion: CORPUS_SCHEMA_VERSION,
+      schemaSha256: schema.hash,
+      conversations,
+      messages
+    }));
+    return Object.freeze({
+      schemaVersion: CORPUS_SCHEMA_VERSION,
+      source: Object.freeze({
+        physicalPath: source.path,
+        device: source.stats.dev.toString(),
+        inode: source.stats.ino.toString(),
+        bytes: Number(source.stats.size),
+        modifiedAt: sourceModifiedAt(source.stats),
+        schemaSha256: schema.hash,
+        snapshotSha256
+      }),
+      conversations: Object.freeze(conversations),
+      messages: Object.freeze(messages),
+      warnings: aggregateWarnings(warningCounts, schema.hasAttachmentJoin)
+    });
+  } finally {
+    if (transactionOpen && database !== null) {
+      try {
+        database.exec("ROLLBACK");
+      } catch {}
+    }
+    try {
+      database?.close();
+    } finally {
+      rmSync(isolated.temporaryDirectory, { recursive: true, force: true });
+    }
+  }
+}
+
+// src/sqlite-snapshot.ts
+var OH_SQLITE_SNAPSHOT_MODULE = "@hraness/oh/sqlite-snapshot";
+var require2 = createRequire(import.meta.url);
+function loadOhLoader() {
+  try {
+    const mod = require2(OH_SQLITE_SNAPSHOT_MODULE);
+    if (typeof mod.snapshotDatabaseSync !== "function")
+      return null;
+    return mod;
+  } catch {
+    return null;
+  }
+}
+function isSidecarMissingError(error) {
+  if (!(error instanceof Error))
+    return false;
+  return error.name === "SnapshotSidecarNotFoundError";
+}
+function temporaryDirectory() {
+  const root = tmpdir2();
+  if (!isAbsolute2(root))
+    throw new Error("temporary directory must be absolute");
+  return mkdtempSync2(join4(root, "textbutler-sqlite-snapshot-"));
+}
+function isolateMessageSource(source, maximumBytes) {
+  const loader = loadOhLoader();
+  if (loader === null) {
+    return isolateSource(source, maximumBytes);
+  }
+  const outputDirectory = temporaryDirectory();
+  try {
+    const snapshot = loader.snapshotDatabaseSync({
+      sourcePath: source.path,
+      outputDirectory,
+      maxFileBytes: maximumBytes,
+      maxTotalBytes: maximumBytes * 2
+    });
+    return Object.freeze({
+      source,
+      path: snapshot.databasePath,
+      temporaryDirectory: outputDirectory
+    });
+  } catch (error) {
+    if (isSidecarMissingError(error)) {
+      return isolateSource(source, maximumBytes);
+    }
+    throw error;
+  }
+}
+function isolateContactsSource(source, maximumBytes) {
+  const loader = loadOhLoader();
+  if (loader === null) {
+    return isolateSource2(source, maximumBytes);
+  }
+  const outputDirectory = temporaryDirectory();
+  try {
+    const snapshot = loader.snapshotDatabaseSync({
+      sourcePath: source.path,
+      outputDirectory,
+      maxFileBytes: maximumBytes,
+      maxTotalBytes: maximumBytes * 2
+    });
+    return Object.freeze({
+      source,
+      path: snapshot.databasePath,
+      temporaryDirectory: outputDirectory
+    });
+  } catch (error) {
+    if (isSidecarMissingError(error)) {
+      return isolateSource2(source, maximumBytes);
+    }
+    throw error;
+  }
+}
+
 // src/contacts.ts
-var DEFAULT_CONTACTS_DIRECTORY = join3(homedir(), "Library", "Application Support", "AddressBook");
+var DEFAULT_CONTACTS_DIRECTORY = join5(homedir2(), "Library", "Application Support", "AddressBook");
 var DATABASE_NAME = /^AddressBook-v[1-9][0-9]*\.abcddb$/u;
 var MAX_SOURCE_DATABASES = 64;
 var MAX_SOURCE_DATABASE_BYTES = 512 * 1024 * 1024;
@@ -15446,13 +16292,13 @@ var MAX_IDENTIFIER_BYTES = 1024;
 var MAX_LABEL_BYTES = 4096;
 var MAX_HANDLE_BYTES = 4096;
 var MAX_TOTAL_TEXT_BYTES = 128 * 1024 * 1024;
-var DEFAULT_PAGE_SIZE = 5000;
-var MAX_PAGE_SIZE = 20000;
+var DEFAULT_PAGE_SIZE2 = 5000;
+var MAX_PAGE_SIZE2 = 20000;
 var SNAPSHOT_ATTEMPTS = 5;
-function fail10(message) {
+function fail11(message) {
   throw new Error(`Contacts source ${message}`);
 }
-function boundedInteger(value, fallback, minimum, maximum, label) {
+function boundedInteger2(value, fallback, minimum, maximum, label) {
   const result = value ?? fallback;
   if (!Number.isSafeInteger(result) || result < minimum || result > maximum) {
     throw new Error(`${label} must be an integer from ${minimum} through ${maximum}`);
@@ -15466,18 +16312,18 @@ function keyBytes(value) {
   }
   return Uint8Array.from(bytes);
 }
-function hmac(key, namespace, value) {
-  return createHmac("sha256", key).update(`message-like-me\x00${namespace}\x00`, "utf8").update(value, "utf8").digest("hex");
+function hmac2(key, namespace, value) {
+  return createHmac2("sha256", key).update(`message-like-me\x00${namespace}\x00`, "utf8").update(value, "utf8").digest("hex");
 }
 function owned(stats) {
   return typeof process.getuid !== "function" || stats.uid === BigInt(process.getuid());
 }
-function sameFile(left3, right3) {
+function sameFile2(left3, right3) {
   return left3.dev === right3.dev && left3.ino === right3.ino;
 }
-function optionalStats(path) {
+function optionalStats2(path) {
   try {
-    return lstatSync(path, { bigint: true });
+    return lstatSync2(path, { bigint: true });
   } catch (error) {
     if (error.code === "ENOENT")
       return null;
@@ -15485,31 +16331,31 @@ function optionalStats(path) {
   }
 }
 function inspectDirectory(path, label) {
-  if (!isAbsolute(path))
-    return fail10(`${label} path must be absolute`);
-  const requested = resolve(path);
-  const before2 = lstatSync(requested, { bigint: true });
+  if (!isAbsolute3(path))
+    return fail11(`${label} path must be absolute`);
+  const requested = resolve2(path);
+  const before2 = lstatSync2(requested, { bigint: true });
   if (!before2.isDirectory() || before2.isSymbolicLink() || before2.nlink < 1n || !owned(before2)) {
-    return fail10(`${label} must be a current-user-owned physical directory`);
+    return fail11(`${label} must be a current-user-owned physical directory`);
   }
-  const physical = realpathSync(requested);
-  const after3 = lstatSync(physical, { bigint: true });
-  if (!sameFile(before2, after3))
-    return fail10(`${label} changed identity while resolving`);
+  const physical = realpathSync2(requested);
+  const after3 = lstatSync2(physical, { bigint: true });
+  if (!sameFile2(before2, after3))
+    return fail11(`${label} changed identity while resolving`);
   return physical;
 }
 function inspectDatabase(path, key, maximumBytes) {
-  if (!isAbsolute(path))
-    return fail10("database path must be absolute");
-  const requested = resolve(path);
-  const before2 = lstatSync(requested, { bigint: true });
+  if (!isAbsolute3(path))
+    return fail11("database path must be absolute");
+  const requested = resolve2(path);
+  const before2 = lstatSync2(requested, { bigint: true });
   if (!before2.isFile() || before2.isSymbolicLink() || before2.nlink !== 1n || !owned(before2) || before2.size < 1n || before2.size > BigInt(maximumBytes)) {
-    return fail10("database must be one current-user-owned regular non-symlink file within the configured size bound");
+    return fail11("database must be one current-user-owned regular non-symlink file within the configured size bound");
   }
-  const physical = realpathSync(requested);
-  const after3 = lstatSync(physical, { bigint: true });
-  if (!sameFile(before2, after3))
-    return fail10("database changed identity while resolving");
+  const physical = realpathSync2(requested);
+  const after3 = lstatSync2(physical, { bigint: true });
+  if (!sameFile2(before2, after3))
+    return fail11("database changed identity while resolving");
   return Object.freeze({ key, path: physical, stats: after3 });
 }
 function databaseInDirectory(directory, key, maximumBytes) {
@@ -15517,24 +16363,24 @@ function databaseInDirectory(directory, key, maximumBytes) {
   if (candidates.length === 0)
     return null;
   if (candidates.length !== 1)
-    return fail10("one source store contains multiple AddressBook databases");
+    return fail11("one source store contains multiple AddressBook databases");
   const name = candidates[0]?.name;
   if (name === undefined)
-    return fail10("one source store has no database name");
-  return inspectDatabase(join3(directory, name), key, maximumBytes);
+    return fail11("one source store has no database name");
+  return inspectDatabase(join5(directory, name), key, maximumBytes);
 }
 function databasesInSources(sourcesPath, maximumBytes) {
   const sources = inspectDirectory(sourcesPath, "Sources");
   const result = [];
   for (const entry of readdirSync(sources, { withFileTypes: true }).sort((left3, right3) => left3.name.localeCompare(right3.name, "en-US"))) {
     if (entry.isSymbolicLink())
-      return fail10("Sources must not contain symbolic-link stores");
+      return fail11("Sources must not contain symbolic-link stores");
     if (!entry.isDirectory())
       continue;
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(entry.name)) {
-      return fail10("source store directory name is invalid");
+      return fail11("source store directory name is invalid");
     }
-    const storeDirectory = inspectDirectory(join3(sources, entry.name), "source store");
+    const storeDirectory = inspectDirectory(join5(sources, entry.name), "source store");
     const source = databaseInDirectory(storeDirectory, entry.name, maximumBytes);
     if (source !== null)
       result.push(source);
@@ -15542,88 +16388,88 @@ function databasesInSources(sourcesPath, maximumBytes) {
   return result;
 }
 function discoverDatabases(path, maximumBytes) {
-  if (!isAbsolute(path))
-    return fail10("AddressBook path must be absolute");
-  const requested = resolve(path);
-  const identity3 = lstatSync(requested, { bigint: true });
+  if (!isAbsolute3(path))
+    return fail11("AddressBook path must be absolute");
+  const requested = resolve2(path);
+  const identity3 = lstatSync2(requested, { bigint: true });
   let result;
   if (identity3.isFile() || identity3.isSymbolicLink()) {
-    if (!DATABASE_NAME.test(basename(requested))) {
-      return fail10("explicit database must be named AddressBook-vN.abcddb");
+    if (!DATABASE_NAME.test(basename2(requested))) {
+      return fail11("explicit database must be named AddressBook-vN.abcddb");
     }
-    result = [inspectDatabase(requested, basename(dirname(requested)), maximumBytes)];
+    result = [inspectDatabase(requested, basename2(dirname(requested)), maximumBytes)];
   } else {
     const directory = inspectDirectory(requested, "AddressBook root");
-    if (basename(directory) === "Sources") {
+    if (basename2(directory) === "Sources") {
       result = databasesInSources(directory, maximumBytes);
     } else {
-      const sourcesStats = optionalStats(join3(directory, "Sources"));
-      result = sourcesStats === null ? [] : databasesInSources(join3(directory, "Sources"), maximumBytes);
+      const sourcesStats = optionalStats2(join5(directory, "Sources"));
+      result = sourcesStats === null ? [] : databasesInSources(join5(directory, "Sources"), maximumBytes);
       if (result.length === 0) {
-        const direct = databaseInDirectory(directory, basename(directory), maximumBytes);
+        const direct = databaseInDirectory(directory, basename2(directory), maximumBytes);
         result = direct === null ? [] : [direct];
       }
     }
   }
   result.sort((left3, right3) => left3.key.localeCompare(right3.key, "en-US"));
   if (result.length < 1)
-    return fail10("contains no supported AddressBook database");
+    return fail11("contains no supported AddressBook database");
   if (result.length > MAX_SOURCE_DATABASES)
-    return fail10("contains too many AddressBook databases");
+    return fail11("contains too many AddressBook databases");
   const total = result.reduce((bytes, source) => bytes + source.stats.size, 0n);
   if (total > BigInt(MAX_TOTAL_SOURCE_BYTES))
-    return fail10("databases exceed the aggregate source size bound");
+    return fail11("databases exceed the aggregate source size bound");
   return Object.freeze(result);
 }
-function validateSidecar(path, stats, maximumBytes) {
+function validateSidecar2(path, stats, maximumBytes) {
   if (!stats.isFile() || stats.isSymbolicLink() || stats.nlink !== 1n || !owned(stats) || stats.size < 0n || stats.size > BigInt(maximumBytes))
-    return fail10(`sidecar ${basename(path)} is not a bounded current-user-owned physical file`);
+    return fail11(`sidecar ${basename2(path)} is not a bounded current-user-owned physical file`);
 }
-function snapshotMembers(source, maximumBytes) {
+function snapshotMembers2(source, maximumBytes) {
   const current = inspectDatabase(source.path, source.key, maximumBytes);
-  if (!sameFile(source.stats, current.stats))
-    return fail10("database changed identity before isolation");
+  if (!sameFile2(source.stats, current.stats))
+    return fail11("database changed identity before isolation");
   const members = [{ suffix: "", path: source.path, stats: current.stats }];
   for (const suffix of ["-wal", "-journal"]) {
     const sidecarPath = `${source.path}${suffix}`;
-    const stats = optionalStats(sidecarPath);
+    const stats = optionalStats2(sidecarPath);
     if (stats === null)
       continue;
-    validateSidecar(sidecarPath, stats, maximumBytes);
+    validateSidecar2(sidecarPath, stats, maximumBytes);
     members.push({ suffix, path: sidecarPath, stats });
   }
   const shmPath = `${source.path}-shm`;
-  const shm = optionalStats(shmPath);
+  const shm = optionalStats2(shmPath);
   if (shm !== null)
-    validateSidecar(shmPath, shm, MAX_SHM_BYTES);
+    validateSidecar2(shmPath, shm, MAX_SHM_BYTES);
   const total = members.reduce((bytes, member) => bytes + member.stats.size, 0n);
   if (total > BigInt(maximumBytes) * 2n)
-    return fail10("database and sidecars exceed the snapshot bound");
+    return fail11("database and sidecars exceed the snapshot bound");
   return Object.freeze(members);
 }
 function sameMembers(left3, right3) {
   return left3.length === right3.length && left3.every((member, index) => {
     const other = right3[index];
-    return other !== undefined && member.suffix === other.suffix && sameFile(member.stats, other.stats) && member.stats.size === other.stats.size && member.stats.mtimeNs === other.stats.mtimeNs && member.stats.ctimeNs === other.stats.ctimeNs;
+    return other !== undefined && member.suffix === other.suffix && sameFile2(member.stats, other.stats) && member.stats.size === other.stats.size && member.stats.mtimeNs === other.stats.mtimeNs && member.stats.ctimeNs === other.stats.ctimeNs;
   });
 }
-function isolateSource(source, maximumBytes) {
-  const temporaryRoot = tmpdir();
-  if (!isAbsolute(temporaryRoot))
-    return fail10("requires an absolute temporary directory");
-  const temporaryDirectory = mkdtempSync(join3(temporaryRoot, "message-like-me-contacts-"));
-  chmodSync(temporaryDirectory, 448);
+function isolateSource2(source, maximumBytes) {
+  const temporaryRoot = tmpdir3();
+  if (!isAbsolute3(temporaryRoot))
+    return fail11("requires an absolute temporary directory");
+  const temporaryDirectory2 = mkdtempSync3(join5(temporaryRoot, "message-like-me-contacts-"));
+  chmodSync2(temporaryDirectory2, 448);
   try {
     for (let attempt = 0;attempt < SNAPSHOT_ATTEMPTS; attempt += 1) {
-      const before2 = snapshotMembers(source, maximumBytes);
-      const attemptDirectory = join3(temporaryDirectory, `attempt-${attempt}`);
-      mkdirSync(attemptDirectory, { mode: 448 });
+      const before2 = snapshotMembers2(source, maximumBytes);
+      const attemptDirectory = join5(temporaryDirectory2, `attempt-${attempt}`);
+      mkdirSync2(attemptDirectory, { mode: 448 });
       let raced = false;
       try {
         for (const member of before2) {
-          const destination = join3(attemptDirectory, `${basename(source.path)}${member.suffix}`);
-          copyFileSync(member.path, destination, fsConstants.COPYFILE_EXCL | fsConstants.COPYFILE_FICLONE);
-          chmodSync(destination, 384);
+          const destination = join5(attemptDirectory, `${basename2(source.path)}${member.suffix}`);
+          copyFileSync2(member.path, destination, fsConstants2.COPYFILE_EXCL | fsConstants2.COPYFILE_FICLONE);
+          chmodSync2(destination, 384);
         }
       } catch (error) {
         const code = error.code;
@@ -15632,42 +16478,42 @@ function isolateSource(source, maximumBytes) {
         else
           throw error;
       }
-      const after3 = snapshotMembers(source, maximumBytes);
+      const after3 = snapshotMembers2(source, maximumBytes);
       if (!raced && sameMembers(before2, after3)) {
         return Object.freeze({
           source: Object.freeze({ ...source, stats: before2[0].stats }),
-          path: join3(attemptDirectory, basename(source.path)),
-          temporaryDirectory
+          path: join5(attemptDirectory, basename2(source.path)),
+          temporaryDirectory: temporaryDirectory2
         });
       }
-      rmSync(attemptDirectory, { recursive: true, force: true });
+      rmSync2(attemptDirectory, { recursive: true, force: true });
     }
-    return fail10(`changed during ${SNAPSHOT_ATTEMPTS} snapshot attempts`);
+    return fail11(`changed during ${SNAPSHOT_ATTEMPTS} snapshot attempts`);
   } catch (error) {
-    rmSync(temporaryDirectory, { recursive: true, force: true });
+    rmSync2(temporaryDirectory2, { recursive: true, force: true });
     throw error;
   }
 }
-function allRows(database, sql, ...bindings) {
+function allRows2(database, sql, ...bindings) {
   return database.query(sql).all(...bindings);
 }
-function getRow(database, sql, ...bindings) {
+function getRow2(database, sql, ...bindings) {
   return database.query(sql).get(...bindings);
 }
 function integer(value, label) {
   if (typeof value !== "number" || !Number.isSafeInteger(value))
-    return fail10(`${label} must be an integer`);
+    return fail11(`${label} must be an integer`);
   return value;
 }
-function flag(value, label) {
+function flag2(value, label) {
   const result = integer(value, label);
   if (result !== 0 && result !== 1)
-    return fail10(`${label} must be zero or one`);
+    return fail11(`${label} must be zero or one`);
   return result;
 }
 function boundedText2(value, label, maximumBytes) {
   if (typeof value !== "string" || value.includes("\x00") || Buffer.byteLength(value, "utf8") < 1 || Buffer.byteLength(value, "utf8") > maximumBytes)
-    return fail10(`${label} must be bounded text`);
+    return fail11(`${label} must be bounded text`);
   return value;
 }
 function privateLabel(parts2) {
@@ -15675,12 +16521,12 @@ function privateLabel(parts2) {
     if (value === null)
       return null;
     if (typeof value !== "string")
-      return fail10("contact name field must be text or null");
+      return fail11("contact name field must be text or null");
     const normalized = value.normalize("NFKC").trim();
     if (normalized === "")
       return null;
     if (/\p{Cc}/u.test(normalized) || Buffer.byteLength(normalized, "utf8") > MAX_LABEL_BYTES) {
-      return fail10("contact label exceeds its text bound");
+      return fail11("contact label exceeds its text bound");
     }
     return normalized;
   });
@@ -15696,7 +16542,7 @@ function privateLabel(parts2) {
 function normalizeContactLabelQuery(value) {
   const normalized = value.normalize("NFKC").trim().toLocaleLowerCase("en-US");
   if (normalized.length < 1 || /\p{Cc}/u.test(normalized) || Buffer.byteLength(normalized, "utf8") > MAX_LABEL_BYTES)
-    return fail10("private label query must be bounded text");
+    return fail11("private label query must be bounded text");
   return normalized;
 }
 function normalizeEmail(value) {
@@ -15741,26 +16587,26 @@ function normalizeContactHandle(value) {
     normalizedValue: international ? `+${canonicalDigits}` : canonicalDigits
   });
 }
-function contactHandleMatchId(hmacKey, handle) {
-  return hmac(keyBytes(hmacKey), "contact-handle", `${handle.kind}\x00${handle.normalizedValue}`);
+function contactHandleMatchId(hmacKey2, handle) {
+  return hmac2(keyBytes(hmacKey2), "contact-handle", `${handle.kind}\x00${handle.normalizedValue}`);
 }
-function tableNames(database) {
-  const rows = allRows(database, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+function tableNames2(database) {
+  const rows = allRows2(database, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
   if (rows.length > MAX_TABLES)
-    return fail10("schema contains too many tables");
+    return fail11("schema contains too many tables");
   return new Set(rows.map((row) => boundedText2(row.name, "table name", 256)));
 }
-function tableColumns(database, table) {
-  const rows = allRows(database, "SELECT name FROM pragma_table_info(?) ORDER BY cid", table);
+function tableColumns2(database, table) {
+  const rows = allRows2(database, "SELECT name FROM pragma_table_info(?) ORDER BY cid", table);
   if (rows.length > MAX_COLUMNS_PER_TABLE)
-    return fail10(`${table} contains too many columns`);
+    return fail11(`${table} contains too many columns`);
   return rows.map((row) => boundedText2(row.name, `${table} column name`, 256));
 }
 function requireColumns(database, table, required) {
-  const columns = new Set(tableColumns(database, table));
+  const columns = new Set(tableColumns2(database, table));
   for (const column of required) {
     if (!columns.has(column))
-      return fail10(`${table} is missing required column ${column}`);
+      return fail11(`${table} is missing required column ${column}`);
   }
   return columns;
 }
@@ -15773,18 +16619,18 @@ function boundedColumn(columns, column, alias, maximumBytes) {
       THEN 1 ELSE 0 END AS ${alias}_over_bound`;
 }
 function countRows(database, table, maximum) {
-  const count = integer(getRow(database, `SELECT count(*) AS value FROM ${table}`)?.value, `${table} row count`);
+  const count = integer(getRow2(database, `SELECT count(*) AS value FROM ${table}`)?.value, `${table} row count`);
   if (count < 0 || count > maximum)
-    return fail10(`${table} exceeds its row bound`);
+    return fail11(`${table} exceeds its row bound`);
   return count;
 }
 function contactEntityIds(database, columns) {
-  const rows = allRows(database, `
+  const rows = allRows2(database, `
     SELECT Z_ENT,Z_NAME,${columns.has("Z_SUPER") ? "Z_SUPER" : "NULL AS Z_SUPER"}
     FROM Z_PRIMARYKEY ORDER BY Z_ENT
   `);
   if (rows.length > MAX_TABLES)
-    return fail10("Z_PRIMARYKEY exceeds its entity bound");
+    return fail11("Z_PRIMARYKEY exceeds its entity bound");
   const parsed = rows.map((row) => ({
     entity: integer(row.Z_ENT, "AddressBook entity ID"),
     name: boundedText2(row.Z_NAME, "AddressBook entity name", 256),
@@ -15792,7 +16638,7 @@ function contactEntityIds(database, columns) {
   }));
   const roots = parsed.filter((row) => row.name === "ABCDContact").map((row) => row.entity);
   if (roots.length !== 1 || roots[0] < 1)
-    return fail10("has no unique ABCDContact entity");
+    return fail11("has no unique ABCDContact entity");
   const result = new Set(roots);
   for (;; ) {
     let changed = false;
@@ -15809,15 +16655,15 @@ function contactEntityIds(database, columns) {
 }
 function readContactRows(database, columns, entities, maximumContacts, pageSize) {
   const placeholders = entities.map(() => "?").join(",");
-  const count = integer(getRow(database, `SELECT count(*) AS value FROM ZABCDRECORD WHERE Z_ENT IN (${placeholders})`, ...entities)?.value, "contact row count");
+  const count = integer(getRow2(database, `SELECT count(*) AS value FROM ZABCDRECORD WHERE Z_ENT IN (${placeholders})`, ...entities)?.value, "contact row count");
   if (count < 0 || count > maximumContacts)
-    return fail10("contact rows exceed their bound");
+    return fail11("contact rows exceed their bound");
   const result = [];
   const identifiers = new Set;
   let after3 = 0;
   let textBytes = 0;
   for (;; ) {
-    const rows = allRows(database, `SELECT Z_PK AS primary_key,
+    const rows = allRows2(database, `SELECT Z_PK AS primary_key,
       ${boundedColumn(columns, "ZUNIQUEID", "unique_id", MAX_IDENTIFIER_BYTES)},
       ${boundedColumn(columns, "ZNAME", "display_name", MAX_LABEL_BYTES)},
       ${boundedColumn(columns, "ZFIRSTNAME", "first_name", MAX_LABEL_BYTES)},
@@ -15830,15 +16676,15 @@ function readContactRows(database, columns, entities, maximumContacts, pageSize)
     for (const row of rows) {
       const primaryKey = integer(row.primary_key, "contact primary key");
       if (primaryKey <= after3)
-        return fail10("contact paging did not advance");
+        return fail11("contact paging did not advance");
       for (const alias of ["unique_id", "display_name", "first_name", "middle_name", "last_name", "organization"]) {
-        if (flag(row[`${alias}_over_bound`], `${alias} bound flag`) === 1) {
-          return fail10(`contact ${alias} exceeds its text bound`);
+        if (flag2(row[`${alias}_over_bound`], `${alias} bound flag`) === 1) {
+          return fail11(`contact ${alias} exceeds its text bound`);
         }
       }
       const identifier3 = boundedText2(row.unique_id, "contact identifier", MAX_IDENTIFIER_BYTES);
       if (identifiers.has(identifier3))
-        return fail10("contact identifiers are duplicated");
+        return fail11("contact identifiers are duplicated");
       identifiers.add(identifier3);
       const label = privateLabel([
         row.display_name,
@@ -15856,7 +16702,7 @@ function readContactRows(database, columns, entities, maximumContacts, pageSize)
       if (label.value !== null)
         textBytes += Buffer.byteLength(label.value, "utf8");
       if (textBytes > MAX_TOTAL_TEXT_BYTES)
-        return fail10("contact text exceeds its aggregate bound");
+        return fail11("contact text exceeds its aggregate bound");
       result.push(Object.freeze({
         primaryKey,
         identifier: identifier3,
@@ -15867,7 +16713,7 @@ function readContactRows(database, columns, entities, maximumContacts, pageSize)
     }
   }
   if (result.length !== count)
-    return fail10("contact paging count changed during its transaction");
+    return fail11("contact paging count changed during its transaction");
   return Object.freeze({ rows: Object.freeze(result), textBytes });
 }
 function methodColumns(database, table) {
@@ -15884,7 +16730,7 @@ function readMethods(database, table, pageSize) {
   let textBytes = 0;
   let rowsRead = 0;
   for (;; ) {
-    const rows = allRows(database, `SELECT Z_PK AS primary_key, ${shape.owner} AS owner,
+    const rows = allRows2(database, `SELECT Z_PK AS primary_key, ${shape.owner} AS owner,
       ${boundedColumn(shape.columns, shape.value, "method_value", MAX_HANDLE_BYTES)}
       FROM ${table} WHERE Z_PK > ? ORDER BY Z_PK LIMIT ?`, after3, pageSize);
     if (rows.length === 0)
@@ -15892,21 +16738,21 @@ function readMethods(database, table, pageSize) {
     for (const row of rows) {
       const primaryKey = integer(row.primary_key, `${table} primary key`);
       if (primaryKey <= after3)
-        return fail10(`${table} paging did not advance`);
+        return fail11(`${table} paging did not advance`);
       const owner = integer(row.owner, `${table} owner`);
       if (owner < 1)
-        return fail10(`${table} owner is invalid`);
-      if (flag(row.method_value_over_bound, `${table} value bound flag`) === 1) {
-        return fail10(`${table} value exceeds its text bound`);
+        return fail11(`${table} owner is invalid`);
+      if (flag2(row.method_value_over_bound, `${table} value bound flag`) === 1) {
+        return fail11(`${table} value exceeds its text bound`);
       }
       if (row.method_value !== null && typeof row.method_value !== "string") {
-        return fail10(`${table} value must be text or null`);
+        return fail11(`${table} value must be text or null`);
       }
       const raw = row.method_value;
       if (raw !== null) {
         textBytes += Buffer.byteLength(raw, "utf8");
         if (textBytes > MAX_TOTAL_TEXT_BYTES)
-          return fail10("contact methods exceed their aggregate text bound");
+          return fail11("contact methods exceed their aggregate text bound");
       }
       const handle = raw === null ? null : normalizeContactHandle(raw);
       const expectedKind = table === "ZABCDEMAILADDRESS" ? "email" : "phone";
@@ -15922,7 +16768,7 @@ function readMethods(database, table, pageSize) {
     }
   }
   if (rowsRead !== expectedRows)
-    return fail10(`${table} paging count changed during its transaction`);
+    return fail11(`${table} paging count changed during its transaction`);
   return Object.freeze({
     byOwner: new Map([...grouped.entries()].map(([owner, values3]) => [
       owner,
@@ -15939,44 +16785,44 @@ function readMethods(database, table, pageSize) {
 function modifiedAt(stats) {
   const milliseconds = Number(stats.mtimeMs);
   if (!Number.isFinite(milliseconds))
-    return fail10("database modification time is invalid");
+    return fail11("database modification time is invalid");
   return new Date(milliseconds).toISOString();
 }
 function readStore(source, key, maximumBytes, maximumContacts, pageSize) {
-  const isolated = isolateSource(source, maximumBytes);
+  const isolated = isolateContactsSource(source, maximumBytes);
   let database = null;
   let transactionOpen = false;
   try {
-    database = new Database(isolated.path, { strict: true });
+    database = new Database2(isolated.path, { strict: true });
     database.exec("PRAGMA trusted_schema=OFF; PRAGMA temp_store=MEMORY; PRAGMA mmap_size=0; PRAGMA query_only=ON");
-    if (getRow(database, "PRAGMA query_only")?.query_only !== 1) {
-      return fail10("could not enable query-only mode");
+    if (getRow2(database, "PRAGMA query_only")?.query_only !== 1) {
+      return fail11("could not enable query-only mode");
     }
     database.exec("BEGIN");
     transactionOpen = true;
-    const names = tableNames(database);
+    const names = tableNames2(database);
     if (!names.has("Z_PRIMARYKEY") || !names.has("ZABCDRECORD")) {
-      return fail10("has an unsupported AddressBook schema");
+      return fail11("has an unsupported AddressBook schema");
     }
     const primaryColumns = requireColumns(database, "Z_PRIMARYKEY", ["Z_ENT", "Z_NAME"]);
     const recordColumns = requireColumns(database, "ZABCDRECORD", ["Z_PK", "Z_ENT", "ZUNIQUEID"]);
     const entities = contactEntityIds(database, primaryColumns);
-    const schema = [...names].sort((left3, right3) => left3.localeCompare(right3, "en-US")).map((table) => ({ table, columns: tableColumns(database, table) }));
+    const schema = [...names].sort((left3, right3) => left3.localeCompare(right3, "en-US")).map((table) => ({ table, columns: tableColumns2(database, table) }));
     const schemaSha256 = sha256(canonicalJson(schema));
     const contactRead = readContactRows(database, recordColumns, entities, maximumContacts, pageSize);
     const emails = names.has("ZABCDEMAILADDRESS") ? readMethods(database, "ZABCDEMAILADDRESS", pageSize) : { byOwner: new Map, invalid: 0, rows: 0, textBytes: 0 };
     const phones = names.has("ZABCDPHONENUMBER") ? readMethods(database, "ZABCDPHONENUMBER", pageSize) : { byOwner: new Map, invalid: 0, rows: 0, textBytes: 0 };
     if (emails.rows + phones.rows > MAX_METHOD_ROWS) {
-      return fail10("contact methods exceed their aggregate row bound");
+      return fail11("contact methods exceed their aggregate row bound");
     }
     if (contactRead.textBytes + emails.textBytes + phones.textBytes > MAX_TOTAL_TEXT_BYTES) {
-      return fail10("contact data exceeds its aggregate text bound");
+      return fail11("contact data exceeds its aggregate text bound");
     }
     const contactRows = contactRead.rows;
     const contactPrimaryKeys = new Set(contactRows.map((contact) => contact.primaryKey));
     for (const owner of [...emails.byOwner.keys(), ...phones.byOwner.keys()]) {
       if (!contactPrimaryKeys.has(owner))
-        return fail10("contact method references a missing contact");
+        return fail11("contact method references a missing contact");
     }
     const contacts = contactRows.map((contact) => {
       const handles = [
@@ -15990,7 +16836,7 @@ function readStore(source, key, maximumBytes, maximumContacts, pageSize) {
         matchId: contactHandleMatchId(key, handle)
       }));
       return Object.freeze({
-        id: hmac(key, "addressbook-contact", `${source.key}\x00${contact.identifier}`),
+        id: hmac2(key, "addressbook-contact", `${source.key}\x00${contact.identifier}`),
         privateLabel: contact.privateLabel,
         privateLabelBasis: contact.privateLabelBasis,
         handles: Object.freeze(handles)
@@ -16023,17 +16869,17 @@ function readStore(source, key, maximumBytes, maximumContacts, pageSize) {
     try {
       database?.close();
     } finally {
-      rmSync(isolated.temporaryDirectory, { recursive: true, force: true });
+      rmSync2(isolated.temporaryDirectory, { recursive: true, force: true });
     }
   }
 }
 function readMacOSContacts(path, options) {
   const key = keyBytes(options.hmacKey);
-  const maximumBytes = boundedInteger(options.maxDatabaseBytes, MAX_SOURCE_DATABASE_BYTES, 1, MAX_SOURCE_DATABASE_BYTES, "maxDatabaseBytes");
-  const maximumContacts = boundedInteger(options.maxContacts, MAX_CONTACTS, 1, MAX_CONTACTS, "maxContacts");
-  const pageSize = boundedInteger(options.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE, "pageSize");
+  const maximumBytes = boundedInteger2(options.maxDatabaseBytes, MAX_SOURCE_DATABASE_BYTES, 1, MAX_SOURCE_DATABASE_BYTES, "maxDatabaseBytes");
+  const maximumContacts = boundedInteger2(options.maxContacts, MAX_CONTACTS, 1, MAX_CONTACTS, "maxContacts");
+  const pageSize = boundedInteger2(options.pageSize, DEFAULT_PAGE_SIZE2, 1, MAX_PAGE_SIZE2, "pageSize");
   const sources = discoverDatabases(path, maximumBytes);
-  const initialMembers = sources.map((source) => snapshotMembers(source, maximumBytes));
+  const initialMembers = sources.map((source) => snapshotMembers2(source, maximumBytes));
   const reads = [];
   let aggregateContacts = 0;
   let aggregateHandles = 0;
@@ -16047,25 +16893,25 @@ function readMacOSContacts(path, options) {
     aggregateMethodRows += read.methodRows;
     aggregateTextBytes += read.textBytes;
     if (aggregateContacts > maximumContacts)
-      return fail10("contacts exceed their aggregate row bound");
+      return fail11("contacts exceed their aggregate row bound");
     if (aggregateHandles > MAX_METHOD_ROWS)
-      return fail10("contact methods exceed their aggregate row bound");
+      return fail11("contact methods exceed their aggregate row bound");
     if (aggregateMethodRows > MAX_METHOD_ROWS)
-      return fail10("contact method rows exceed their aggregate bound");
+      return fail11("contact method rows exceed their aggregate bound");
     if (aggregateTextBytes > MAX_TOTAL_TEXT_BYTES)
-      return fail10("contact text exceeds its aggregate bound");
+      return fail11("contact text exceeds its aggregate bound");
   }
   const finalSources = discoverDatabases(path, maximumBytes);
   if (finalSources.length !== sources.length || finalSources.some((source, index) => {
     const prior = sources[index];
-    return prior === undefined || source.key !== prior.key || source.path !== prior.path || !sameFile(source.stats, prior.stats);
-  }) || finalSources.some((source, index) => !sameMembers(initialMembers[index] ?? [], snapshotMembers(source, maximumBytes))))
-    return fail10("AddressBook store set changed during its snapshot");
+    return prior === undefined || source.key !== prior.key || source.path !== prior.path || !sameFile2(source.stats, prior.stats);
+  }) || finalSources.some((source, index) => !sameMembers(initialMembers[index] ?? [], snapshotMembers2(source, maximumBytes))))
+    return fail11("AddressBook store set changed during its snapshot");
   const contacts = reads.flatMap((read) => read.contacts).sort((left3, right3) => left3.id.localeCompare(right3.id, "en-US"));
   const ids3 = new Set;
   for (const contact of contacts) {
     if (ids3.has(contact.id))
-      return fail10("contains duplicate pseudonymous contact IDs");
+      return fail11("contains duplicate pseudonymous contact IDs");
     ids3.add(contact.id);
   }
   const warnings = [];
@@ -16082,7 +16928,7 @@ function readMacOSContacts(path, options) {
   const snapshotSha256 = sha256(canonicalJson({
     schemaVersion: CONTACTS_SCHEMA_VERSION,
     sources: sources.map((source, index) => ({
-      id: hmac(key, "addressbook-source", source.key),
+      id: hmac2(key, "addressbook-source", source.key),
       schemaSha256: sourceIdentities[index].schemaSha256
     })),
     contacts,
@@ -16137,16 +16983,16 @@ class MessageBundleV1ContractError extends TypeError {
     this.name = "MessageBundleV1ContractError";
   }
 }
-function fail11(message) {
+function fail12(message) {
   throw new MessageBundleV1ContractError(message);
 }
 function object2(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value) || nodeTypes2.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
-    return fail11(`${label} must be a plain object`);
+    return fail12(`${label} must be a plain object`);
   for (const key of Reflect.ownKeys(value)) {
     const descriptor3 = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== "string" || descriptor3 === undefined || descriptor3.enumerable !== true || !("value" in descriptor3))
-      return fail11(`${label} must contain only enumerable string data properties`);
+      return fail12(`${label} must contain only enumerable string data properties`);
   }
   return value;
 }
@@ -16154,14 +17000,14 @@ function exactKeys2(value, keys3, label) {
   const expected = [...keys3].sort();
   const observed = Reflect.ownKeys(value).map(String).sort();
   if (expected.length !== observed.length || observed.some((key, index) => key !== expected[index]))
-    fail11(`${label} must contain exactly: ${keys3.join(", ")}`);
+    fail12(`${label} must contain exactly: ${keys3.join(", ")}`);
 }
 function utf8Bytes2(value) {
   return new TextEncoder().encode(value).byteLength;
 }
 function boundedText3(value, label, maximum) {
   if (typeof value !== "string" || utf8Bytes2(value) > maximum || value.includes("\x00")) {
-    return fail11(`${label} must be NUL-free text within ${maximum} UTF-8 bytes`);
+    return fail12(`${label} must be NUL-free text within ${maximum} UTF-8 bytes`);
   }
   return value;
 }
@@ -16171,7 +17017,7 @@ function nullableText(value, label, maximum) {
 function identifier3(value, label) {
   const result = boundedText3(value, label, LOCAL_MESSAGE_BUNDLE_V1_LIMITS.identifierBytes);
   if (result.length === 0 || /[\u0000-\u001f\u007f]/u.test(result)) {
-    return fail11(`${label} must be a non-empty identifier without ASCII controls`);
+    return fail12(`${label} must be a non-empty identifier without ASCII controls`);
   }
   return result;
 }
@@ -16181,26 +17027,26 @@ function nullableIdentifier(value, label) {
 function token(value, label, maximum = 128) {
   const result = boundedText3(value, label, maximum);
   if (!/^[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?$/u.test(result)) {
-    return fail11(`${label} must be a lowercase categorical token`);
+    return fail12(`${label} must be a lowercase categorical token`);
   }
   return result;
 }
 function version(value, label) {
   const result = boundedText3(value, label, 128);
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$/u.test(result)) {
-    return fail11(`${label} must be a bounded version token`);
+    return fail12(`${label} must be a bounded version token`);
   }
   return result;
 }
 function oneOf(value, values3, label) {
   if (typeof value !== "string" || !values3.includes(value)) {
-    return fail11(`${label} must be one of: ${values3.join(", ")}`);
+    return fail12(`${label} must be one of: ${values3.join(", ")}`);
   }
   return value;
 }
 function integer2(value, label, maximum = Number.MAX_SAFE_INTEGER) {
   if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
-    return fail11(`${label} must be a non-negative safe integer`);
+    return fail12(`${label} must be a non-negative safe integer`);
   }
   return value;
 }
@@ -16209,7 +17055,7 @@ function nullableInteger(value, label) {
 }
 function boolean(value, label) {
   if (typeof value !== "boolean")
-    return fail11(`${label} must be boolean`);
+    return fail12(`${label} must be boolean`);
   return value;
 }
 function nullableBoolean(value, label) {
@@ -16219,7 +17065,7 @@ function timestamp2(value, label) {
   const result = boundedText3(value, label, 64);
   const date = new Date(result);
   if (!Number.isFinite(date.getTime()) || date.toISOString() !== result) {
-    return fail11(`${label} must be a canonical UTC timestamp`);
+    return fail12(`${label} must be a canonical UTC timestamp`);
   }
   return result;
 }
@@ -16229,12 +17075,12 @@ function nullableTimestamp(value, label) {
 function digest2(value, label) {
   const result = boundedText3(value, label, 64);
   if (!/^[a-f0-9]{64}$/u.test(result))
-    return fail11(`${label} must be lowercase SHA-256`);
+    return fail12(`${label} must be lowercase SHA-256`);
   return result;
 }
 function array3(value, label, maximum) {
   if (!Array.isArray(value) || nodeTypes2.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > maximum) {
-    return fail11(`${label} must contain at most ${maximum} items`);
+    return fail12(`${label} must contain at most ${maximum} items`);
   }
   const expectedKeys = new Set([
     "length",
@@ -16244,17 +17090,17 @@ function array3(value, label, maximum) {
     const descriptor3 = Object.getOwnPropertyDescriptor(value, key);
     const isLength = key === "length";
     if (typeof key !== "string" || !expectedKeys.has(key) || descriptor3 === undefined || !("value" in descriptor3) || !isLength && descriptor3.enumerable !== true)
-      return fail11(`${label} must be a dense array of data properties`);
+      return fail12(`${label} must be a dense array of data properties`);
   }
   if (Reflect.ownKeys(value).length !== expectedKeys.size) {
-    return fail11(`${label} must be a dense array of data properties`);
+    return fail12(`${label} must be a dense array of data properties`);
   }
   return value;
 }
 function identifiers(value, label, maximum) {
   const result = array3(value, label, maximum).map((item, index) => identifier3(item, `${label}[${index}]`));
   if (new Set(result).size !== result.length)
-    fail11(`${label} repeats an ID`);
+    fail12(`${label} repeats an ID`);
   return Object.freeze(result);
 }
 function isLocalMessageBundleV1SourceTransformVersion(value) {
@@ -16263,7 +17109,7 @@ function isLocalMessageBundleV1SourceTransformVersion(value) {
 function assertLocalMessageBundleV1SourceTransformVersion(value, label = "manifest.source.version") {
   const parsed = version(value, label);
   if (!isLocalMessageBundleV1SourceTransformVersion(parsed)) {
-    return fail11(`${label} must be a supported source transform: ${LOCAL_MESSAGE_BUNDLE_V1_SUPPORTED_SOURCE_TRANSFORM_VERSIONS.join(", ")}`);
+    return fail12(`${label} must be a supported source transform: ${LOCAL_MESSAGE_BUNDLE_V1_SUPPORTED_SOURCE_TRANSFORM_VERSIONS.join(", ")}`);
   }
   return parsed;
 }
@@ -16293,7 +17139,7 @@ function parseCommon(record, kind, extraKeys, label) {
     ...extraKeys
   ], label);
   if (record.schemaVersion !== LOCAL_MESSAGE_BUNDLE_V1_SCHEMA_VERSION || record.kind !== kind) {
-    return fail11(`${label} has the wrong schemaVersion or kind`);
+    return fail12(`${label} has the wrong schemaVersion or kind`);
   }
   return Object.freeze({
     schemaVersion: LOCAL_MESSAGE_BUNDLE_V1_SCHEMA_VERSION,
@@ -16311,7 +17157,7 @@ function parseAccount(record, label) {
     "selfParticipantId"
   ], label);
   if (common.id !== common.accountId || common.provenance.providerId !== common.provenance.connectedAccountProviderId)
-    return fail11(`${label} does not establish one connected account realm`);
+    return fail12(`${label} does not establish one connected account realm`);
   return Object.freeze({
     ...common,
     kind: "account",
@@ -16342,7 +17188,7 @@ function parseConversation(record, label) {
   const startedAt = nullableTimestamp(record.startedAt, `${label}.startedAt`);
   const lastMessageAt = nullableTimestamp(record.lastMessageAt, `${label}.lastMessageAt`);
   if (startedAt !== null && lastMessageAt !== null && startedAt > lastMessageAt) {
-    return fail11(`${label}.startedAt must not follow lastMessageAt`);
+    return fail12(`${label}.startedAt must not follow lastMessageAt`);
   }
   return Object.freeze({
     ...common,
@@ -16373,7 +17219,7 @@ function parseEdit(value, sentAt, label) {
     exactKeys2(record, ["kind", "editedAt", "providerRevision"], label);
     const editedAt2 = timestamp2(record.editedAt, `${label}.editedAt`);
     if (editedAt2 < sentAt)
-      return fail11(`${label} precedes the message`);
+      return fail12(`${label} precedes the message`);
     return Object.freeze({
       kind: "in-place",
       editedAt: editedAt2,
@@ -16381,7 +17227,7 @@ function parseEdit(value, sentAt, label) {
     });
   }
   if (record.kind !== "replacement") {
-    return fail11(`${label}.kind must be in-place or replacement`);
+    return fail12(`${label}.kind must be in-place or replacement`);
   }
   exactKeys2(record, [
     "kind",
@@ -16392,7 +17238,7 @@ function parseEdit(value, sentAt, label) {
   ], label);
   const editedAt = timestamp2(record.editedAt, `${label}.editedAt`);
   if (editedAt < sentAt)
-    return fail11(`${label} precedes the message`);
+    return fail12(`${label} precedes the message`);
   return Object.freeze({
     kind: "replacement",
     replacesMessageId: nullableIdentifier(record.replacesMessageId, `${label}.replacesMessageId`),
@@ -16419,7 +17265,7 @@ function parseAttachments(value, label) {
     exactKeys2(record, ["kind", "mimeType", "name", "sizeBytes"], itemLabel);
     const name = nullableText(record.name, `${itemLabel}.name`, LOCAL_MESSAGE_BUNDLE_V1_LIMITS.shortTextBytes);
     if (name !== null && (name === "." || name === ".." || name.includes("/") || name.includes("\\"))) {
-      return fail11(`${itemLabel}.name must not be a path`);
+      return fail12(`${itemLabel}.name must not be a path`);
     }
     return Object.freeze({
       kind: oneOf(record.kind, ["audio", "document", "image", "link", "sticker", "video", "unknown"], `${itemLabel}.kind`),
@@ -16447,7 +17293,7 @@ function parseMessage(record, label) {
   const deletion = parseDeletion(record.deletion, `${label}.deletion`);
   const body = nullableText(record.body, `${label}.body`, LOCAL_MESSAGE_BUNDLE_V1_LIMITS.bodyBytes);
   if (deletion !== null && body !== null) {
-    return fail11(`${label}.body must be null for a deleted message`);
+    return fail12(`${label}.body must be null for a deleted message`);
   }
   return Object.freeze({
     ...common,
@@ -16528,7 +17374,7 @@ function parseArtifact(value, index) {
   const record = object2(value, label);
   exactKeys2(record, ["path", "mediaType", "recordKind", "records", "bytes", "sha256"], label);
   if (record.path !== expected.path || record.mediaType !== "application/x-ndjson" || record.recordKind !== expected.kind)
-    return fail11(`${label} does not match the fixed artifact inventory`);
+    return fail12(`${label} does not match the fixed artifact inventory`);
   return Object.freeze({
     path: expected.path,
     mediaType: "application/x-ndjson",
@@ -16561,16 +17407,16 @@ function parseLocalMessageBundleV1Manifest(value) {
     "integrity"
   ], "manifest");
   if (record.schemaVersion !== LOCAL_MESSAGE_BUNDLE_V1_SCHEMA_VERSION || record.format !== LOCAL_MESSAGE_BUNDLE_V1_FORMAT)
-    return fail11("Manifest has an unsupported schemaVersion or format");
+    return fail12("Manifest has an unsupported schemaVersion or format");
   const source = object2(record.source, "manifest.source");
   exactKeys2(source, ["id", "version"], "manifest.source");
   if (source.id !== LOCAL_MESSAGE_BUNDLE_V1_SOURCE_ID) {
-    return fail11(`manifest.source.id must be ${LOCAL_MESSAGE_BUNDLE_V1_SOURCE_ID}`);
+    return fail12(`manifest.source.id must be ${LOCAL_MESSAGE_BUNDLE_V1_SOURCE_ID}`);
   }
   const provider = object2(record.provider, "manifest.provider");
   exactKeys2(provider, ["id", "version"], "manifest.provider");
   if (provider.id !== LOCAL_MESSAGE_BUNDLE_V1_PROVIDER_ID) {
-    return fail11(`manifest.provider.id must be ${LOCAL_MESSAGE_BUNDLE_V1_PROVIDER_ID}`);
+    return fail12(`manifest.provider.id must be ${LOCAL_MESSAGE_BUNDLE_V1_PROVIDER_ID}`);
   }
   const timestamps = object2(record.timestamps, "manifest.timestamps");
   exactKeys2(timestamps, ["startedAt", "finishedAt", "createdAt"], "manifest.timestamps");
@@ -16578,7 +17424,7 @@ function parseLocalMessageBundleV1Manifest(value) {
   const finishedAt = timestamp2(timestamps.finishedAt, "manifest.timestamps.finishedAt");
   const createdAt = timestamp2(timestamps.createdAt, "manifest.timestamps.createdAt");
   if (startedAt > finishedAt || finishedAt > createdAt) {
-    return fail11("Manifest timestamps are not monotonic");
+    return fail12("Manifest timestamps are not monotonic");
   }
   const completeness = object2(record.completeness, "manifest.completeness");
   exactKeys2(completeness, [
@@ -16590,11 +17436,11 @@ function parseLocalMessageBundleV1Manifest(value) {
   const observedFrom = nullableTimestamp(completeness.observedFrom, "manifest.completeness.observedFrom");
   const observedThrough = nullableTimestamp(completeness.observedThrough, "manifest.completeness.observedThrough");
   if (observedFrom !== null && observedThrough !== null && observedFrom > observedThrough) {
-    return fail11("Manifest completeness bounds are reversed");
+    return fail12("Manifest completeness bounds are reversed");
   }
   const warnings = array3(record.warnings, "manifest.warnings", LOCAL_MESSAGE_BUNDLE_V1_LIMITS.warnings).map((item, index) => token(item, `manifest.warnings[${index}]`));
   if (new Set(warnings).size !== warnings.length)
-    fail11("Manifest warnings repeat");
+    fail12("Manifest warnings repeat");
   const privacy = object2(record.privacy, "manifest.privacy");
   exactKeys2(privacy, [
     "classification",
@@ -16603,7 +17449,7 @@ function parseLocalMessageBundleV1Manifest(value) {
     "credentials"
   ], "manifest.privacy");
   if (privacy.classification !== "private-local" || privacy.attachments !== "metadata-only" || privacy.providerUrls !== "excluded" || privacy.credentials !== "excluded")
-    return fail11("Manifest privacy guarantees are unsupported");
+    return fail12("Manifest privacy guarantees are unsupported");
   const counts = object2(record.counts, "manifest.counts");
   exactKeys2(counts, LOCAL_MESSAGE_BUNDLE_V1_ARTIFACTS.map(({ kind }) => kind), "manifest.counts");
   const parsedCounts = Object.fromEntries(LOCAL_MESSAGE_BUNDLE_V1_ARTIFACTS.map(({ kind }) => [
@@ -16611,28 +17457,28 @@ function parseLocalMessageBundleV1Manifest(value) {
     integer2(counts[kind], `manifest.counts.${kind}`, LOCAL_MESSAGE_BUNDLE_V1_LIMITS.records)
   ]));
   if (parsedCounts.account > LOCAL_MESSAGE_BUNDLE_V1_LIMITS.accounts) {
-    return fail11(`Manifest exceeds the ${LOCAL_MESSAGE_BUNDLE_V1_LIMITS.accounts}-account safety bound`);
+    return fail12(`Manifest exceeds the ${LOCAL_MESSAGE_BUNDLE_V1_LIMITS.accounts}-account safety bound`);
   }
   const artifactValues = array3(record.artifacts, "manifest.artifacts", LOCAL_MESSAGE_BUNDLE_V1_ARTIFACTS.length);
   if (artifactValues.length !== LOCAL_MESSAGE_BUNDLE_V1_ARTIFACTS.length) {
-    return fail11("Manifest must list the fixed six artifacts");
+    return fail12("Manifest must list the fixed six artifacts");
   }
   const artifacts = Object.freeze(artifactValues.map(parseArtifact));
   let totalRecords = 0;
   let totalBytes = 0;
   for (const artifact of artifacts) {
     if (artifact.records !== parsedCounts[artifact.recordKind]) {
-      return fail11(`${artifact.path} count disagrees with manifest.counts`);
+      return fail12(`${artifact.path} count disagrees with manifest.counts`);
     }
     totalRecords += artifact.records;
     totalBytes += artifact.bytes;
   }
   if (totalRecords > LOCAL_MESSAGE_BUNDLE_V1_LIMITS.records || totalBytes > LOCAL_MESSAGE_BUNDLE_V1_LIMITS.totalBytes)
-    return fail11("Manifest exceeds the bundle record or byte bound");
+    return fail12("Manifest exceeds the bundle record or byte bound");
   const integrity = object2(record.integrity, "manifest.integrity");
   exactKeys2(integrity, ["algorithm", "bundleSha256"], "manifest.integrity");
   if (integrity.algorithm !== "sha256") {
-    return fail11("Manifest integrity algorithm is unsupported");
+    return fail12("Manifest integrity algorithm is unsupported");
   }
   const result = Object.freeze({
     schemaVersion: LOCAL_MESSAGE_BUNDLE_V1_SCHEMA_VERSION,
@@ -16667,7 +17513,7 @@ function parseLocalMessageBundleV1Manifest(value) {
     })
   });
   if (localMessageBundleV1BundleSha256(localMessageBundleV1ManifestProjection(result)) !== result.integrity.bundleSha256)
-    return fail11("Manifest bundle SHA-256 does not match its canonical projection");
+    return fail12("Manifest bundle SHA-256 does not match its canonical projection");
   return result;
 }
 
@@ -16713,16 +17559,16 @@ class MessageBundleV2ContractError extends TypeError {
     this.name = "MessageBundleV2ContractError";
   }
 }
-function fail12(message) {
+function fail13(message) {
   throw new MessageBundleV2ContractError(message);
 }
 function object3(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value) || nodeTypes3.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
-    return fail12(`${label} must be a plain object`);
+    return fail13(`${label} must be a plain object`);
   for (const key of Reflect.ownKeys(value)) {
     const descriptor3 = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== "string" || descriptor3 === undefined || descriptor3.enumerable !== true || !("value" in descriptor3))
-      return fail12(`${label} must contain only enumerable string data properties`);
+      return fail13(`${label} must contain only enumerable string data properties`);
   }
   return value;
 }
@@ -16730,14 +17576,14 @@ function exactKeys3(value, keys3, label) {
   const expected = [...keys3].sort();
   const observed = Reflect.ownKeys(value).map(String).sort();
   if (expected.length !== observed.length || observed.some((key, index) => key !== expected[index]))
-    fail12(`${label} must contain exactly: ${keys3.join(", ")}`);
+    fail13(`${label} must contain exactly: ${keys3.join(", ")}`);
 }
 function utf8Bytes3(value) {
   return new TextEncoder().encode(value).byteLength;
 }
 function boundedText4(value, label, maximum) {
   if (typeof value !== "string" || utf8Bytes3(value) > maximum || value.includes("\x00")) {
-    return fail12(`${label} must be NUL-free text within ${maximum} UTF-8 bytes`);
+    return fail13(`${label} must be NUL-free text within ${maximum} UTF-8 bytes`);
   }
   return value;
 }
@@ -16747,7 +17593,7 @@ function nullableText2(value, label, maximum) {
 function identifier4(value, label) {
   const result = boundedText4(value, label, LOCAL_MESSAGE_BUNDLE_V2_LIMITS.identifierBytes);
   if (result.length === 0 || /[\u0000-\u001f\u007f]/u.test(result)) {
-    return fail12(`${label} must be a non-empty identifier without ASCII controls`);
+    return fail13(`${label} must be a non-empty identifier without ASCII controls`);
   }
   return result;
 }
@@ -16766,41 +17612,41 @@ function parseLocalMessageBundleV2WhatsAppJid(value, label = "WhatsApp JID") {
   if (/^[1-9][0-9]{4,19}(?:-[1-9][0-9]{0,19})?@g\.us$/u.test(jid)) {
     return Object.freeze({ jid, kind: "group", e164: null });
   }
-  return fail12(`${label} must be a canonical user, LID, or group WhatsApp JID`);
+  return fail13(`${label} must be a canonical user, LID, or group WhatsApp JID`);
 }
 function exactJidHandle(value, jid, label) {
   const handle = nullableText2(value, label, LOCAL_MESSAGE_BUNDLE_V2_LIMITS.shortTextBytes);
   if (jid.kind === "user" && handle !== jid.e164) {
-    return fail12(`${label} must be the exact E.164 projection of its WhatsApp user JID`);
+    return fail13(`${label} must be the exact E.164 projection of its WhatsApp user JID`);
   }
   if (jid.kind !== "user" && handle !== null) {
-    return fail12(`${label} must be null when the WhatsApp JID has no exact E.164 projection`);
+    return fail13(`${label} must be null when the WhatsApp JID has no exact E.164 projection`);
   }
   return handle;
 }
 function token2(value, label, maximum = 128) {
   const result = boundedText4(value, label, maximum);
   if (!/^[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?$/u.test(result)) {
-    return fail12(`${label} must be a lowercase categorical token`);
+    return fail13(`${label} must be a lowercase categorical token`);
   }
   return result;
 }
 function version2(value, label) {
   const result = boundedText4(value, label, 128);
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$/u.test(result)) {
-    return fail12(`${label} must be a bounded version token`);
+    return fail13(`${label} must be a bounded version token`);
   }
   return result;
 }
 function oneOf2(value, values3, label) {
   if (typeof value !== "string" || !values3.includes(value)) {
-    return fail12(`${label} must be one of: ${values3.join(", ")}`);
+    return fail13(`${label} must be one of: ${values3.join(", ")}`);
   }
   return value;
 }
 function integer3(value, label, maximum = Number.MAX_SAFE_INTEGER) {
   if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
-    return fail12(`${label} must be a non-negative safe integer`);
+    return fail13(`${label} must be a non-negative safe integer`);
   }
   return value;
 }
@@ -16809,7 +17655,7 @@ function nullableInteger2(value, label) {
 }
 function boolean2(value, label) {
   if (typeof value !== "boolean")
-    return fail12(`${label} must be boolean`);
+    return fail13(`${label} must be boolean`);
   return value;
 }
 function nullableBoolean2(value, label) {
@@ -16819,7 +17665,7 @@ function timestamp3(value, label) {
   const result = boundedText4(value, label, 64);
   const date = new Date(result);
   if (!Number.isFinite(date.getTime()) || date.toISOString() !== result) {
-    return fail12(`${label} must be a canonical UTC timestamp`);
+    return fail13(`${label} must be a canonical UTC timestamp`);
   }
   return result;
 }
@@ -16829,12 +17675,12 @@ function nullableTimestamp2(value, label) {
 function digest3(value, label) {
   const result = boundedText4(value, label, 64);
   if (!/^[a-f0-9]{64}$/u.test(result))
-    return fail12(`${label} must be lowercase SHA-256`);
+    return fail13(`${label} must be lowercase SHA-256`);
   return result;
 }
 function array4(value, label, maximum) {
   if (!Array.isArray(value) || nodeTypes3.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > maximum) {
-    return fail12(`${label} must contain at most ${maximum} items`);
+    return fail13(`${label} must contain at most ${maximum} items`);
   }
   const expectedKeys = new Set([
     "length",
@@ -16844,17 +17690,17 @@ function array4(value, label, maximum) {
     const descriptor3 = Object.getOwnPropertyDescriptor(value, key);
     const isLength = key === "length";
     if (typeof key !== "string" || !expectedKeys.has(key) || descriptor3 === undefined || !("value" in descriptor3) || !isLength && descriptor3.enumerable !== true)
-      return fail12(`${label} must be a dense array of data properties`);
+      return fail13(`${label} must be a dense array of data properties`);
   }
   if (Reflect.ownKeys(value).length !== expectedKeys.size) {
-    return fail12(`${label} must be a dense array of data properties`);
+    return fail13(`${label} must be a dense array of data properties`);
   }
   return value;
 }
 function identifiers2(value, label, maximum) {
   const result = array4(value, label, maximum).map((item, index) => identifier4(item, `${label}[${index}]`));
   if (new Set(result).size !== result.length)
-    fail12(`${label} repeats an ID`);
+    fail13(`${label} repeats an ID`);
   return Object.freeze(result);
 }
 function isLocalMessageBundleV2SourceTransformVersion(value) {
@@ -16863,7 +17709,7 @@ function isLocalMessageBundleV2SourceTransformVersion(value) {
 function assertLocalMessageBundleV2SourceTransformVersion(value, label = "manifest.source.version") {
   const parsed = version2(value, label);
   if (!isLocalMessageBundleV2SourceTransformVersion(parsed)) {
-    return fail12(`${label} must be a supported source transform: ${LOCAL_MESSAGE_BUNDLE_V2_SUPPORTED_SOURCE_TRANSFORM_VERSIONS.join(", ")}`);
+    return fail13(`${label} must be a supported source transform: ${LOCAL_MESSAGE_BUNDLE_V2_SUPPORTED_SOURCE_TRANSFORM_VERSIONS.join(", ")}`);
   }
   return parsed;
 }
@@ -16893,14 +17739,14 @@ function parseCommon2(record, kind, extraKeys, label) {
     ...extraKeys
   ], label);
   if (record.schemaVersion !== LOCAL_MESSAGE_BUNDLE_V2_SCHEMA_VERSION || record.kind !== kind) {
-    return fail12(`${label} has the wrong schemaVersion or kind`);
+    return fail13(`${label} has the wrong schemaVersion or kind`);
   }
   if (record.network !== LOCAL_MESSAGE_BUNDLE_V2_NETWORK) {
-    return fail12(`${label}.network must be ${LOCAL_MESSAGE_BUNDLE_V2_NETWORK}`);
+    return fail13(`${label}.network must be ${LOCAL_MESSAGE_BUNDLE_V2_NETWORK}`);
   }
   const connectedAccount = parseLocalMessageBundleV2WhatsAppJid(object3(record.provenance, `${label}.provenance`).connectedAccountProviderId, `${label}.provenance.connectedAccountProviderId`);
   if (connectedAccount.kind === "group") {
-    return fail12(`${label}.provenance.connectedAccountProviderId must be a WhatsApp user or LID JID`);
+    return fail13(`${label}.provenance.connectedAccountProviderId must be a WhatsApp user or LID JID`);
   }
   return Object.freeze({
     schemaVersion: LOCAL_MESSAGE_BUNDLE_V2_SCHEMA_VERSION,
@@ -16918,10 +17764,10 @@ function parseAccount2(record, label) {
     "selfParticipantId"
   ], label);
   if (common.id !== common.accountId || common.provenance.providerId !== common.provenance.connectedAccountProviderId)
-    return fail12(`${label} does not establish one connected account realm`);
+    return fail13(`${label} does not establish one connected account realm`);
   const providerJid = parseLocalMessageBundleV2WhatsAppJid(common.provenance.providerId, `${label}.provenance.providerId`);
   if (providerJid.kind === "group") {
-    return fail12(`${label}.provenance.providerId must be a WhatsApp user or LID JID`);
+    return fail13(`${label}.provenance.providerId must be a WhatsApp user or LID JID`);
   }
   return Object.freeze({
     ...common,
@@ -16935,7 +17781,7 @@ function parseParticipant2(record, label) {
   const common = parseCommon2(record, "participant", ["displayName", "handle", "isSelf"], label);
   const providerJid = parseLocalMessageBundleV2WhatsAppJid(common.provenance.providerId, `${label}.provenance.providerId`);
   if (providerJid.kind === "group") {
-    return fail12(`${label}.provenance.providerId must identify a WhatsApp user or LID participant`);
+    return fail13(`${label}.provenance.providerId must identify a WhatsApp user or LID participant`);
   }
   return Object.freeze({
     ...common,
@@ -16957,16 +17803,16 @@ function parseConversation2(record, label) {
   const startedAt = nullableTimestamp2(record.startedAt, `${label}.startedAt`);
   const lastMessageAt = nullableTimestamp2(record.lastMessageAt, `${label}.lastMessageAt`);
   if (startedAt !== null && lastMessageAt !== null && startedAt > lastMessageAt) {
-    return fail12(`${label}.startedAt must not follow lastMessageAt`);
+    return fail13(`${label}.startedAt must not follow lastMessageAt`);
   }
   const type = oneOf2(record.type, ["direct", "group"], `${label}.type`);
   const providerJid = parseLocalMessageBundleV2WhatsAppJid(common.provenance.providerId, `${label}.provenance.providerId`);
   if (type === "direct" && providerJid.kind === "group" || type === "group" && providerJid.kind !== "group")
-    return fail12(`${label} type conflicts with its WhatsApp JID`);
+    return fail13(`${label} type conflicts with its WhatsApp JID`);
   const participantIds = identifiers2(record.participantIds, `${label}.participantIds`, LOCAL_MESSAGE_BUNDLE_V2_LIMITS.participantsPerConversation);
   const participantsComplete = nullableBoolean2(record.participantsComplete, `${label}.participantsComplete`);
   if (type === "direct" && (participantsComplete !== true || participantIds.length !== 2)) {
-    return fail12(`${label} direct roster must contain exactly two proven participants`);
+    return fail13(`${label} direct roster must contain exactly two proven participants`);
   }
   return Object.freeze({
     ...common,
@@ -16997,7 +17843,7 @@ function parseEdit2(value, sentAt, label) {
     exactKeys3(record, ["kind", "editedAt", "providerRevision"], label);
     const editedAt2 = timestamp3(record.editedAt, `${label}.editedAt`);
     if (editedAt2 < sentAt)
-      return fail12(`${label} precedes the message`);
+      return fail13(`${label} precedes the message`);
     return Object.freeze({
       kind: "in-place",
       editedAt: editedAt2,
@@ -17005,7 +17851,7 @@ function parseEdit2(value, sentAt, label) {
     });
   }
   if (record.kind !== "replacement") {
-    return fail12(`${label}.kind must be in-place or replacement`);
+    return fail13(`${label}.kind must be in-place or replacement`);
   }
   exactKeys3(record, [
     "kind",
@@ -17016,7 +17862,7 @@ function parseEdit2(value, sentAt, label) {
   ], label);
   const editedAt = timestamp3(record.editedAt, `${label}.editedAt`);
   if (editedAt < sentAt)
-    return fail12(`${label} precedes the message`);
+    return fail13(`${label} precedes the message`);
   return Object.freeze({
     kind: "replacement",
     replacesMessageId: nullableIdentifier2(record.replacesMessageId, `${label}.replacesMessageId`),
@@ -17043,7 +17889,7 @@ function parseAttachments2(value, label) {
     exactKeys3(record, ["kind", "mimeType", "name", "sizeBytes"], itemLabel);
     const name = nullableText2(record.name, `${itemLabel}.name`, LOCAL_MESSAGE_BUNDLE_V2_LIMITS.shortTextBytes);
     if (name !== null && (name === "." || name === ".." || name.includes("/") || name.includes("\\"))) {
-      return fail12(`${itemLabel}.name must not be a path`);
+      return fail13(`${itemLabel}.name must not be a path`);
     }
     return Object.freeze({
       kind: oneOf2(record.kind, ["audio", "document", "image", "link", "sticker", "video", "unknown"], `${itemLabel}.kind`),
@@ -17071,7 +17917,7 @@ function parseMessage2(record, label) {
   const deletion = parseDeletion2(record.deletion, `${label}.deletion`);
   const body = nullableText2(record.body, `${label}.body`, LOCAL_MESSAGE_BUNDLE_V2_LIMITS.bodyBytes);
   if (deletion !== null && body !== null) {
-    return fail12(`${label}.body must be null for a deleted message`);
+    return fail13(`${label}.body must be null for a deleted message`);
   }
   return Object.freeze({
     ...common,
@@ -17152,7 +17998,7 @@ function parseArtifact2(value, index) {
   const record = object3(value, label);
   exactKeys3(record, ["path", "mediaType", "recordKind", "records", "bytes", "sha256"], label);
   if (record.path !== expected.path || record.mediaType !== "application/x-ndjson" || record.recordKind !== expected.kind)
-    return fail12(`${label} does not match the fixed artifact inventory`);
+    return fail13(`${label} does not match the fixed artifact inventory`);
   return Object.freeze({
     path: expected.path,
     mediaType: "application/x-ndjson",
@@ -17185,16 +18031,16 @@ function parseLocalMessageBundleV2Manifest(value) {
     "integrity"
   ], "manifest");
   if (record.schemaVersion !== LOCAL_MESSAGE_BUNDLE_V2_SCHEMA_VERSION || record.format !== LOCAL_MESSAGE_BUNDLE_V2_FORMAT)
-    return fail12("Manifest has an unsupported schemaVersion or format");
+    return fail13("Manifest has an unsupported schemaVersion or format");
   const source = object3(record.source, "manifest.source");
   exactKeys3(source, ["id", "version"], "manifest.source");
   if (source.id !== LOCAL_MESSAGE_BUNDLE_V2_SOURCE_ID) {
-    return fail12(`manifest.source.id must be ${LOCAL_MESSAGE_BUNDLE_V2_SOURCE_ID}`);
+    return fail13(`manifest.source.id must be ${LOCAL_MESSAGE_BUNDLE_V2_SOURCE_ID}`);
   }
   const provider = object3(record.provider, "manifest.provider");
   exactKeys3(provider, ["id", "version"], "manifest.provider");
   if (provider.id !== LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_ID) {
-    return fail12(`manifest.provider.id must be ${LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_ID}`);
+    return fail13(`manifest.provider.id must be ${LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_ID}`);
   }
   const timestamps = object3(record.timestamps, "manifest.timestamps");
   exactKeys3(timestamps, ["startedAt", "finishedAt", "createdAt"], "manifest.timestamps");
@@ -17202,7 +18048,7 @@ function parseLocalMessageBundleV2Manifest(value) {
   const finishedAt = timestamp3(timestamps.finishedAt, "manifest.timestamps.finishedAt");
   const createdAt = timestamp3(timestamps.createdAt, "manifest.timestamps.createdAt");
   if (startedAt > finishedAt || finishedAt > createdAt) {
-    return fail12("Manifest timestamps are not monotonic");
+    return fail13("Manifest timestamps are not monotonic");
   }
   const completeness = object3(record.completeness, "manifest.completeness");
   exactKeys3(completeness, [
@@ -17214,11 +18060,11 @@ function parseLocalMessageBundleV2Manifest(value) {
   const observedFrom = nullableTimestamp2(completeness.observedFrom, "manifest.completeness.observedFrom");
   const observedThrough = nullableTimestamp2(completeness.observedThrough, "manifest.completeness.observedThrough");
   if (observedFrom !== null && observedThrough !== null && observedFrom > observedThrough) {
-    return fail12("Manifest completeness bounds are reversed");
+    return fail13("Manifest completeness bounds are reversed");
   }
   const warnings = array4(record.warnings, "manifest.warnings", LOCAL_MESSAGE_BUNDLE_V2_LIMITS.warnings).map((item, index) => token2(item, `manifest.warnings[${index}]`));
   if (new Set(warnings).size !== warnings.length)
-    fail12("Manifest warnings repeat");
+    fail13("Manifest warnings repeat");
   const privacy = object3(record.privacy, "manifest.privacy");
   exactKeys3(privacy, [
     "classification",
@@ -17227,7 +18073,7 @@ function parseLocalMessageBundleV2Manifest(value) {
     "credentials"
   ], "manifest.privacy");
   if (privacy.classification !== "private-local" || privacy.attachments !== "metadata-only" || privacy.providerUrls !== "excluded" || privacy.credentials !== "excluded")
-    return fail12("Manifest privacy guarantees are unsupported");
+    return fail13("Manifest privacy guarantees are unsupported");
   const counts = object3(record.counts, "manifest.counts");
   exactKeys3(counts, LOCAL_MESSAGE_BUNDLE_V2_ARTIFACTS.map(({ kind }) => kind), "manifest.counts");
   const parsedCounts = Object.fromEntries(LOCAL_MESSAGE_BUNDLE_V2_ARTIFACTS.map(({ kind }) => [
@@ -17235,31 +18081,31 @@ function parseLocalMessageBundleV2Manifest(value) {
     integer3(counts[kind], `manifest.counts.${kind}`, LOCAL_MESSAGE_BUNDLE_V2_LIMITS.records)
   ]));
   if (parsedCounts.account > LOCAL_MESSAGE_BUNDLE_V2_LIMITS.accounts) {
-    return fail12(`Manifest exceeds the ${LOCAL_MESSAGE_BUNDLE_V2_LIMITS.accounts}-account safety bound`);
+    return fail13(`Manifest exceeds the ${LOCAL_MESSAGE_BUNDLE_V2_LIMITS.accounts}-account safety bound`);
   }
   if (parsedCounts.account !== 1) {
-    return fail12("A native Wacli bundle must contain exactly one connected account");
+    return fail13("A native Wacli bundle must contain exactly one connected account");
   }
   const artifactValues = array4(record.artifacts, "manifest.artifacts", LOCAL_MESSAGE_BUNDLE_V2_ARTIFACTS.length);
   if (artifactValues.length !== LOCAL_MESSAGE_BUNDLE_V2_ARTIFACTS.length) {
-    return fail12("Manifest must list the fixed six artifacts");
+    return fail13("Manifest must list the fixed six artifacts");
   }
   const artifacts = Object.freeze(artifactValues.map(parseArtifact2));
   let totalRecords = 0;
   let totalBytes = 0;
   for (const artifact of artifacts) {
     if (artifact.records !== parsedCounts[artifact.recordKind]) {
-      return fail12(`${artifact.path} count disagrees with manifest.counts`);
+      return fail13(`${artifact.path} count disagrees with manifest.counts`);
     }
     totalRecords += artifact.records;
     totalBytes += artifact.bytes;
   }
   if (totalRecords > LOCAL_MESSAGE_BUNDLE_V2_LIMITS.records || totalBytes > LOCAL_MESSAGE_BUNDLE_V2_LIMITS.totalBytes)
-    return fail12("Manifest exceeds the bundle record or byte bound");
+    return fail13("Manifest exceeds the bundle record or byte bound");
   const integrity = object3(record.integrity, "manifest.integrity");
   exactKeys3(integrity, ["algorithm", "bundleSha256"], "manifest.integrity");
   if (integrity.algorithm !== "sha256") {
-    return fail12("Manifest integrity algorithm is unsupported");
+    return fail13("Manifest integrity algorithm is unsupported");
   }
   const result = Object.freeze({
     schemaVersion: LOCAL_MESSAGE_BUNDLE_V2_SCHEMA_VERSION,
@@ -17273,7 +18119,7 @@ function parseLocalMessageBundleV2Manifest(value) {
       version: (() => {
         const parsed = version2(provider.version, "manifest.provider.version");
         if (parsed !== LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_VERSION) {
-          return fail12(`manifest.provider.version must be ${LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_VERSION}`);
+          return fail13(`manifest.provider.version must be ${LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_VERSION}`);
         }
         return LOCAL_MESSAGE_BUNDLE_V2_PROVIDER_VERSION;
       })()
@@ -17300,7 +18146,7 @@ function parseLocalMessageBundleV2Manifest(value) {
     })
   });
   if (localMessageBundleV2BundleSha256(localMessageBundleV2ManifestProjection(result)) !== result.integrity.bundleSha256)
-    return fail12("Manifest bundle SHA-256 does not match its canonical projection");
+    return fail13("Manifest bundle SHA-256 does not match its canonical projection");
   return result;
 }
 
@@ -17335,11 +18181,11 @@ function parseManifest(value) {
 function parseRecord(value, schemaVersion, kind, label) {
   return schemaVersion === LOCAL_MESSAGE_BUNDLE_V1_SCHEMA_VERSION ? contractValue(() => parseLocalMessageBundleV1Record(value, kind, label)) : contractValue(() => parseLocalMessageBundleV2Record(value, kind, label));
 }
-function sameFile2(left3, right3) {
+function sameFile3(left3, right3) {
   return left3.dev === right3.dev && left3.ino === right3.ino;
 }
 async function bundleDirectory(path) {
-  if (!isAbsolute2(path) || resolve2(path) !== path) {
+  if (!isAbsolute4(path) || resolve3(path) !== path) {
     throw new CliError("unsafe-path", "Bundle input must be a normalized absolute path");
   }
   const before2 = await lstat(path);
@@ -17349,7 +18195,7 @@ async function bundleDirectory(path) {
   if (physical !== path)
     throw new CliError("unsafe-path", "Bundle input path must not traverse a symbolic link");
   const after3 = await lstat(physical);
-  if (!sameFile2(before2, after3))
+  if (!sameFile3(before2, after3))
     throw new CliError("unsafe-path", "Bundle directory changed while resolving");
   const expected = ["manifest.json", ...LOCAL_MESSAGE_BUNDLE_V1_ARTIFACTS.map(({ path: artifactPath }) => artifactPath)].sort();
   const entries2 = (await readdir(physical)).sort();
@@ -17359,7 +18205,7 @@ async function bundleDirectory(path) {
   return physical;
 }
 async function openPrivateFile(path, maximumBytes, allowEmpty) {
-  const handle = await open(path, fsConstants2.O_RDONLY | fsConstants2.O_NOFOLLOW);
+  const handle = await open(path, fsConstants3.O_RDONLY | fsConstants3.O_NOFOLLOW);
   try {
     const before2 = await handle.stat({ bigint: true });
     if (!before2.isFile() || before2.nlink !== 1n || before2.size > BigInt(maximumBytes) || !allowEmpty && before2.size < 1n || (before2.mode & 0o777n) !== 0o600n || typeof process.getuid === "function" && before2.uid !== BigInt(process.getuid()))
@@ -17412,9 +18258,9 @@ async function readManifest(path) {
   }
 }
 async function readArtifact(root, schemaVersion, artifact) {
-  const path = join4(root, artifact.path);
+  const path = join6(root, artifact.path);
   const opened = await openPrivateFile(path, artifact.bytes, true);
-  const hash2 = createHash2("sha256");
+  const hash2 = createHash3("sha256");
   const records = [];
   let totalBytes = 0;
   let pending3 = Buffer.alloc(0);
@@ -17474,15 +18320,15 @@ async function readArtifact(root, schemaVersion, artifact) {
     throw new CliError("invalid-data", `${artifact.path} does not match its manifest integrity`);
   return Object.freeze(records);
 }
-function hmacKey(value) {
+function hmacKey2(value) {
   const key = typeof value === "string" ? new TextEncoder().encode(value) : value;
   if (!(key instanceof Uint8Array) || key.byteLength < 16 || key.byteLength > 1024) {
     throw new CliError("invalid-data", "Bundle HMAC key must contain 16 through 1024 bytes");
   }
   return Uint8Array.from(key);
 }
-function hmac2(key, namespace, value) {
-  return createHmac2("sha256", key).update(`message-like-me\x00bundle-${namespace}\x00`, "utf8").update(value, "utf8").digest("hex");
+function hmac3(key, namespace, value) {
+  return createHmac3("sha256", key).update(`message-like-me\x00bundle-${namespace}\x00`, "utf8").update(value, "utf8").digest("hex");
 }
 function compareCodeUnits(left3, right3) {
   return left3 < right3 ? -1 : left3 > right3 ? 1 : 0;
@@ -17635,18 +18481,18 @@ function normalizeBundle(manifest, manifestSha256, records, key) {
       account.provenance.connectedAccountProviderId,
       self.provenance.providerId
     ].join("\x00");
-    const sourceId = `source_${hmac2(key, "source", namespace)}`;
+    const sourceId = `source_${hmac3(key, "source", namespace)}`;
     if (sourceIds.has(sourceId)) {
       throw new CliError("invalid-data", "Connected accounts repeat a stable source realm");
     }
     sourceIds.add(sourceId);
     const conversationLocalIds = new Map(accountConversations.map((conversation) => [
       conversation.id,
-      `conversation_${hmac2(key, "conversation", `${namespace}\x00${conversation.provenance.providerId}`)}`
+      `conversation_${hmac3(key, "conversation", `${namespace}\x00${conversation.provenance.providerId}`)}`
     ]));
     const participantLocalIds = new Map(accountParticipants.map((participant) => [
       participant.id,
-      `participant_${hmac2(key, "participant", `${namespace}\x00${participant.provenance.providerId}`)}`
+      `participant_${hmac3(key, "participant", `${namespace}\x00${participant.provenance.providerId}`)}`
     ]));
     const normalizedConversations = accountConversations.map((conversation) => {
       const known = conversation.participantIds.flatMap((id) => {
@@ -17743,7 +18589,7 @@ function normalizeBundle(manifest, manifestSha256, records, key) {
     const localReactionIds = new Map;
     const timelineReactionIds = new Set;
     for (const [index, message] of analyzableMessages.entries()) {
-      const localId = `message_${hmac2(key, "message", `${namespace}\x00${message.provenance.providerId}`)}`;
+      const localId = `message_${hmac3(key, "message", `${namespace}\x00${message.provenance.providerId}`)}`;
       localMessageIds.set(message.id, localId);
       const body = message.bodyTruncated === true || message.deletion !== null ? null : message.body;
       normalizedMessages.push(Object.freeze({
@@ -17774,7 +18620,7 @@ function normalizeBundle(manifest, manifestSha256, records, key) {
     }
     const accountReactions = reactionsByAccount.get(account.id) ?? [];
     for (const reaction of accountReactions) {
-      localReactionIds.set(reaction.id, `message_${hmac2(key, "reaction", `${namespace}\x00${reaction.provenance.providerId}`)}`);
+      localReactionIds.set(reaction.id, `message_${hmac3(key, "reaction", `${namespace}\x00${reaction.provenance.providerId}`)}`);
     }
     const reactionFacts = [];
     for (const reaction of accountReactions) {
@@ -17962,7 +18808,7 @@ function normalizeBundle(manifest, manifestSha256, records, key) {
     ].sort(compareCodeUnits);
     const accountObservedFrom = accountTimelineBounds[0] ?? null;
     const accountObservedThrough = accountTimelineBounds.at(-1) ?? null;
-    const revisionHash = createHash2("sha256");
+    const revisionHash = createHash3("sha256");
     const revisionHeader = canonicalJson({
       schemaVersion: manifest.schemaVersion,
       source: manifest.source,
@@ -18028,9 +18874,9 @@ function normalizeBundle(manifest, manifestSha256, records, key) {
   return Object.freeze(result);
 }
 async function readMessageBundle(path, options) {
-  const key = hmacKey(options.hmacKey);
+  const key = hmacKey2(options.hmacKey);
   const root = await bundleDirectory(path);
-  const manifestResult = await readManifest(join4(root, "manifest.json"));
+  const manifestResult = await readManifest(join6(root, "manifest.json"));
   const manifest = manifestResult.manifest;
   const manifestSha256 = sha256(manifestResult.bytes);
   const parsedRecords = [];
@@ -18046,771 +18892,6 @@ async function readMessageBundle(path, options) {
     manifestSha256,
     sources: normalizeBundle(manifest, manifestSha256, records, key)
   });
-}
-
-// src/imessage.ts
-import { Database as Database2 } from "bun:sqlite";
-import { createHash as createHash3, createHmac as createHmac3 } from "crypto";
-import {
-  chmodSync as chmodSync2,
-  constants as fsConstants3,
-  copyFileSync as copyFileSync2,
-  lstatSync as lstatSync2,
-  mkdirSync as mkdirSync2,
-  mkdtempSync as mkdtempSync2,
-  realpathSync as realpathSync2,
-  rmSync as rmSync2
-} from "fs";
-import { homedir as homedir2, tmpdir as tmpdir2 } from "os";
-import { basename as basename2, isAbsolute as isAbsolute3, join as join5, resolve as resolve3 } from "path";
-var DEFAULT_IMESSAGE_DATABASE = join5(homedir2(), "Library", "Messages", "chat.db");
-var APPLE_EPOCH_MILLISECONDS = Date.UTC(2001, 0, 1);
-var DEFAULT_MAX_DATABASE_BYTES = 16 * 1024 * 1024 * 1024;
-var MAX_CONFIGURABLE_DATABASE_BYTES = 64 * 1024 * 1024 * 1024;
-var DEFAULT_MAX_MESSAGES = 5000000;
-var MAX_CONFIGURABLE_MESSAGES = 1e7;
-var DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
-var MAX_CONFIGURABLE_BODY_BYTES = 16 * 1024 * 1024;
-var DEFAULT_MAX_ATTRIBUTED_BODY_BYTES = 8 * 1024 * 1024;
-var MAX_CONFIGURABLE_ATTRIBUTED_BODY_BYTES = 32 * 1024 * 1024;
-var DEFAULT_PAGE_SIZE2 = 5000;
-var MAX_PAGE_SIZE2 = 20000;
-var MAX_HANDLES = 1e6;
-var MAX_CHATS = 1e6;
-var MAX_CHAT_HANDLE_JOINS = 5000000;
-var MAX_TEXT_IDENTITY_BYTES = 4096;
-var MAX_SQLITE_SHM_BYTES = 64 * 1024 * 1024;
-var SOURCE_SNAPSHOT_ATTEMPTS = 5;
-var TYPEDSTREAM_MARKER = new TextEncoder().encode("streamtyped");
-var NSSTRING_MARKER = new TextEncoder().encode("NSString");
-var WARNING_LABELS = Object.freeze([
-  { category: "spamOrCorrupt", label: "excluded spam or corrupt messages" },
-  { category: "unsupportedTimestamp", label: "excluded messages with unsupported timestamps" },
-  { category: "missingConversation", label: "excluded messages without conversations" },
-  {
-    category: "multipleConversations",
-    label: "messages joined to multiple conversations (lowest chat ROWID selected)"
-  },
-  {
-    category: "missingSenderHandle",
-    label: "incoming messages referencing missing sender handles"
-  },
-  {
-    category: "unsupportedAttributedBody",
-    label: "unsupported or over-bound attributed bodies"
-  }
-]);
-function fail13(message) {
-  throw new Error(`iMessage source ${message}`);
-}
-function stableJson(value) {
-  if (value === null || typeof value !== "object")
-    return JSON.stringify(value);
-  if (Array.isArray(value))
-    return `[${value.map(stableJson).join(",")}]`;
-  const record = value;
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
-}
-function sha2562(value) {
-  return createHash3("sha256").update(value).digest("hex");
-}
-function hmac3(key, namespace, value) {
-  return createHmac3("sha256", key).update(`message-like-me\x00${namespace}\x00`, "utf8").update(value, "utf8").digest("hex");
-}
-function hmacKey2(value) {
-  const key = typeof value === "string" ? new TextEncoder().encode(value) : value;
-  if (!(key instanceof Uint8Array) || key.byteLength < 16 || key.byteLength > 1024) {
-    throw new Error("iMessage HMAC key must contain 16 through 1024 bytes");
-  }
-  return Uint8Array.from(key);
-}
-function boundedInteger2(value, fallback, minimum, maximum, label) {
-  const result = value ?? fallback;
-  if (!Number.isSafeInteger(result) || result < minimum || result > maximum) {
-    throw new Error(`${label} must be an integer from ${minimum} through ${maximum}`);
-  }
-  return result;
-}
-function ownedByCurrentUser(stats) {
-  return typeof process.getuid !== "function" || stats.uid === BigInt(process.getuid());
-}
-function sameFile3(left3, right3) {
-  return left3.dev === right3.dev && left3.ino === right3.ino;
-}
-function inspectSource(path, maximumBytes) {
-  if (!isAbsolute3(path))
-    return fail13("path must be absolute");
-  const requested = resolve3(path);
-  const requestedStats = lstatSync2(requested, { bigint: true });
-  if (!requestedStats.isFile() || requestedStats.isSymbolicLink() || requestedStats.nlink !== 1n || !ownedByCurrentUser(requestedStats) || requestedStats.size < 1n || requestedStats.size > BigInt(maximumBytes)) {
-    return fail13("must be one current-user-owned regular non-symlink file within the configured size bound");
-  }
-  const physicalPath = realpathSync2(requested);
-  const physicalStats = lstatSync2(physicalPath, { bigint: true });
-  if (!sameFile3(requestedStats, physicalStats)) {
-    return fail13("changed identity while its path was resolved");
-  }
-  return Object.freeze({ path: physicalPath, stats: physicalStats });
-}
-function optionalStats2(path) {
-  try {
-    return lstatSync2(path, { bigint: true });
-  } catch (error) {
-    if (error.code === "ENOENT")
-      return null;
-    throw error;
-  }
-}
-function validateSidecar2(path, stats, maximumBytes) {
-  if (!stats.isFile() || stats.isSymbolicLink() || stats.nlink !== 1n || !ownedByCurrentUser(stats) || stats.size < 0n || stats.size > BigInt(maximumBytes)) {
-    return fail13(`sidecar ${basename2(path)} must be one current-user-owned regular non-symlink file within its size bound`);
-  }
-}
-function snapshotMembers2(source, maximumBytes) {
-  const current = inspectSource(source.path, maximumBytes);
-  if (!sameFile3(source.stats, current.stats))
-    return fail13("changed identity before its snapshot was isolated");
-  const members = [{ suffix: "", path: current.path, stats: current.stats }];
-  for (const suffix of ["-wal", "-journal"]) {
-    const path = `${source.path}${suffix}`;
-    const stats = optionalStats2(path);
-    if (stats === null)
-      continue;
-    validateSidecar2(path, stats, maximumBytes);
-    members.push(Object.freeze({ suffix, path, stats }));
-  }
-  const shmPath = `${source.path}-shm`;
-  const shm = optionalStats2(shmPath);
-  if (shm !== null)
-    validateSidecar2(shmPath, shm, MAX_SQLITE_SHM_BYTES);
-  const totalBytes = members.reduce((total, member) => total + member.stats.size, 0n);
-  if (totalBytes > BigInt(maximumBytes) * 2n) {
-    return fail13("database and transactional sidecars exceed the configured snapshot size bound");
-  }
-  return Object.freeze(members);
-}
-function sameSnapshotMembers(left3, right3) {
-  return left3.length === right3.length && left3.every((member, index) => {
-    const other = right3[index];
-    return other !== undefined && member.suffix === other.suffix && sameFile3(member.stats, other.stats) && member.stats.size === other.stats.size && member.stats.mtimeNs === other.stats.mtimeNs && member.stats.ctimeNs === other.stats.ctimeNs;
-  });
-}
-function isolateSource2(source, maximumBytes) {
-  const temporaryRoot = tmpdir2();
-  if (!isAbsolute3(temporaryRoot))
-    return fail13("requires an absolute temporary directory");
-  const temporaryDirectory = mkdtempSync2(join5(temporaryRoot, "message-like-me-source-"));
-  chmodSync2(temporaryDirectory, 448);
-  try {
-    for (let attempt = 0;attempt < SOURCE_SNAPSHOT_ATTEMPTS; attempt += 1) {
-      const before2 = snapshotMembers2(source, maximumBytes);
-      const attemptDirectory = join5(temporaryDirectory, `attempt-${attempt}`);
-      mkdirSync2(attemptDirectory, { mode: 448 });
-      let copyFailedForRace = false;
-      try {
-        for (const member of before2) {
-          const destination = join5(attemptDirectory, `${basename2(source.path)}${member.suffix}`);
-          copyFileSync2(member.path, destination, fsConstants3.COPYFILE_EXCL | fsConstants3.COPYFILE_FICLONE);
-          chmodSync2(destination, 384);
-        }
-      } catch (error) {
-        const code = error.code;
-        if (code === "ENOENT" || code === "ESTALE")
-          copyFailedForRace = true;
-        else
-          throw error;
-      }
-      const after3 = snapshotMembers2(source, maximumBytes);
-      if (!copyFailedForRace && sameSnapshotMembers(before2, after3)) {
-        return Object.freeze({
-          source: Object.freeze({ path: source.path, stats: before2[0].stats }),
-          path: join5(attemptDirectory, basename2(source.path)),
-          temporaryDirectory
-        });
-      }
-      rmSync2(attemptDirectory, { recursive: true, force: true });
-    }
-    return fail13(`changed during ${SOURCE_SNAPSHOT_ATTEMPTS} attempts to isolate a consistent snapshot`);
-  } catch (error) {
-    rmSync2(temporaryDirectory, { recursive: true, force: true });
-    throw error;
-  }
-}
-function allRows2(database, sql, ...bindings) {
-  return database.query(sql).all(...bindings);
-}
-function getRow2(database, sql, ...bindings) {
-  return database.query(sql).get(...bindings);
-}
-function safeInteger(value, label, nullable = false) {
-  if (nullable && value === null)
-    return null;
-  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
-    return fail13(`${label} must be a safe integer`);
-  }
-  return value;
-}
-function flag2(value, label, fallback = 0) {
-  if (value === null)
-    return fallback;
-  const parsed = safeInteger(value, label);
-  if (parsed !== 0 && parsed !== 1)
-    return fail13(`${label} must be zero or one`);
-  return parsed;
-}
-function privateText(value, label, nullable = false, allowEmpty = false) {
-  if (nullable && value === null)
-    return null;
-  if (typeof value !== "string" || !allowEmpty && value.length === 0 || Buffer.byteLength(value, "utf8") > MAX_TEXT_IDENTITY_BYTES || value.includes("\x00"))
-    return fail13(`${label} must be bounded text`);
-  return value;
-}
-function bodyText(value, label, maximumBytes) {
-  if (value === null)
-    return null;
-  if (typeof value !== "string")
-    return fail13(`${label} must be text or null`);
-  if (Buffer.byteLength(value, "utf8") > maximumBytes) {
-    return fail13(`${label} exceeds the configured body bound`);
-  }
-  return value;
-}
-function blob(value, label) {
-  if (value === null)
-    return null;
-  if (value instanceof Uint8Array)
-    return Uint8Array.from(value);
-  return fail13(`${label} must be binary data or null`);
-}
-function tableColumns2(database, table) {
-  return allRows2(database, `SELECT cid,name,type,"notnull",dflt_value,pk FROM pragma_table_info('${table}') ORDER BY cid`).map((row) => Object.freeze({
-    cid: safeInteger(row.cid, `${table} column ordinal`),
-    name: privateText(row.name, `${table} column name`),
-    type: privateText(row.type, `${table} column type`, false, true),
-    notnull: safeInteger(row.notnull, `${table} column nullability`),
-    dflt_value: row.dflt_value,
-    pk: safeInteger(row.pk, `${table} column primary-key position`)
-  }));
-}
-function tableNames2(database) {
-  return new Set(allRows2(database, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").map((row) => privateText(row.name, "table name")));
-}
-function inspectSchema(database) {
-  const names = tableNames2(database);
-  const required = Object.freeze({
-    message: ["ROWID", "guid", "service", "handle_id", "date", "is_from_me"],
-    handle: ["ROWID", "id", "service"],
-    chat: ["ROWID", "guid", "style"],
-    chat_message_join: ["chat_id", "message_id"],
-    chat_handle_join: ["chat_id", "handle_id"]
-  });
-  const inspected = new Map;
-  const sets = new Map;
-  for (const [table, columns] of Object.entries(required)) {
-    if (!names.has(table))
-      return fail13(`is missing required table ${table}`);
-    const shape = tableColumns2(database, table);
-    const set7 = new Set(shape.map((column) => column.name));
-    for (const column of columns) {
-      if (!set7.has(column))
-        return fail13(`${table} is missing required column ${column}`);
-    }
-    inspected.set(table, shape);
-    sets.set(table, set7);
-  }
-  const messageColumns = sets.get("message");
-  if (messageColumns === undefined || !messageColumns.has("text") && !messageColumns.has("attributedBody")) {
-    return fail13("message must expose text or attributedBody");
-  }
-  let hasAttachmentJoin = false;
-  if (names.has("message_attachment_join")) {
-    const shape = tableColumns2(database, "message_attachment_join");
-    const set7 = new Set(shape.map((column) => column.name));
-    for (const column of ["message_id", "attachment_id"]) {
-      if (!set7.has(column))
-        return fail13(`message_attachment_join is missing required column ${column}`);
-    }
-    inspected.set("message_attachment_join", shape);
-    sets.set("message_attachment_join", set7);
-    hasAttachmentJoin = true;
-  }
-  const serialized = [...inspected.entries()].sort(([left3], [right3]) => left3.localeCompare(right3, "en-US")).map(([table, columns]) => ({ table, columns }));
-  return Object.freeze({ hash: sha2562(stableJson(serialized)), tables: sets, hasAttachmentJoin });
-}
-function boundedTableCount(database, table, maximum) {
-  const row = getRow2(database, `SELECT count(*) AS value FROM ${table}`);
-  const count = safeInteger(row?.value, `${table} row count`);
-  if (count === null || count < 0 || count > maximum) {
-    return fail13(`${table} exceeds its supported row bound`);
-  }
-  return count;
-}
-function indexOfBytes(haystack, needle, start3) {
-  const last2 = haystack.byteLength - needle.byteLength;
-  for (let offset = Math.max(0, start3);offset <= last2; offset += 1) {
-    let match14 = true;
-    for (let index = 0;index < needle.byteLength; index += 1) {
-      if (haystack[offset + index] !== needle[index]) {
-        match14 = false;
-        break;
-      }
-    }
-    if (match14)
-      return offset;
-  }
-  return -1;
-}
-function typedstreamLength(bytes, offset, maximum) {
-  const marker = bytes[offset];
-  if (marker === undefined)
-    return null;
-  if (marker <= 127) {
-    return marker <= maximum ? Object.freeze({ length: marker, next: offset + 1 }) : null;
-  }
-  const width = marker === 129 ? 2 : marker === 130 ? 4 : marker === 131 ? 8 : 0;
-  if (width === 0 || offset + 1 + width > bytes.byteLength)
-    return null;
-  let length2 = 0n;
-  for (let index = width - 1;index >= 0; index -= 1) {
-    length2 = length2 << 8n | BigInt(bytes[offset + 1 + index]);
-  }
-  if (length2 > BigInt(maximum) || length2 > BigInt(Number.MAX_SAFE_INTEGER))
-    return null;
-  return Object.freeze({ length: Number(length2), next: offset + 1 + width });
-}
-function decodeStringPayload(payload) {
-  try {
-    if (payload.byteLength >= 2 && payload[0] === 255 && payload[1] === 254) {
-      return new TextDecoder("utf-16le", { fatal: true }).decode(payload.subarray(2));
-    }
-    if (payload.byteLength >= 2 && payload[0] === 254 && payload[1] === 255) {
-      const swapped = new Uint8Array(payload.byteLength - 2);
-      for (let index = 2;index + 1 < payload.byteLength; index += 2) {
-        swapped[index - 2] = payload[index + 1];
-        swapped[index - 1] = payload[index];
-      }
-      if (swapped.byteLength % 2 !== 0)
-        return null;
-      return new TextDecoder("utf-16le", { fatal: true }).decode(swapped);
-    }
-    return new TextDecoder("utf-8", { fatal: true }).decode(payload);
-  } catch {
-    return null;
-  }
-}
-function decodeAttributedBody(value, maximumBlobBytes = DEFAULT_MAX_ATTRIBUTED_BODY_BYTES, maximumBodyBytes = DEFAULT_MAX_BODY_BYTES) {
-  if (!(value instanceof Uint8Array) || !Number.isSafeInteger(maximumBlobBytes) || !Number.isSafeInteger(maximumBodyBytes) || maximumBlobBytes < 1 || maximumBodyBytes < 1 || value.byteLength < TYPEDSTREAM_MARKER.byteLength || value.byteLength > maximumBlobBytes || indexOfBytes(value, TYPEDSTREAM_MARKER, 0) < 0)
-    return null;
-  let searchFrom = 0;
-  for (;; ) {
-    const marker = indexOfBytes(value, NSSTRING_MARKER, searchFrom);
-    if (marker < 0)
-      return null;
-    const markerEnd = marker + NSSTRING_MARKER.byteLength;
-    const end3 = Math.min(value.byteLength - 1, markerEnd + 32);
-    const preferredTag = markerEnd + 4;
-    const tagOffsets = [
-      ...preferredTag <= end3 ? [preferredTag] : [],
-      ...Array.from({ length: Math.max(0, end3 - markerEnd + 1) }, (_unused, index) => markerEnd + index).filter((offset) => offset !== preferredTag)
-    ];
-    for (const tagOffset of tagOffsets) {
-      if (value[tagOffset] !== 43)
-        continue;
-      const length2 = typedstreamLength(value, tagOffset + 1, maximumBodyBytes);
-      if (length2 === null || length2.next + length2.length > value.byteLength)
-        continue;
-      const decoded = decodeStringPayload(value.subarray(length2.next, length2.next + length2.length));
-      if (decoded !== null && !decoded.includes("\x00") && Buffer.byteLength(decoded, "utf8") <= maximumBodyBytes)
-        return decoded;
-    }
-    searchFrom = markerEnd;
-  }
-}
-function appleTimestamp(value) {
-  if (value === null || value === "" || value === "0")
-    return null;
-  let millisecondsSinceEpoch;
-  if (/^[0-9]+$/u.test(value)) {
-    const raw = BigInt(value);
-    if (raw <= 0n || raw > 4000000000000000000n)
-      return null;
-    if (raw < 4000000000n)
-      millisecondsSinceEpoch = Number(raw * 1000n);
-    else if (raw < 4000000000000n)
-      millisecondsSinceEpoch = Number(raw);
-    else if (raw < 4000000000000000n)
-      millisecondsSinceEpoch = Number(raw / 1000n);
-    else
-      millisecondsSinceEpoch = Number(raw / 1000000n);
-  } else if (/^[0-9]+\.[0-9]+$/u.test(value)) {
-    const seconds2 = Number(value);
-    if (!Number.isFinite(seconds2) || seconds2 <= 0 || seconds2 >= 4000000000)
-      return null;
-    millisecondsSinceEpoch = Math.trunc(seconds2 * 1000);
-  } else
-    return null;
-  if (!Number.isSafeInteger(millisecondsSinceEpoch))
-    return null;
-  const result = new Date(APPLE_EPOCH_MILLISECONDS + millisecondsSinceEpoch);
-  const year = result.getUTCFullYear();
-  return year >= 2001 && year <= 2200 ? result.toISOString() : null;
-}
-function hasAppleTimestampMarker(value) {
-  if (value === null || value === "")
-    return false;
-  return !/^0+(?:\.0+)?$/u.test(value);
-}
-function columnExpression(columns, column, expression, alias) {
-  return columns.has(column) ? `${expression} AS ${alias}` : `NULL AS ${alias}`;
-}
-function boundedTextExpression(columns, column, maximumBytes) {
-  if (!columns.has(column))
-    return "NULL AS message_text, 0 AS message_text_over_bound";
-  return `CASE WHEN ${column} IS NULL OR length(CAST(${column} AS BLOB)) <= ${maximumBytes}
-    THEN ${column} ELSE NULL END AS message_text,
-    CASE WHEN ${column} IS NOT NULL AND length(CAST(${column} AS BLOB)) > ${maximumBytes}
-    THEN 1 ELSE 0 END AS message_text_over_bound`;
-}
-function boundedBlobExpression(columns, column, maximumBytes) {
-  if (!columns.has(column)) {
-    return "NULL AS attributed_body, 0 AS attributed_body_over_bound";
-  }
-  return `CASE WHEN ${column} IS NULL OR length(${column}) <= ${maximumBytes}
-    THEN ${column} ELSE NULL END AS attributed_body,
-    CASE WHEN ${column} IS NOT NULL AND length(${column}) > ${maximumBytes}
-    THEN 1 ELSE 0 END AS attributed_body_over_bound`;
-}
-function loadHandles(database, key) {
-  boundedTableCount(database, "handle", MAX_HANDLES);
-  const result = new Map;
-  for (const row of allRows2(database, "SELECT ROWID,id,service FROM handle ORDER BY ROWID")) {
-    const rowId = safeInteger(row.ROWID, "handle ROWID");
-    const id = privateText(row.id, "handle identity");
-    const service3 = privateText(row.service, "handle service", true);
-    if (result.has(rowId))
-      return fail13("contains duplicate handle ROWIDs");
-    result.set(rowId, Object.freeze({
-      rowId,
-      id,
-      service: service3,
-      participantId: hmac3(key, "participant", `${service3 ?? ""}\x00${id}`)
-    }));
-  }
-  return result;
-}
-function loadChats(database, schema, handles, key) {
-  boundedTableCount(database, "chat", MAX_CHATS);
-  boundedTableCount(database, "chat_handle_join", MAX_CHAT_HANDLE_JOINS);
-  const handleIds = new Map;
-  for (const row of allRows2(database, "SELECT chat_id,handle_id FROM chat_handle_join ORDER BY chat_id,handle_id")) {
-    const chatId = safeInteger(row.chat_id, "chat participant chat ID");
-    const handleId = safeInteger(row.handle_id, "chat participant handle ID");
-    if (!handles.has(handleId))
-      return fail13("chat participant references a missing handle");
-    const set7 = handleIds.get(chatId) ?? new Set;
-    set7.add(handleId);
-    handleIds.set(chatId, set7);
-  }
-  const columns = schema.tables.get("chat");
-  if (columns === undefined)
-    return fail13("chat schema disappeared");
-  const rows = allRows2(database, `SELECT ROWID,guid,style,
-    ${columnExpression(columns, "display_name", "display_name", "display_name")},
-    ${columnExpression(columns, "service_name", "service_name", "service_name")}
-    FROM chat ORDER BY ROWID`);
-  const result = new Map;
-  const conversationIds = new Set;
-  for (const row of rows) {
-    const rowId = safeInteger(row.ROWID, "chat ROWID");
-    const sourceKey = privateText(row.guid, "chat GUID");
-    safeInteger(row.style, "chat style", true);
-    const privateLabel2 = privateText(row.display_name, "chat display name", true, true);
-    const declaredService = privateText(row.service_name, "chat service", true, true);
-    const participants = [...handleIds.get(rowId) ?? new Set].sort((left3, right3) => left3 - right3).map((handleId) => handles.get(handleId)).filter((handle) => handle !== undefined);
-    const services = [...new Set(participants.map((participant) => participant.service).filter((service3) => service3 !== null))].sort();
-    const conversation = Object.freeze({
-      id: hmac3(key, "conversation", sourceKey),
-      sourceKey,
-      privateLabel: privateLabel2,
-      service: declaredService === null || declaredService === "" ? services.length === 1 ? services[0] : null : declaredService,
-      participantCount: participants.length,
-      participantIds: Object.freeze(participants.map((participant) => participant.participantId)),
-      privateParticipants: Object.freeze(participants.map((participant) => participant.id)),
-      group: participants.length > 1
-    });
-    if (result.has(rowId) || conversationIds.has(conversation.id)) {
-      return fail13("contains duplicate chat identities");
-    }
-    result.set(rowId, Object.freeze({ rowId, conversation }));
-    conversationIds.add(conversation.id);
-  }
-  return result;
-}
-function loadChatJoins(database, first, last2) {
-  const grouped = new Map;
-  for (const row of allRows2(database, `SELECT message_id,chat_id
-    FROM chat_message_join WHERE message_id BETWEEN ? AND ? ORDER BY message_id,chat_id`, first, last2)) {
-    const messageId = safeInteger(row.message_id, "chat-message message ID");
-    const chatId = safeInteger(row.chat_id, "chat-message chat ID");
-    const values3 = grouped.get(messageId) ?? new Set;
-    values3.add(chatId);
-    grouped.set(messageId, values3);
-  }
-  return new Map([...grouped.entries()].map(([messageId, values3]) => [
-    messageId,
-    Object.freeze([...values3].sort((left3, right3) => left3 - right3))
-  ]));
-}
-function loadAttachmentCounts(database, schema, first, last2) {
-  if (!schema.hasAttachmentJoin)
-    return new Map;
-  const result = new Map;
-  for (const row of allRows2(database, `SELECT message_id,
-    count(DISTINCT attachment_id) AS value FROM message_attachment_join
-    WHERE message_id BETWEEN ? AND ? GROUP BY message_id ORDER BY message_id`, first, last2)) {
-    const messageId = safeInteger(row.message_id, "attachment message ID");
-    const count = safeInteger(row.value, "message attachment count");
-    if (count < 0)
-      return fail13("contains a negative attachment count");
-    result.set(messageId, count);
-  }
-  return result;
-}
-function messageRows(database, schema, afterRowId, pageSize, maximumBodyBytes, maximumAttributedBodyBytes) {
-  const columns = schema.tables.get("message");
-  if (columns === undefined)
-    return fail13("message schema disappeared");
-  const rows = allRows2(database, `SELECT
-    ROWID AS source_rowid,guid,service,handle_id,CAST(date AS TEXT) AS date_text,is_from_me,
-    ${boundedTextExpression(columns, "text", maximumBodyBytes)},
-    ${boundedBlobExpression(columns, "attributedBody", maximumAttributedBodyBytes)},
-    ${columnExpression(columns, "item_type", "item_type", "item_type")},
-    ${columnExpression(columns, "associated_message_type", "associated_message_type", "associated_message_type")},
-    ${columnExpression(columns, "associated_message_guid", "associated_message_guid", "associated_message_guid")},
-    ${columnExpression(columns, "thread_originator_guid", "thread_originator_guid", "thread_originator_guid")},
-    ${columnExpression(columns, "reply_to_guid", "reply_to_guid", "reply_to_guid")},
-    ${columnExpression(columns, "is_system_message", "is_system_message", "is_system_message")},
-    ${columnExpression(columns, "is_service_message", "is_service_message", "is_service_message")},
-    ${columnExpression(columns, "is_spam", "is_spam", "is_spam")},
-    ${columnExpression(columns, "is_corrupt", "is_corrupt", "is_corrupt")},
-    ${columnExpression(columns, "date_edited", "CAST(date_edited AS TEXT)", "date_edited_text")},
-    ${columnExpression(columns, "date_retracted", "CAST(date_retracted AS TEXT)", "date_retracted_text")},
-    ${columnExpression(columns, "cache_has_attachments", "cache_has_attachments", "cache_has_attachments")}
-    FROM message WHERE ROWID>? ORDER BY ROWID LIMIT ?`, afterRowId, pageSize);
-  return rows.map((row) => Object.freeze({
-    sourceRowId: safeInteger(row.source_rowid, "message ROWID"),
-    sourceGuid: privateText(row.guid, "message GUID"),
-    service: privateText(row.service, "message service", true, true),
-    handleId: safeInteger(row.handle_id, "message sender handle ID", true),
-    dateText: privateText(row.date_text, "message date", true, true),
-    isFromMe: flag2(row.is_from_me, "message direction"),
-    text: bodyText(row.message_text, "message text", maximumBodyBytes),
-    textOverBound: flag2(row.message_text_over_bound, "message text bound flag"),
-    attributedBody: blob(row.attributed_body, "message attributed body"),
-    attributedBodyOverBound: flag2(row.attributed_body_over_bound, "message attributed-body bound flag"),
-    itemType: row.item_type === null ? 0 : safeInteger(row.item_type, "message item type"),
-    associatedMessageType: row.associated_message_type === null ? 0 : safeInteger(row.associated_message_type, "message associated-message type"),
-    associatedMessageGuid: privateText(row.associated_message_guid, "associated message GUID", true, true),
-    threadOriginatorGuid: privateText(row.thread_originator_guid, "thread originator GUID", true, true),
-    replyToGuid: privateText(row.reply_to_guid, "reply-to GUID", true, true),
-    isSystemMessage: flag2(row.is_system_message, "message system flag"),
-    isServiceMessage: flag2(row.is_service_message, "message service flag"),
-    isSpam: flag2(row.is_spam, "message spam flag"),
-    isCorrupt: flag2(row.is_corrupt, "message corrupt flag"),
-    editedDateText: privateText(row.date_edited_text, "message edited date", true, true),
-    retractedDateText: privateText(row.date_retracted_text, "message retracted date", true, true),
-    cacheHasAttachments: flag2(row.cache_has_attachments, "message attachment cache flag")
-  }));
-}
-function messageBody(row, maximumAttributedBodyBytes, maximumBodyBytes) {
-  if (row.text !== null)
-    return Object.freeze({ body: row.text, bodySource: "text" });
-  if (row.attributedBody !== null) {
-    const decoded = decodeAttributedBody(row.attributedBody, maximumAttributedBodyBytes, maximumBodyBytes);
-    if (decoded !== null)
-      return Object.freeze({ body: decoded, bodySource: "attributed-body" });
-  }
-  return Object.freeze({ body: null, bodySource: "unavailable" });
-}
-function messageKind(row, body, attachmentCount) {
-  if (row.associatedMessageType !== 0 || (row.associatedMessageGuid ?? "") !== "")
-    return "reaction";
-  if (row.itemType !== 0 || row.isSystemMessage !== 0 || row.isServiceMessage !== 0)
-    return "system";
-  if (body !== null)
-    return "text";
-  if (attachmentCount > 0 || row.cacheHasAttachments === 1)
-    return "attachment";
-  return "unknown";
-}
-function sourceModifiedAt(stats) {
-  const milliseconds = Number(stats.mtimeMs);
-  if (!Number.isFinite(milliseconds))
-    return fail13("has an invalid modification time");
-  return new Date(milliseconds).toISOString();
-}
-function aggregateWarnings(counts, hasAttachmentJoin) {
-  const warnings = [];
-  if (!hasAttachmentJoin) {
-    warnings.push("message_attachment_join is unavailable; attachment counts are presence lower bounds");
-  }
-  for (const { category, label } of WARNING_LABELS) {
-    const count = counts[category];
-    if (count > 0)
-      warnings.push(`${label}: ${count}`);
-  }
-  return Object.freeze(warnings);
-}
-function readIMessageDatabase(path, options) {
-  const key = hmacKey2(options.hmacKey);
-  const maximumDatabaseBytes = boundedInteger2(options.maxDatabaseBytes, DEFAULT_MAX_DATABASE_BYTES, 1, MAX_CONFIGURABLE_DATABASE_BYTES, "maxDatabaseBytes");
-  const maximumMessages = boundedInteger2(options.maxMessages, DEFAULT_MAX_MESSAGES, 1, MAX_CONFIGURABLE_MESSAGES, "maxMessages");
-  const maximumBodyBytes = boundedInteger2(options.maxBodyBytes, DEFAULT_MAX_BODY_BYTES, 1, MAX_CONFIGURABLE_BODY_BYTES, "maxBodyBytes");
-  const maximumAttributedBodyBytes = boundedInteger2(options.maxAttributedBodyBytes, DEFAULT_MAX_ATTRIBUTED_BODY_BYTES, 1, MAX_CONFIGURABLE_ATTRIBUTED_BODY_BYTES, "maxAttributedBodyBytes");
-  const pageSize = boundedInteger2(options.pageSize, DEFAULT_PAGE_SIZE2, 1, MAX_PAGE_SIZE2, "pageSize");
-  const requestedSource = inspectSource(path, maximumDatabaseBytes);
-  const isolated = isolateSource2(requestedSource, maximumDatabaseBytes);
-  const source = isolated.source;
-  let database = null;
-  let transactionOpen = false;
-  try {
-    database = new Database2(isolated.path, { strict: true });
-    database.exec("PRAGMA trusted_schema=OFF; PRAGMA temp_store=MEMORY; PRAGMA mmap_size=0; PRAGMA query_only=ON");
-    const queryOnly = getRow2(database, "PRAGMA query_only");
-    if (queryOnly?.query_only !== 1)
-      return fail13("could not enable query-only mode");
-    database.exec("BEGIN");
-    transactionOpen = true;
-    const schema = inspectSchema(database);
-    boundedTableCount(database, "message", maximumMessages);
-    const handles = loadHandles(database, key);
-    const chats = loadChats(database, schema, handles, key);
-    const warningCounts = {
-      spamOrCorrupt: 0,
-      unsupportedTimestamp: 0,
-      missingConversation: 0,
-      multipleConversations: 0,
-      missingSenderHandle: 0,
-      unsupportedAttributedBody: 0
-    };
-    const messages = [];
-    const messageIds = new Set;
-    let afterRowId = 0;
-    for (;; ) {
-      const page = messageRows(database, schema, afterRowId, pageSize, maximumBodyBytes, maximumAttributedBodyBytes);
-      if (page.length === 0)
-        break;
-      const first = page[0]?.sourceRowId;
-      const last2 = page.at(-1)?.sourceRowId;
-      if (first === undefined || last2 === undefined || first <= afterRowId || last2 < first) {
-        return fail13("message paging order is inconsistent");
-      }
-      const joins = loadChatJoins(database, first, last2);
-      const attachments = loadAttachmentCounts(database, schema, first, last2);
-      for (const row of page) {
-        const id = hmac3(key, "message", row.sourceGuid);
-        if (messageIds.has(id))
-          return fail13("contains duplicate message GUIDs");
-        if (row.isSpam === 1 || row.isCorrupt === 1) {
-          warningCounts.spamOrCorrupt += 1;
-          continue;
-        }
-        if (row.textOverBound === 1) {
-          return fail13(`message text ${id} exceeds the configured body bound`);
-        }
-        if (row.attributedBodyOverBound === 1) {
-          return fail13(`attributed body ${id} exceeds the configured attributed-body bound`);
-        }
-        const sentAt = appleTimestamp(row.dateText);
-        if (sentAt === null) {
-          warningCounts.unsupportedTimestamp += 1;
-          continue;
-        }
-        const chatIds = joins.get(row.sourceRowId) ?? [];
-        const chatId = chatIds[0];
-        if (chatId === undefined) {
-          warningCounts.missingConversation += 1;
-          continue;
-        }
-        if (chatIds.length > 1) {
-          warningCounts.multipleConversations += 1;
-        }
-        const chat = chats.get(chatId);
-        if (chat === undefined)
-          return fail13("message references a missing chat");
-        if (row.isFromMe === 0 && row.handleId !== null && !handles.has(row.handleId)) {
-          warningCounts.missingSenderHandle += 1;
-        }
-        const decodedBody = messageBody(row, maximumAttributedBodyBytes, maximumBodyBytes);
-        if (row.text === null && row.attributedBody !== null && decodedBody.body === null) {
-          warningCounts.unsupportedAttributedBody += 1;
-        }
-        const attachmentCount = attachments.get(row.sourceRowId) ?? (row.cacheHasAttachments === 1 ? 1 : 0);
-        const kind = messageKind(row, decodedBody.body, attachmentCount);
-        const retractedAt = appleTimestamp(row.retractedDateText);
-        const retainBody = !hasAppleTimestampMarker(row.retractedDateText) && kind !== "reaction" && kind !== "system";
-        const body = retainBody ? decodedBody : Object.freeze({ body: null, bodySource: "unavailable" });
-        messages.push(Object.freeze({
-          id,
-          sourceRowId: row.sourceRowId,
-          sourceGuid: row.sourceGuid,
-          conversationId: chat.conversation.id,
-          sentAt,
-          direction: row.isFromMe === 1 ? "outgoing" : "incoming",
-          body: body.body,
-          bodySource: body.bodySource,
-          kind,
-          replyToSourceGuid: (row.threadOriginatorGuid || row.replyToGuid) ?? null,
-          replyState: row.threadOriginatorGuid || row.replyToGuid ? "explicit" : "none",
-          editedAt: appleTimestamp(row.editedDateText),
-          retractedAt,
-          service: row.service === "" ? null : row.service,
-          attachmentCount
-        }));
-        messageIds.add(id);
-      }
-      afterRowId = last2;
-    }
-    messages.sort((left3, right3) => {
-      const time = left3.sentAt.localeCompare(right3.sentAt, "en-US");
-      return time !== 0 ? time : left3.sourceRowId - right3.sourceRowId || left3.id.localeCompare(right3.id, "en-US");
-    });
-    const conversations = [...chats.values()].map((chat) => chat.conversation).sort((left3, right3) => left3.id.localeCompare(right3.id, "en-US"));
-    database.exec("COMMIT");
-    transactionOpen = false;
-    const snapshotSha256 = sha2562(stableJson({
-      schemaVersion: CORPUS_SCHEMA_VERSION,
-      schemaSha256: schema.hash,
-      conversations,
-      messages
-    }));
-    return Object.freeze({
-      schemaVersion: CORPUS_SCHEMA_VERSION,
-      source: Object.freeze({
-        physicalPath: source.path,
-        device: source.stats.dev.toString(),
-        inode: source.stats.ino.toString(),
-        bytes: Number(source.stats.size),
-        modifiedAt: sourceModifiedAt(source.stats),
-        schemaSha256: schema.hash,
-        snapshotSha256
-      }),
-      conversations: Object.freeze(conversations),
-      messages: Object.freeze(messages),
-      warnings: aggregateWarnings(warningCounts, schema.hasAttachmentJoin)
-    });
-  } finally {
-    if (transactionOpen && database !== null) {
-      try {
-        database.exec("ROLLBACK");
-      } catch {}
-    }
-    try {
-      database?.close();
-    } finally {
-      rmSync2(isolated.temporaryDirectory, { recursive: true, force: true });
-    }
-  }
 }
 
 // src/paths.ts
@@ -18842,32 +18923,32 @@ import {
   stat
 } from "fs/promises";
 import { homedir as homedir3, platform } from "os";
-import { basename as basename3, dirname as dirname2, isAbsolute as isAbsolute4, join as join6, resolve as resolve4 } from "path";
+import { basename as basename3, dirname as dirname2, isAbsolute as isAbsolute5, join as join7, resolve as resolve4 } from "path";
 function defaultDataDirectory() {
   const override = process.env.XDG_DATA_HOME;
   if (override !== undefined && override.trim() !== "") {
-    if (!isAbsolute4(override)) {
+    if (!isAbsolute5(override)) {
       throw new CliError("unsafe-path", "XDG_DATA_HOME must be absolute");
     }
-    return join6(resolve4(override), "message-like-me");
+    return join7(resolve4(override), "message-like-me");
   }
   if (platform() === "darwin") {
-    return join6(homedir3(), "Library", "Application Support", "Message Like Me");
+    return join7(homedir3(), "Library", "Application Support", "Message Like Me");
   }
-  return join6(homedir3(), ".local", "share", "message-like-me");
+  return join7(homedir3(), ".local", "share", "message-like-me");
 }
 function dataPaths(explicit) {
-  if (explicit !== undefined && !isAbsolute4(explicit)) {
+  if (explicit !== undefined && !isAbsolute5(explicit)) {
     throw new CliError("unsafe-path", "Data directory must be absolute");
   }
   const root = explicit === undefined ? defaultDataDirectory() : resolve4(explicit);
-  if (!isAbsolute4(root))
+  if (!isAbsolute5(root))
     throw new CliError("unsafe-path", "Data directory must be absolute");
   return {
     root,
-    database: join6(root, "message-like-me.sqlite3"),
-    installKey: join6(root, "install.key"),
-    packets: join6(root, "study-packets")
+    database: join7(root, "message-like-me.sqlite3"),
+    installKey: join7(root, "install.key"),
+    packets: join7(root, "study-packets")
   };
 }
 async function existingType(path) {
@@ -18905,11 +18986,11 @@ async function ensurePrivateDirectory(path) {
 }
 async function initializeDataPaths(paths) {
   const physicalRoot = await ensurePrivateDirectory(paths.root);
-  const physicalPackets = await ensurePrivateDirectory(join6(physicalRoot, "study-packets"));
+  const physicalPackets = await ensurePrivateDirectory(join7(physicalRoot, "study-packets"));
   return {
     root: physicalRoot,
-    database: join6(physicalRoot, basename3(paths.database)),
-    installKey: join6(physicalRoot, basename3(paths.installKey)),
+    database: join7(physicalRoot, basename3(paths.database)),
+    installKey: join7(physicalRoot, basename3(paths.installKey)),
     packets: physicalPackets
   };
 }
@@ -19065,8 +19146,8 @@ async function discardPrivatePublication(publication) {
 async function publishPrivateArtifact(path, bytes) {
   const parent = await privateOutputDirectory(dirname2(resolve4(path)));
   const directory = lstatSync3(parent);
-  const destination = join6(parent, basename3(path));
-  const temporary = join6(parent, `.${basename3(path)}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`);
+  const destination = join7(parent, basename3(path));
+  const temporary = join7(parent, `.${basename3(path)}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`);
   const bytesSha256 = sha256(bytes);
   const size9 = typeof bytes === "string" ? Buffer.byteLength(bytes) : bytes.byteLength;
   let created = null;
@@ -19709,7 +19790,7 @@ import { createHash as createHash5, randomBytes as randomBytes2 } from "crypto";
 import { constants as constants2 } from "fs";
 import * as fs from "fs/promises";
 import { homedir as homedir4 } from "os";
-import { basename as basename4, dirname as dirname4, join as join7, relative, resolve as resolve6, sep } from "path";
+import { basename as basename4, dirname as dirname4, join as join8, relative, resolve as resolve6, sep } from "path";
 var MAX_ENTRIES = 64;
 var MAX_FILE_BYTES = 256 * 1024;
 var MAX_TOTAL_BYTES = 2 * 1024 * 1024;
@@ -19806,7 +19887,7 @@ async function inventory(root) {
   const visit = async (name, depth) => {
     if (depth > MAX_DEPTH || name.length > 4096 || entries2.length >= MAX_ENTRIES)
       throw bounded();
-    const path = join7(root, name);
+    const path = join8(root, name);
     const stat2 = await fs.lstat(path, { bigint: true });
     physical(stat2);
     if (stat2.isFile()) {
@@ -19823,7 +19904,7 @@ async function inventory(root) {
           const child = await directory.read();
           if (child === null)
             break;
-          await visit(join7(name, child.name), depth + 1);
+          await visit(join8(name, child.name), depth + 1);
         }
       } catch (error) {
         read = { ok: false, error };
@@ -19912,7 +19993,7 @@ async function projectAnchor(requested) {
     const missing = [];
     let anchor = existing;
     for (const name of suffix.reverse()) {
-      anchor = join7(anchor, name);
+      anchor = join8(anchor, name);
       missing.push(anchor);
     }
     return { anchor, parents: [{ path: existing, stat: stat2 }], missing };
@@ -19921,8 +20002,8 @@ async function projectAnchor(requested) {
 async function preflight(options) {
   const { anchor, parents: observed, missing } = await projectAnchor(options.scope === "user" ? homedir4() : options.projectDirectory ?? process.cwd());
   const folder = options.target === "agents" ? ".agents" : options.target === "codex" ? ".codex" : ".claude";
-  const root = join7(anchor, folder, "skills");
-  for (const path of [join7(anchor, folder), root]) {
+  const root = join8(anchor, folder, "skills");
+  for (const path of [join8(anchor, folder), root]) {
     const stat2 = await optionalStat(path);
     if (stat2 === null)
       missing.push(path);
@@ -19946,7 +20027,7 @@ async function preflight(options) {
     if (contains5(source, root) || contains5(root, source))
       throw unsafe();
     const sourceInventory = await inventory(source);
-    const destination = join7(root, name);
+    const destination = join8(root, name);
     const current = await optionalStat(destination);
     if (current !== null) {
       physical(current);
@@ -19963,11 +20044,11 @@ async function removeObserved(transaction, root, entries2) {
   for (const entry of [...entries2].reverse()) {
     await custody(transaction);
     for (const parent of entries2) {
-      if (parent.stat.isDirectory() && contains5(join7(root, parent.name), join7(root, entry.name))) {
-        await assertIdentity(join7(root, parent.name), parent.stat);
+      if (parent.stat.isDirectory() && contains5(join8(root, parent.name), join8(root, entry.name))) {
+        await assertIdentity(join8(root, parent.name), parent.stat);
       }
     }
-    const path = join7(root, entry.name);
+    const path = join8(root, entry.name);
     await assertIdentity(path, entry.stat);
     if (entry.stat.isDirectory())
       await fs.rmdir(path);
@@ -19987,12 +20068,12 @@ var skillInstallPlatform = {
     const plan = plans.get(token3);
     if (plan === undefined)
       throw unsafe();
-    const directory = join7(plan.root, `.skill-install.${randomBytes2(16).toString("hex")}`);
-    const itemState = (name) => ({ stage: join7(directory, `${name}.stage`), backup: join7(directory, `${name}.backup`), staged: [], backupAttempted: false, publishAttempted: false });
+    const directory = join8(plan.root, `.skill-install.${randomBytes2(16).toString("hex")}`);
+    const itemState = (name) => ({ stage: join8(directory, `${name}.stage`), backup: join8(directory, `${name}.backup`), staged: [], backupAttempted: false, publishAttempted: false });
     const transaction = Object.freeze({ _tag: "SkillInstallTransaction" });
     transactions.set(transaction, {
       plan,
-      lock: join7(plan.root, ".message-like-me.install-lock"),
+      lock: join8(plan.root, ".message-like-me.install-lock"),
       lockAttempted: false,
       directory,
       directoryAttempted: false,
@@ -20036,16 +20117,16 @@ var skillInstallPlatform = {
     for (const entry of item.sourceInventory) {
       await custody(transaction);
       for (const parent of current.staged) {
-        if (parent.stat.isDirectory() && contains5(join7(current.stage, parent.name), join7(current.stage, entry.name))) {
-          await assertIdentity(join7(current.stage, parent.name), parent.stat);
+        if (parent.stat.isDirectory() && contains5(join8(current.stage, parent.name), join8(current.stage, entry.name))) {
+          await assertIdentity(join8(current.stage, parent.name), parent.stat);
         }
       }
-      const target = join7(current.stage, entry.name);
-      await assertIdentity(join7(item.source, entry.name), entry.stat);
+      const target = join8(current.stage, entry.name);
+      await assertIdentity(join8(item.source, entry.name), entry.stat);
       if (entry.stat.isDirectory())
         await fs.mkdir(target, { mode: 448 });
       else
-        await fs.cp(join7(item.source, entry.name), target, { force: false, errorOnExist: true, dereference: false });
+        await fs.cp(join8(item.source, entry.name), target, { force: false, errorOnExist: true, dereference: false });
       const stat2 = await fs.lstat(target, { bigint: true });
       physical(stat2);
       if (stat2.isDirectory() !== entry.stat.isDirectory())
@@ -23236,7 +23317,7 @@ import {
   readSync as readSync3,
   realpathSync as realpathSync4
 } from "fs";
-import { isAbsolute as isAbsolute5, resolve as resolve7 } from "path";
+import { isAbsolute as isAbsolute6, resolve as resolve7 } from "path";
 
 // src/x-archive-zip.ts
 import { readSync as readSync2 } from "fs";
@@ -24496,7 +24577,7 @@ function sameStat(left3, right3) {
   return left3.dev === right3.dev && left3.ino === right3.ino && left3.size === right3.size && left3.mtimeNs === right3.mtimeNs && left3.ctimeNs === right3.ctimeNs && left3.mode === right3.mode && left3.uid === right3.uid && left3.nlink === right3.nlink;
 }
 async function readXArchive(path) {
-  if (typeof path !== "string" || path.length < 1 || path.includes("\x00") || !isAbsolute5(path) || resolve7(path) !== path)
+  if (typeof path !== "string" || path.length < 1 || path.includes("\x00") || !isAbsolute6(path) || resolve7(path) !== path)
     throw new Error("X archive path must be a normalized absolute path");
   let physical2;
   try {
@@ -24747,7 +24828,7 @@ function rejectUnused(parsed, allowedOptions, allowedFlags) {
 }
 
 // src/command-input.ts
-import { isAbsolute as isAbsolute6, resolve as resolve8 } from "path";
+import { isAbsolute as isAbsolute7, resolve as resolve8 } from "path";
 
 // src/version.ts
 var MESSAGE_LIKE_ME_VERSION = "0.8.9";
@@ -24851,7 +24932,7 @@ function compactMetrics(metrics) {
 function absolutePrivatePath(value, label) {
   if (value === undefined)
     throw new CliError("usage", `${label} is required`);
-  if (!isAbsolute6(value))
+  if (!isAbsolute7(value))
     throw new CliError("unsafe-path", `${label} must be an absolute private path`);
   return resolve8(value);
 }
