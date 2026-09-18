@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { lstatSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -93,7 +93,9 @@ describe("sqlite-snapshot wrapper parity", () => {
 
   test("wrapper falls back to TypeScript when the sidecar binary path is missing", () => {
     const previousPath = process.env.HRANESS_OH_SQLITE_CLI_PATH;
+    const previousTmpdir = process.env.TMPDIR;
     process.env.HRANESS_OH_SQLITE_CLI_PATH = join(tempDirectory, "no-such-sidecar");
+    process.env.TMPDIR = tempDirectory;
     try {
       const sourcePath = join(tempDirectory, "chat.db");
       createSqliteFile(sourcePath);
@@ -101,12 +103,18 @@ describe("sqlite-snapshot wrapper parity", () => {
       const source = messageSourceFile(sourcePath);
       const wrapperResult = isolateMessageSource(source, 64 * 1024 * 1024);
       expect(lstatSync(wrapperResult.path).size).toBe(lstatSync(sourcePath).size);
+      expect(readdirSync(tempDirectory).filter(name => name.startsWith("textbutler-sqlite-snapshot-"))).toEqual([]);
       rmSync(wrapperResult.temporaryDirectory, { recursive: true, force: true });
     } finally {
       if (previousPath === undefined) {
         delete process.env.HRANESS_OH_SQLITE_CLI_PATH;
       } else {
         process.env.HRANESS_OH_SQLITE_CLI_PATH = previousPath;
+      }
+      if (previousTmpdir === undefined) {
+        delete process.env.TMPDIR;
+      } else {
+        process.env.TMPDIR = previousTmpdir;
       }
     }
   });
