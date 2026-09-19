@@ -52,8 +52,9 @@ test("installation creates a fixed private LaunchAgent, preserves data, and neve
   const plist = await readFile(f.plistPath, "utf8"); expect(plist).toContain("owner &amp; home"); expect(plist).toContain("<key>RunAtLoad</key><true/>");
   const args = f.state.job!.args;
   expect(args.slice(0, 4)).toEqual(["/usr/bin/env", "-i", `HOME=${f.home}`, "PATH=/usr/bin:/bin:/usr/sbin:/sbin"]);
-  expect(args.slice(5)).toEqual([f.runtime, "--no-env-file", f.entrypoint, "daemon", "run", "--data-dir", f.dataDir]);
-  expect(args[4]).toMatch(/^TEXTBUTLER_LAUNCH_AGENT_GENERATION=[a-f0-9-]{36}$/u);
+  expect(args[4]).toBe("BUN_RUNTIME_TRANSPILER_CACHE_PATH=0");
+  expect(args.slice(6)).toEqual([f.runtime, "--config=/dev/null", "--cwd=/", "--no-env-file", f.entrypoint, "daemon", "run", "--data-dir", f.dataDir]);
+  expect(args[5]).toMatch(/^TEXTBUTLER_LAUNCH_AGENT_GENERATION=[a-f0-9-]{36}$/u);
   expect(await f.lifecycle.install(f.dataDir)).toMatchObject({ installation: "installed" });
   expect(f.calls.filter(args => args[0] === "bootstrap")).toHaveLength(1);
   expect(await f.lifecycle.uninstall(f.dataDir)).toMatchObject({ installation: "absent", service: "not-loaded" });
@@ -159,4 +160,39 @@ test("unsupported platforms never invoke launchctl", async () => {
   expect(await lifecycle.status(f.dataDir)).toMatchObject({ installation: "unsupported" });
   await expect(lifecycle.install(f.dataDir)).rejects.toThrow("macOS"); await expect(lifecycle.uninstall(f.dataDir)).rejects.toThrow("macOS");
   expect(f.calls).toHaveLength(0);
+});
+
+test("daemon login arguments ignore planted startup configuration and inherited preload options", async () => {
+  const f = await fixture(), runtime = await realpath(process.execPath), injected = join(f.home, "injected.js");
+  await writeFile(injected, 'process.stdout.write("UNSAFE-PRELOAD\\n");');
+  await writeFile(join(f.home, ".bunfig.toml"), `preload = [${JSON.stringify(injected)}]\n`);
+  await writeFile(f.entrypoint, 'process.stdout.write(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), home: process.env.HOME, generation: process.env.TEXTBUTLER_LAUNCH_AGENT_GENERATION, inherited: process.env.TEXTBUTLER_INJECTED }) + "\\n");');
+  await createLaunchAgentLifecycle({ ...f.host, runtime }).install(f.dataDir);
+  await writeFile(join(f.dataDir, "bunfig.toml"), `preload = [${JSON.stringify(injected)}]\n`);
+  await writeFile(join(f.dataDir, ".env"), "TEXTBUTLER_INJECTED=from-file\n");
+  expect(await readFile(f.plistPath, "utf8")).toContain("<key>WorkingDirectory</key><string>/</string>");
+  const child = Bun.spawn(f.state.job!.args, { cwd: f.dataDir,
+    env: { HOME: f.home, BUN_OPTIONS: `--preload=${injected}`, NODE_OPTIONS: `--require=${injected}`, TEXTBUTLER_INJECTED: "from-environment" }, stdout: "pipe", stderr: "pipe" });
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  expect(code).toBe(0); expect(stderr).toBe(""); expect(stdout).not.toContain("UNSAFE-PRELOAD");
+  expect(JSON.parse(stdout)).toEqual({ cwd: "/", home: f.home, generation: JSON.parse(await readFile(f.receiptPath, "utf8")).generation,
+    args: ["daemon", "run", "--data-dir", f.dataDir] });
+});
+
+test("the previous startup contract remains removable without silent replacement", async () => {
+  const f = await fixture(); await f.lifecycle.install(f.dataDir);
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  receipt.schemaVersion = 1;
+  await writeFile(f.receiptPath, `${JSON.stringify(receipt)}\n`);
+  const current = await readFile(f.plistPath, "utf8");
+  const previous = current.replace("<string>--config=/dev/null</string><string>--cwd=/</string>", "")
+    .replace("<string>BUN_RUNTIME_TRANSPILER_CACHE_PATH=0</string>", "")
+    .replace("<key>WorkingDirectory</key><string>/</string>", `<key>WorkingDirectory</key><string>${f.dataDir}</string>`);
+  await writeFile(f.plistPath, previous); await f.loadJob();
+  expect((await f.lifecycle.status(f.dataDir)).installation).toBe("installed");
+  await expect(f.lifecycle.install(f.dataDir)).rejects.toThrow("previous startup contract");
+  expect(await readFile(f.plistPath, "utf8")).toBe(previous);
+  expect((await f.lifecycle.uninstall(f.dataDir)).installation).toBe("absent");
+  expect((await f.lifecycle.install(f.dataDir)).installation).toBe("installed");
+  expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(2);
 });

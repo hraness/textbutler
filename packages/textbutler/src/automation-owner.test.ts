@@ -24,6 +24,7 @@ function fixture(provider: AutomationProvider = "imessage") {
   const status = { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(AUTOMATION_ACTIONS.map(kind => [kind, { available: ["text", "attachment", "reaction"].includes(kind), reason: ["text", "attachment", "reaction"].includes(kind) ? null : "Unavailable in fixture" }])) };
   const client = createGhostgetAutomationClient(async (method, params) => {
     calls.push(method);
+    if (method === "start" && provider !== "whatsapp") throw new Error("This provider has no start operation");
     if (method === "status" || method === "start") return status;
     if (method === "conversations") return { identity, conversations: [conversation], complete: true };
     if (method === "enrollments") return enrolled ? [enrollment] : [];
@@ -151,9 +152,92 @@ test("owner automation has explicit startup, exact network identity and opt-in c
     const imported = await f.port.enroll(listed[0]!, true, signal);
     expect(imported.messages).toMatchObject([{ author: "contact", text: "Synthetic memory" }]);
     expect(f.calls.filter(method => method === "enroll")).toHaveLength(1);
-    await f.port.start(provider, signal); expect(f.calls.at(-1)).toBe("start");
+    await f.port.start(provider, signal); expect(f.calls.at(-1)).toBe(provider === "whatsapp" ? "start" : "status");
     f.drift(); await expect(f.port.grant(first.binding, "synthetic-intent", signal)).rejects.toThrow("changed"); expect(f.grants).toHaveLength(0);
   }
+});
+
+test("connection checks retain offline and unavailable event states without granting access", async () => {
+  for (const provider of ["imessage", "beeper", "whatsapp"] as const) {
+    for (const connected of [false, true]) {
+      const f = fixture(provider), calls: string[] = [];
+      const client = createGhostgetAutomationClient(async method => {
+        calls.push(method);
+        return { identity: f.enrollment.identity, connected, events: { available: false, reason: "Reconnect required" },
+          actions: Object.fromEntries(AUTOMATION_ACTIONS.map(kind => [kind, { available: false, reason: "Reconnect required" }])) };
+      });
+      const port = createAutomationOwnerPort({ client, providers: [provider] });
+      await expect(port.start(provider, new AbortController().signal)).rejects.toThrow("unavailable");
+      expect(calls).toEqual([provider === "whatsapp" ? "start" : "status"]);
+      expect(port.observedCapabilities()[0]?.status).toMatchObject({ connected, events: { available: false } });
+    }
+  }
+});
+
+test("discovery isolates provider failures and reports partial coverage without leaking diagnostics", async () => {
+  const fixtures = { imessage: fixture("imessage"), whatsapp: fixture("whatsapp"), beeper: fixture("beeper") };
+  const calls: AutomationProvider[] = [];
+  let repaired = false;
+  const client = createGhostgetAutomationClient(async (method, params) => {
+    if (method !== "conversations") throw new Error("Unexpected operation");
+    const provider = params.provider as AutomationProvider; calls.push(provider);
+    expect(params.limit).toBe(66);
+    if (provider === "imessage" && !repaired) throw new Error("Sensitive path and provider diagnostics must not appear");
+    const f = fixtures[provider];
+    return { identity: f.candidate.identity, conversations: [f.candidate.conversation], complete: provider !== "beeper" || repaired };
+  });
+  const port = createAutomationOwnerPort({ client, providers: ["imessage", "whatsapp", "beeper"] });
+  const candidates = await port.list(new AbortController().signal);
+  expect(candidates.map(candidate => candidate.identity.provider)).toEqual(["whatsapp", "beeper"]);
+  expect(calls).toEqual(["imessage", "whatsapp", "beeper"]);
+  expect(port.discoveryStatus?.().providers.map(item => [item.provider, item.state])).toEqual([
+    ["imessage", "unavailable"], ["whatsapp", "complete"], ["beeper", "truncated"],
+  ]);
+  expect(JSON.stringify(port.discoveryStatus?.())).not.toContain("Sensitive path");
+  expect(port.discoveryStatus?.().providers[2]?.detail).toContain("Older conversations may be missing");
+  const snapshot = port.discoveryStatus!();
+  (snapshot.providers as unknown as { detail: string }[])[0]!.detail = "Mutated by caller";
+  expect(port.discoveryStatus?.().providers[0]?.detail).not.toBe("Mutated by caller");
+  repaired = true;
+  expect(await port.list(new AbortController().signal)).toHaveLength(3);
+  expect(port.discoveryStatus?.().providers.every(item => item.state === "complete")).toBe(true);
+});
+
+test("discovery bounds the combined list across three configured providers", async () => {
+  const fixtures = { imessage: fixture("imessage"), whatsapp: fixture("whatsapp"), beeper: fixture("beeper") };
+  const client = createGhostgetAutomationClient(async (_, params) => {
+    const f = fixtures[params.provider as AutomationProvider];
+    return { identity: f.candidate.identity, conversations: Array.from({ length: Number(params.limit) }, () => f.candidate.conversation), complete: false };
+  });
+  const port = createAutomationOwnerPort({ client, providers: ["imessage", "whatsapp", "beeper"] });
+  expect(await port.list(new AbortController().signal)).toHaveLength(198);
+  expect(port.discoveryStatus?.().providers.every(item => item.state === "truncated")).toBe(true);
+});
+
+test("discovery cancellation stops before the next provider and publishes no partial result", async () => {
+  const controller = new AbortController(), calls: unknown[] = [];
+  const client = createGhostgetAutomationClient(async (_, params) => {
+    calls.push(params.provider); controller.abort(); throw new Error("Cancelled");
+  });
+  const port = createAutomationOwnerPort({ client, providers: ["imessage", "beeper"] });
+  await expect(port.list(controller.signal)).rejects.toThrow();
+  expect(calls).toEqual(["imessage"]); expect(port.discoveryStatus?.().providers).toEqual([]);
+});
+
+test("conversation selection shows unavailable providers and incomplete coverage beside usable candidates", async () => {
+  const f = fixture("whatsapp");
+  const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-discovery-")); roots.push(dataDir);
+  const service = await TextbutlerControlService.open({ dataDir, automation: { ...f.port, discoveryStatus: () => ({ providers: [
+    { provider: "whatsapp", state: "truncated", detail: "WhatsApp returned a partial list. Older conversations may be missing." },
+    { provider: "beeper", state: "unavailable", detail: "Beeper conversations are unavailable. Check its connection in Ghostget." },
+  ] }) } }); services.push(service);
+  const listing = parseControlResponse(await finish(service, await service.request({ protocol, command: "conversations.list" })));
+  if (!listing.ok || listing.kind !== "conversations") throw new Error("Missing discovery result");
+  expect(listing.candidates).toHaveLength(1);
+  expect(listing.detail).toContain("butler disabled");
+  expect(listing.detail).toContain("Older conversations may be missing");
+  expect(listing.detail).toContain("Beeper conversations are unavailable");
+  expect(f.calls).not.toContain("grant");
 });
 
 test("v2 control enrollment stores identity and grants outside contact memory and supports explicit enable/disable", async () => {

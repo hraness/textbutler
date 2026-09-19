@@ -24,8 +24,20 @@ test('renders the complete README with one source-owned heading and working anch
     'Message Like Me receives no provider credentials, never calls Ghostget or a Beeper operation, and never sends',
   );
   expect(html).toContain('"headline":"Textbutler"');
-  expect(html).toContain('"dateModified":"2026-09-11"');
+  expect(html).toContain('"dateModified":"2026-09-19"');
   expect(css).toContain('.readme-prose img { height: auto; max-width: 100%; }');
+});
+
+test('puts guided setup and complete draft review before the legacy installation', () => {
+  const html = renderToStaticMarkup(<DocsPage />);
+  expect(html).toContain('<h2 id="open-the-guided-terminal">Open the guided terminal</h2>');
+  expect(html).toContain('bun run textbutler tui');
+  expect(html).toContain('docs/textbutler/getting-started.md');
+  expect(html).toContain('source pilot');
+  expect(html).toContain('no qualified AI reply engine');
+  expect(html).toContain('bun run textbutler replies show DRAFT');
+  expect(html).toContain('bun run textbutler replies send DRAFT DIGEST');
+  expect(html.indexOf('id="open-the-guided-terminal"')).toBeLessThan(html.indexOf('id="install-and-first-run"'));
 });
 
 test.each([

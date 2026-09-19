@@ -49,9 +49,9 @@ function parseUiSettings(value: unknown) {
   if (keyword.length > 40) fail("invalid-request", "The trigger keyword is limited to 40 characters.");
   return { enabled: bool(settings.enabled), responseMode: settings.responseMode as "smart" | "keyword", keyword, provider: settings.provider as "codex" | "claude",
     ...(settings.accountId === undefined ? {} : { accountId: contactId(settings.accountId) }),
-    disclosure: { character: text(disclosure.character, 64), begin: text(disclosure.begin, 64), end: text(disclosure.end, 64) } };
+    disclosure: { character: disclosure.character === "" ? "" : text(disclosure.character, 64), begin: disclosure.begin === "" ? "" : text(disclosure.begin, 64), end: disclosure.end === "" ? "" : text(disclosure.end, 64) } };
 }
-/** This is an owner control channel. Requests cannot create message sends or change routes. */
+/** Owner control channel: explicit sends still use bound grants and journaled intent. */
 export function parseControlRequest(value: unknown): ControlRequest {
   const item = record(value);
   if (item.protocol !== TEXTBUTLER_CONTROL_PROTOCOL) fail("invalid-request", "Unsupported control protocol.");
@@ -85,14 +85,17 @@ export function parseControlRequest(value: unknown): ControlRequest {
   }
   if (item.command === "replies.send") {
     if (Object.hasOwn(item, "draftId")) {
-      exact(item, ["protocol", "command", "draftId"]);
-      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, draftId: text(item.draftId, 120) };
+      exact(item, ["protocol", "command", "draftId", "expectedDigest"]);
+      const expectedDigest = text(item.expectedDigest, 64);
+      if (!/^[a-f0-9]{64}$/u.test(expectedDigest)) fail("invalid-request", "Review the complete draft and use its exact digest before sending.");
+      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, draftId: text(item.draftId, 120), expectedDigest };
     }
-    exact(item, ["protocol", "command", "contactId", "text"]);
+    exact(item, ["protocol", "command", "contactId", "text", ...(Object.hasOwn(item, "expectedRevision") ? ["expectedRevision"] : [])]);
     if (typeof item.text !== "string" || !item.text.trim() || Buffer.byteLength(item.text) > 16_384 || item.text.includes("\0")) fail("invalid-request", "Reply text must be 1-16,384 bytes without NUL.");
-    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), text: item.text };
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), text: item.text,
+      ...(Object.hasOwn(item, "expectedRevision") ? { expectedRevision: integer(item.expectedRevision, 1) } : {}) };
   }
-  if (item.command === "replies.discard") {
+  if (item.command === "replies.discard" || item.command === "replies.draft.read") {
     exact(item, ["protocol", "command", "draftId"]);
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, draftId: text(item.draftId, 120) };
   }
@@ -138,7 +141,9 @@ async function privateText(path: string): Promise<string> {
   }
 }
 export type OwnerBinding = ConversationBinding | AutomationBinding;
-export type OwnerRuntimeState = Readonly<{ settings: Settings; bindings: Readonly<Record<string, OwnerBinding>>; grants: Readonly<Record<string, AutomationGrant>> }>;
+export type OwnerRuntimeState = Readonly<{ settings: Settings; bindings: Readonly<Record<string, OwnerBinding>>; grants: Readonly<Record<string, AutomationGrant>>;
+  /** Real owner state always supplies this; legacy injected ports cannot admit revision-bound sends. */
+  revision?: number }>;
 type OwnerState = OwnerRuntimeState & Readonly<{ schemaVersion: 1; revision: number }>;
 const ownerBindingDigest = (binding: OwnerBinding): string => binding.version === 1 ? bindingDigest(binding) : binding.bindingDigest;
 const ownerBindingRoute = (binding: OwnerBinding, contactId: string): string => binding.version === 1 ? `local-binding:${contactId}` : binding.enrollmentId;
@@ -220,7 +225,7 @@ export class TextbutlerControlService {
     return { state: parseOwnerState(JSON.parse(bytes)), bytes };
   }
   async settings(): Promise<Settings> { return (await this.current()).state.settings; }
-  async runtimeState(): Promise<OwnerRuntimeState> { const { settings, bindings, grants } = (await this.current()).state; return { settings, bindings, grants }; }
+  async runtimeState(): Promise<OwnerRuntimeState> { const { settings, bindings, grants, revision } = (await this.current()).state; return { settings, bindings, grants, revision }; }
   runJournal(): RunJournal { return this.journal; }
   setRuntimeStatus(status: { state: "running" | "paused" | "unavailable"; detail: string }): void {
     if (!["running", "paused", "unavailable"].includes(status.state) || typeof status.detail !== "string" || status.detail.length > 512) throw new Error("Invalid runtime diagnostic");
@@ -292,7 +297,7 @@ export class TextbutlerControlService {
   private publishGrant(contactId: string, grant: AutomationGrant | null): Promise<void> {
     return this.serial(async () => {
       const latest = await this.current();
-      if (this.closed) return;
+      if (this.closed) fail("unavailable", "The control service closed before publishing this messaging grant.");
       const grants = { ...latest.state.grants };
       if (grant === null) delete grants[contactId]; else grants[contactId] = grant;
       await this.publish(latest, latest.state.settings, latest.state.bindings, grants);
@@ -538,13 +543,21 @@ export class TextbutlerControlService {
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-suggestion", draft: result.draft, pending: result.pending };
       });
     }
+    if (request.command === "replies.draft.read") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-draft", draft: await replies.readDraft(request.draftId) };
+    }
     if (request.command === "replies.send") {
       const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      if (!("draftId" in request) && request.expectedRevision !== undefined && request.expectedRevision !== current.state.revision)
+        fail("conflict", "Settings changed since the reply preview. Review the reply again before sending.");
       return this.startJob(async signal => {
         const result = "draftId" in request
-          ? await replies.send({ draftId: request.draftId }, signal)
-          : await replies.send({ contactId: request.contactId, text: request.text }, signal);
-        signal.throwIfAborted();
+          ? await replies.send({ draftId: request.draftId, expectedDigest: request.expectedDigest }, signal)
+          : await replies.send({ contactId: request.contactId, text: request.text,
+            ...(request.expectedRevision === undefined ? {} : { expectedRevision: request.expectedRevision }) }, signal);
+        // Sending journals cancellation and dispatch uncertainty itself. A job
+        // deadline during grant cleanup must not replace its terminal receipt.
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-sent", ...result };
       });
     }
@@ -569,7 +582,9 @@ export class TextbutlerControlService {
             subtitle: `${providerName(candidate.identity.provider)} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
             eligible: !duplicate, reason: duplicate ? "Already added" : "Ready to add" };
         });
-        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows, detail: "Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled." };
+        const coverage = this.automation!.discoveryStatus?.().providers.filter(item => item.state !== "complete").map(item => item.detail) ?? [];
+        return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows,
+          detail: ["Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled.", ...coverage].join(" ") };
       });
       if (!this.enrollment) fail("unavailable", "Messages selection is not configured. Set up the owner-installed Ghostget CLI in Textbutler's host configuration, then restart the daemon.");
       return this.startJob(async signal => {

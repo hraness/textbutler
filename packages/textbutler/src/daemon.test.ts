@@ -66,10 +66,10 @@ describe("foreground owner-only control socket", () => {
   test("CLI init and status perform real local work without installing a background service", async () => {
     const dataDir = await root(), lines: string[] = []; const output = { write: (value: string) => lines.push(value) };
     expect(await runTextbutlerCli(["init", "--data-dir", dataDir], output)).toBe(0);
-    expect(JSON.parse(lines.pop()!)).toMatchObject({ status: "initialized", automation: "unavailable" });
+    expect(JSON.parse(lines.pop()!)).toMatchObject({ status: "initialized", automation: "unchanged" });
     expect(await runTextbutlerCli(["daemon", "status", "--data-dir", dataDir], output)).toBe(1);
     await start(dataDir);
-    expect(await runTextbutlerCli(["doctor", "--data-dir", dataDir], output)).toBe(0);
-    expect(JSON.parse(lines.pop()!)).toMatchObject({ ok: true, automaticReplies: "unavailable" });
+    expect(await runTextbutlerCli(["doctor", "--data-dir", dataDir], output)).toBe(process.platform === "darwin" ? 0 : 1);
+    expect(JSON.parse(lines.pop()!)).toMatchObject({ ok: process.platform === "darwin", daemonConnected: true, automaticReplies: "unavailable" });
   });
 });

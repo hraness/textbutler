@@ -6,11 +6,16 @@ import type { HistoryMessage } from "./enrollment.ts";
 export type AutomationBinding = Readonly<{ version: 2; enrollmentId: string; identity: AutomationIdentity;
   conversation: AutomationConversation; bindingDigest: string }>;
 export type AutomationCandidate = Readonly<{ identity: AutomationIdentity; conversation: AutomationConversation }>;
+export type AutomationDiscoveryStatus = Readonly<{ providers: readonly Readonly<{
+  provider: AutomationProvider; state: "complete" | "truncated" | "unavailable"; detail: string;
+}>[] }>;
 export interface OwnerAutomationPort {
   providers(): readonly AutomationProvider[];
   observedCapabilities(): readonly { status: AutomationStatus; observedAt: number }[];
   start(provider: AutomationProvider, signal: AbortSignal): Promise<void>;
   list(signal: AbortSignal): Promise<readonly AutomationCandidate[]>;
+  /** Coverage of the last completed discovery, separate from send readiness. */
+  discoveryStatus?(): AutomationDiscoveryStatus;
   enroll(candidate: AutomationCandidate, initializeHistory: boolean, signal: AbortSignal): Promise<{ binding: AutomationBinding; messages: HistoryMessage[] }>;
   validate(binding: AutomationBinding, signal: AbortSignal): Promise<AutomationEnrollment>;
   grant(binding: AutomationBinding, intentId: string, signal: AbortSignal): Promise<AutomationGrant>;
@@ -43,6 +48,7 @@ export function assertAutomationBinding(expected: AutomationBinding, observed: A
 export function createAutomationOwnerPort(options: { client: GhostgetAutomationClient; providers: readonly AutomationProvider[]; now?: () => number }): OwnerAutomationPort {
   const client = options.client, providers = [...options.providers], now = options.now ?? Date.now;
   const statuses = new Map<AutomationProvider, { status: AutomationStatus; observedAt: number }>();
+  let discovery: AutomationDiscoveryStatus = { providers: [] };
   const remember = (status: AutomationStatus) => { statuses.set(status.identity.provider, { status: structuredClone(status), observedAt: now() }); };
   if (!providers.length || providers.length > 3 || new Set(providers).size !== providers.length || providers.some(value => value !== "imessage" && value !== "whatsapp" && value !== "beeper")) throw new Error("Invalid owner messaging networks");
   const validate = async (binding: AutomationBinding, signal: AbortSignal) => {
@@ -55,19 +61,35 @@ export function createAutomationOwnerPort(options: { client: GhostgetAutomationC
   return {
     providers: () => [...providers],
     observedCapabilities: () => [...statuses.values()].map(value => structuredClone(value)),
+    discoveryStatus: () => structuredClone(discovery),
     async start(provider, signal) {
       if (!providers.includes(provider)) throw new Error("Messaging provider is not configured");
-      const status = await client.start(provider, signal); signal.throwIfAborted();
+      signal.throwIfAborted();
+      // Ghostget starts an owned sync process only for WhatsApp. Messages and
+      // Beeper already run outside that process and expose readiness via status.
+      const status = await (provider === "whatsapp" ? client.start(provider, signal) : client.status(provider, signal)); signal.throwIfAborted();
       remember(status);
       if (status.identity.provider !== provider || !status.connected || !status.events.available) throw new Error("Messaging connection or event stream is unavailable");
     },
     async list(signal) {
       const result: AutomationCandidate[] = [];
+      const observed: AutomationDiscoveryStatus["providers"][number][] = [];
+      const limit = Math.floor(200 / providers.length);
+      discovery = { providers: [] };
       for (const provider of providers) {
-        signal.throwIfAborted(); const page = await client.conversations(provider, 100, signal);
-        for (const conversation of page.conversations) result.push({ identity: page.identity, conversation });
+        signal.throwIfAborted();
+        const name = provider === "imessage" ? "iMessage" : provider === "whatsapp" ? "WhatsApp" : "Beeper";
+        try {
+          const page = await client.conversations(provider, limit, signal); signal.throwIfAborted();
+          for (const conversation of page.conversations) result.push({ identity: page.identity, conversation });
+          observed.push({ provider, state: page.complete ? "complete" : "truncated",
+            detail: page.complete ? `${name} conversation list is complete.` : `${name} returned a partial list of up to ${limit} recent conversations. Older conversations may be missing.` });
+        } catch {
+          signal.throwIfAborted();
+          observed.push({ provider, state: "unavailable", detail: `${name} conversations are unavailable. Check its connection and permissions in Ghostget, then refresh.` });
+        }
       }
-      signal.throwIfAborted(); return result;
+      signal.throwIfAborted(); discovery = { providers: observed }; return result;
     },
     async enroll(candidate, initializeHistory, signal) {
       signal.throwIfAborted();

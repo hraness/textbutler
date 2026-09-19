@@ -1,9 +1,13 @@
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { handleCompanionCommand, openBrowser, type CompanionOptions, type MenuItem } from "@hraness/desktop-foundation";
-import { CONTROL_PROTOCOL, disconnectedSnapshot, type ControlRequest, type ControlResponse, type DesktopSnapshot } from "../../control/src/index.ts";
+import { CONTROL_PROTOCOL, disconnectedSnapshot, type ControlRequest, type ControlResponse, type DesktopSnapshot, type ConversationCandidate } from "../../control/src/index.ts";
 import { requestDaemon } from "./daemon.ts";
 import { TRAY_ICON } from "./menubar-icon.ts";
+import { awaitOwnerJob, type OwnerControlClient } from "./owner-cli.ts";
+import { createLaunchAgentLifecycle, defaultLaunchAgentHost, isolatedBunInvocation } from "./launch-agent.ts";
 
 const WEBSITE = "https://textbutler.app/";
 const SUPPORT = "https://account.hraness.com/support?product=message-like-me&source=desktop#support";
@@ -32,11 +36,16 @@ function detailItems(detail: string): MenuItem[] {
   return bounded.length ? bounded.map(line => ({ kind: "label" as const, label: menuLabel(line, 72) })) : [{ kind: "label" as const, label: "No additional detail." }];
 }
 
-function contactItems(contacts: DesktopSnapshot["contacts"]): MenuItem[] {
+function contactItems(contacts: DesktopSnapshot["contacts"], accounts: DesktopSnapshot["providerAccounts"] = []): MenuItem[] {
   const rows: MenuItem[] = contacts.slice(0, 20).map(contact => ({
     kind: "submenu" as const,
     label: menuLabel(`${contact.name} · ${contact.settings.enabled ? "Enabled" : "Off"}`) || "Contact",
-    items: [{ kind: "label" as const, label: contact.settings.enabled ? "Enabled" : "Disabled" }, ...detailItems(contact.subtitle)],
+    items: [{ kind: "label" as const, label: contact.settings.enabled ? "Automatic replies on" : "Automatic replies off" }, ...detailItems(contact.subtitle),
+      { kind: "action" as const, id: `contact.toggle:${contact.id}`, label: contact.settings.enabled ? "Disable automatic replies" : "Enable automatic replies" },
+      { kind: "submenu" as const, label: "Agent account", items: accounts.length ? accounts.map(account => ({ kind: "action" as const,
+        id: `contact.account:${contact.id}:${account.id}`, label: menuLabel(`${account.label} · ${account.status}`), checked: contact.settings.accountId === account.id,
+        enabled: !contact.settings.enabled && account.status === "ready" })) : [{ kind: "label" as const, label: "No qualified agent account" }] },
+    ],
   }));
   if (!contacts.length) rows.push({ kind: "label", label: "No contacts configured" });
   if (contacts.length > 20) rows.push({ kind: "label", label: `${contacts.length - 20} more contacts` });
@@ -83,7 +92,7 @@ function replyItems(snapshot: DesktopSnapshot): MenuItem[] {
       ...detailItems(draft.preview),
       ...(draft.actionCount > 1 ? [{ kind: "label" as const, label: `Includes ${draft.actionCount} actions` }] : []),
       { kind: "label" as const, label: menuLabel(`Expires ${draft.expiresAt.slice(11, 16)} UTC`) },
-      { kind: "action" as const, id: `replies.send:${draft.id}`, label: "Send this reply" },
+      { kind: "label" as const, label: "Preview only · full review in textbutler tui" },
       { kind: "action" as const, id: `replies.discard:${draft.id}`, label: "Discard suggestion" },
     ]});
   }
@@ -103,6 +112,28 @@ function activityItems(activity: DesktopSnapshot["activity"]): MenuItem[] {
   }));
 }
 
+/** The shared native runner accepts at most 256 nodes across the whole
+ * tree. Reserve the final quit item and an overflow hint, even for large inboxes. */
+export function boundedMenu(items: readonly MenuItem[]): MenuItem[] {
+  let remaining = 248;
+  let truncated = false;
+  const trim = (rows: readonly MenuItem[]): MenuItem[] => {
+    const result: MenuItem[] = [];
+    for (const row of rows) {
+      if (row.kind === "quit") continue;
+      if (remaining < (row.kind === "submenu" ? 2 : 1)) { truncated = true; continue; }
+      remaining--;
+      if (row.kind === "submenu") result.push({ ...row, items: trim(row.items) });
+      else result.push(row);
+    }
+    return result;
+  };
+  const result = trim(items);
+  if (truncated) result.push({ kind: "label", label: "More options and full replies in textbutler tui" });
+  result.push({ kind: "quit", label: "Quit Textbutler" });
+  return result;
+}
+
 /** Map one owner daemon snapshot onto the shared menu contract. The daemon
  * stays the authority; product browser actions require explicit menu clicks. */
 export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeSeconds: number | null; fresh: boolean }): MenuItem[] {
@@ -116,14 +147,27 @@ export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeS
   const age = status.confirmedAgeSeconds;
   const ageText = age !== null && age < 60 ? `${age}s ago` : `${Math.floor((age ?? 0) / 60)}m ago`;
   const updated = age === null ? "Daemon status not confirmed" : status.fresh ? `Updated ${ageText}` : `Last confirmed ${ageText}`;
-  return [
+  return boundedMenu([
     { kind: "label", label: menuLabel(state) },
     { kind: "label", label: menuLabel(`${active} enabled of ${snapshot.contacts.length} contacts · limit ${snapshot.settings.activeContactLimit}`) },
     { kind: "submenu", label: "Status detail", items: detailItems(snapshot.automation?.detail ?? snapshot.detail) },
     { kind: "separator" },
     { kind: "action", id: "toggle-pause", label: "Automatic replies paused", checked: paused, enabled: connected },
+    { kind: "submenu", label: "Get started", items: [
+      { kind: "label", label: "1. Connect an app  2. Add a conversation" },
+      { kind: "label", label: "3. Try the inbox with automatic replies off" },
+      { kind: "label", label: "Guided setup: textbutler tui" },
+      ...(!connected ? [{ kind: "action" as const, id: "daemon.install", label: "Start background service" }] : []),
+      { kind: "action", id: "open-guide", label: "Read the setup guide…" },
+    ] },
+    { kind: "submenu", label: "Messaging apps", items: [
+      ...(snapshot.messagingProviders ?? []).map(provider => ({ kind: "action" as const, id: `messaging.start:${provider}`,
+        label: provider === "beeper" ? "Connect Beeper (linked apps)" : provider === "imessage" ? "Connect iMessage" : "Start WhatsApp sync", enabled: connected })),
+      ...(!(snapshot.messagingProviders?.length) ? [{ kind: "label" as const, label: "Add your app connections in textbutler tui" }] : []),
+      { kind: "action", id: "contacts.discover", label: "Find conversations to add…", enabled: connected },
+    ] },
     { kind: "submenu", label: `Replies · ${snapshot.replies ? snapshot.replies.pending.reduce((count, item) => count + item.pendingCount, 0) : 0} waiting`, items: replyItems(snapshot) },
-    { kind: "submenu", label: "Contacts", items: contactItems(snapshot.contacts) },
+    { kind: "submenu", label: "Contacts", items: contactItems(snapshot.contacts, snapshot.providerAccounts) },
     { kind: "submenu", label: `Agent accounts · ${ready} of ${accounts.length} ready`, items: accountItems(snapshot) },
     { kind: "submenu", label: "Capabilities", items: capabilityItems(snapshot) },
     { kind: "submenu", label: "Recent activity", items: activityItems(snapshot.activity) },
@@ -134,23 +178,26 @@ export function snapshotItems(snapshot: DesktopSnapshot, status: { confirmedAgeS
     { kind: "action", id: "product.support", label: "Support Textbutler development (optional paid)…" },
     { kind: "separator" },
     { kind: "quit", label: "Quit Textbutler" },
-  ];
+  ]);
 }
 
 /** The Textbutler menu companion is a disposable client of the owner daemon.
  * All state reads and mutations use the existing owner-only control socket;
  * the shared runner renders them and enforces revision-checked dispatch. */
-export function companionOptions(dataDir: string, open: typeof openBrowser = openBrowser): CompanionOptions {
+export function companionOptions(dataDir: string, open: typeof openBrowser = openBrowser, entrypoint: string = fileURLToPath(new URL("cli.ts", import.meta.url)), options: { request?: OwnerControlClient; jobWaitMs?: number } = {}): CompanionOptions {
+  const request = options.request ?? ((value: ControlRequest) => requestDaemon({ dataDir, request: value }));
   let lastSnapshot: DesktopSnapshot | null = null;
   let confirmedAt: number | null = null;
+  let candidates: readonly ConversationCandidate[] = [];
+  let candidateRevision: number | null = null;
+  let discoveryDetail = "";
+  let pendingJobId: string | null = null;
+  let lastOperationDetail: string | null = null;
   /** Job-backed control calls resolve their stored result before returning. */
-  const daemonJob = async (request: ControlRequest): Promise<ControlResponse> => {
-    let response = await requestDaemon({ dataDir, request });
-    const deadline = Date.now() + 90_000;
-    while (response.ok && response.kind === "job" && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 250));
-      response = await requestDaemon({ dataDir, request: { protocol: CONTROL_PROTOCOL, command: "owner.job.read", jobId: response.jobId } });
-    }
+  const daemonJob = async (operation: ControlRequest): Promise<ControlResponse> => {
+    if (pendingJobId !== null) throw new Error("previous-operation-pending");
+    const response = await awaitOwnerJob(operation, request, { waitMs: options.jobWaitMs ?? 90_000 });
+    if (response.ok && response.kind === "job") pendingJobId = response.jobId;
     return response;
   };
   return {
@@ -164,7 +211,7 @@ export function companionOptions(dataDir: string, open: typeof openBrowser = ope
     snapshot: async () => {
       let snapshot: DesktopSnapshot, fresh = false;
       try {
-        const response = await requestDaemon({ dataDir, request: { protocol: CONTROL_PROTOCOL, command: "snapshot" } });
+        const response = await request({ protocol: CONTROL_PROTOCOL, command: "snapshot" });
         if (!response.ok) {
           snapshot = disconnectedSnapshot(menuLabel(response.message, 180));
         } else if (response.kind !== "snapshot" || lastSnapshot !== null && response.snapshot.revision < lastSnapshot.revision) {
@@ -180,44 +227,104 @@ export function companionOptions(dataDir: string, open: typeof openBrowser = ope
         snapshot = disconnectedSnapshot();
         lastSnapshot = null;
       }
-      return snapshotItems(snapshot, { confirmedAgeSeconds: confirmedAt === null ? null : Math.max(0, Math.floor((Date.now() - confirmedAt) / 1000)), fresh });
+      const items = snapshotItems(snapshot, { confirmedAgeSeconds: confirmedAt === null ? null : Math.max(0, Math.floor((Date.now() - confirmedAt) / 1000)), fresh });
+      if (candidateRevision !== null && candidateRevision === snapshot.revision) {
+        items.splice(7, 0, { kind: "submenu", label: "Add a conversation", items: [
+          ...detailItems(discoveryDetail),
+          ...candidates.slice(0, 12).map(candidate => ({ kind: "submenu" as const, label: menuLabel(candidate.name) || "Conversation", items: [
+            ...detailItems(candidate.subtitle), ...(!candidate.eligible ? detailItems(candidate.reason) : []),
+            { kind: "action" as const, id: `contact.add:${candidate.id}`, label: "Add with automatic replies off", enabled: candidate.eligible },
+          ] })),
+          ...(candidates.length > 12 ? [{ kind: "label" as const, label: "More conversations in textbutler tui" }] : []),
+        ] });
+      }
+      if (lastOperationDetail) items.splice(1, 0, { kind: "submenu", label: "Last operation", items: detailItems(lastOperationDetail) });
+      if (pendingJobId) items.splice(1, 0, { kind: "submenu", label: "An operation is still pending", items: [
+        { kind: "label", label: "Do not repeat it; inspect its final result." },
+        { kind: "label", label: menuLabel(`textbutler jobs show ${pendingJobId}`) },
+        { kind: "action", id: "job.refresh", label: "Check pending operation" },
+      ] });
+      return boundedMenu(items);
     },
     onAction: async id => {
+      if (id === "job.refresh" && pendingJobId) {
+        const response = await request({ protocol: CONTROL_PROTOCOL, command: "owner.job.read", jobId: pendingJobId });
+        if (response.ok && response.kind === "job" || !response.ok && response.code === "disconnected") throw new Error("operation-not-yet-confirmed");
+        const completedJob = pendingJobId;
+        pendingJobId = null;
+        if (!response.ok) { lastOperationDetail = `Job ${completedJob}: ${response.message} Inspect the outcome before repeating the original action.`; return; }
+        if (response.kind === "conversations") { candidates = response.candidates; candidateRevision = lastSnapshot?.revision ?? null; discoveryDetail = response.detail; }
+        if (response.kind === "snapshot" || response.kind === "enrolled") { lastSnapshot = response.snapshot; candidates = []; candidateRevision = null; }
+        lastOperationDetail = response.kind === "reply-sent" ? `Reply outcome: ${response.state}. ${response.detail}` : "The pending operation completed. Refresh to see its current state.";
+        return;
+      }
+      if (id === "open-guide") { await open("https://github.com/hraness/textbutler/blob/main/docs/textbutler/getting-started.md"); return; }
+      if (id === "daemon.install") { await createLaunchAgentLifecycle(defaultLaunchAgentHost(entrypoint)).install(dataDir); return; }
+      if (id === "contacts.discover") {
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "conversations.list" });
+        if (!response.ok || response.kind !== "conversations") throw new Error("conversation-discovery-unconfirmed");
+        candidates = response.candidates; candidateRevision = lastSnapshot?.revision ?? null; discoveryDetail = response.detail;
+        return;
+      }
+      if (id.startsWith("messaging.start:")) {
+        const provider = id.slice(16);
+        if (provider !== "imessage" && provider !== "whatsapp" && provider !== "beeper" || !lastSnapshot?.messagingProviders?.includes(provider)) return;
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "messaging.start", provider });
+        if (!response.ok || response.kind === "job") throw new Error("messaging-connection-unconfirmed");
+        return;
+      }
+      if (id.startsWith("contact.add:")) {
+        const candidate = candidates.find(candidate => candidate.id === id.slice(12));
+        if (!candidate?.eligible || !lastSnapshot || candidateRevision !== lastSnapshot.revision) throw new Error("refresh-conversation-selection");
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "contact.enroll", candidateId: candidate.id,
+          expectedRevision: lastSnapshot.revision, initializeHistory: false });
+        candidates = []; candidateRevision = null;
+        if (!response.ok || response.kind !== "enrolled") throw new Error("contact-enrollment-unconfirmed");
+        return;
+      }
+      if (id.startsWith("contact.toggle:") || id.startsWith("contact.account:")) {
+        const snapshot = lastSnapshot;
+        if (!snapshot) return;
+        const contact = snapshot.contacts.find(contact => id === `contact.toggle:${contact.id}` ||
+          snapshot.providerAccounts?.some(account => id === `contact.account:${contact.id}:${account.id}`));
+        if (!contact) return;
+        const account = snapshot.providerAccounts?.find(account => id === `contact.account:${contact.id}:${account.id}`);
+        if (account && (contact.settings.enabled || account.status !== "ready")) return;
+        const settings = account ? { ...contact.settings, accountId: account.id, provider: account.provider }
+          : { ...contact.settings, enabled: !contact.settings.enabled };
+        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "contact.settings.update", contactId: contact.id,
+          expectedRevision: snapshot.revision, settings });
+        if (!response.ok || response.kind === "job") throw new Error("contact-settings-unconfirmed");
+        return;
+      }
       if (id === "open-website") { await open(WEBSITE); return; }
       if (id === "product.support") { await open(SUPPORT); return; }
       if (id === "refresh") return; // the runner re-reads state after every action
       if (id === "replies.scan") {
         const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "replies.scan" });
-        if (!response.ok) throw new Error(`replies-scan-${response.code}`);
+        if (!response.ok || response.kind === "job") throw new Error("replies-scan-unconfirmed");
         return;
       }
       if (id.startsWith("replies.suggest:")) {
         const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "replies.suggest", contactId: id.slice(16) });
-        if (!response.ok) throw new Error(`replies-suggest-${response.code}`);
+        if (!response.ok || response.kind === "job") throw new Error("replies-suggest-unconfirmed");
         return;
       }
-      if (id.startsWith("replies.send:")) {
-        // Sends only ever target an exact reviewed draft; there is no free-text path here.
-        const response = await daemonJob({ protocol: CONTROL_PROTOCOL, command: "replies.send", draftId: id.slice(13) });
-        if (!response.ok) throw new Error(`replies-send-${response.code}`);
-        if (response.kind === "reply-sent" && response.state !== "submitted") throw new Error(`replies-send-${response.state}`);
-        return;
-      }
+      // The menu exposes previews only. Full ordered actions and their digest
+      // are reviewed in the TUI/CLI before a draft can be sent.
+      if (id.startsWith("replies.send:")) throw new Error("full-draft-review-required");
       if (id.startsWith("replies.discard:")) {
-        const response = await requestDaemon({ dataDir, request: { protocol: CONTROL_PROTOCOL, command: "replies.discard", draftId: id.slice(16) } });
+        const response = await request({ protocol: CONTROL_PROTOCOL, command: "replies.discard", draftId: id.slice(16) });
         if (!response.ok) throw new Error(`replies-discard-${response.code}`);
         return;
       }
       if (id === "toggle-pause") {
         const current = lastSnapshot;
         if (!current || current.connection !== "connected") return;
-        const response = await requestDaemon({
-          dataDir,
-          request: {
+        const response = await request({
             protocol: CONTROL_PROTOCOL, command: "global.settings.update",
             expectedRevision: current.revision,
             settings: { paused: !current.settings.paused, activeContactLimit: current.settings.activeContactLimit },
-          },
         });
         // The runner re-reads state after this callback; a daemon rejection or
         // indeterminate mutation is observed there, never retried here.
@@ -228,10 +335,13 @@ export function companionOptions(dataDir: string, open: typeof openBrowser = ope
 }
 
 /** Delegate the product `menubar` command family to the shared lifecycle. */
+export function companionForeground(dataDir: string, entrypoint: string, host: { home: string; runtime: string } = { home: homedir(), runtime: process.execPath }): { executable: string; args: readonly string[] } {
+  return isolatedBunInvocation({ ...host, entrypoint, args: ["menubar", "--foreground", "--data-dir", dataDir] });
+}
 export async function runMenuBarCommand(args: readonly string[], dataDir: string, entrypoint: string, write: (result: unknown) => void): Promise<number> {
-  return await handleCompanionCommand(companionOptions(dataDir), {
+  return await handleCompanionCommand(companionOptions(dataDir, openBrowser, entrypoint), {
     args,
-    foreground: { executable: process.execPath, args: [entrypoint, "menubar", "--foreground", "--data-dir", dataDir] },
+    foreground: companionForeground(dataDir, entrypoint),
     write,
   });
 }

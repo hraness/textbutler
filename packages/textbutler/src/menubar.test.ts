@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { validateSnapshot, type MenuItem, type Snapshot } from "@hraness/desktop-foundation";
+import { planAutostart, validateSnapshot, type MenuItem, type Snapshot } from "@hraness/desktop-foundation";
 import { runTextbutlerCli } from "./cli.ts";
 import { startDaemon, type RunningDaemon } from "./daemon.ts";
-import { companionOptions, menuLabel, snapshotItems } from "./menubar.ts";
+import { companionForeground, companionOptions, menuLabel, snapshotItems } from "./menubar.ts";
 import { TRAY_ICON } from "./menubar-icon.ts";
 import { disconnectedSnapshot, type DesktopSnapshot } from "../../control/src/index.ts";
 
@@ -51,6 +51,24 @@ describe("companion identity", () => {
     expect(TRAY_ICON.width).toBe(32);
     expect(TRAY_ICON.height).toBe(32);
     expect(Buffer.from(TRAY_ICON.rgba, "base64").length).toBe(32 * 32 * 4);
+  });
+  test("immediate and login restarts share isolated argv despite planted Bun configuration", async () => {
+    const directory = await root(), home = join(directory, "home"), cwd = join(directory, "untrusted-cwd"), dataDir = join(directory, "data");
+    await mkdir(home); await mkdir(cwd);
+    const entrypoint = join(directory, "synthetic-entrypoint.mjs"), injected = join(directory, "injected.js");
+    await writeFile(injected, 'process.stdout.write("UNSAFE-PRELOAD\\n");');
+    await writeFile(entrypoint, 'process.stdout.write(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), home: process.env.HOME, inherited: process.env.TEXTBUTLER_INJECTED }) + "\\n");');
+    for (const file of [join(cwd, "bunfig.toml"), join(home, ".bunfig.toml")]) await writeFile(file, `preload = [${JSON.stringify(injected)}]\n`);
+    await writeFile(join(cwd, ".env"), "TEXTBUTLER_INJECTED=from-file\n");
+    const command = companionForeground(dataDir, entrypoint, { home, runtime: await realpath(process.execPath) });
+    const plan = planAutostart({ id: "textbutler", label: "Textbutler", platform: "darwin", home, executable: command.executable, args: [...command.args] });
+    const array = /<key>ProgramArguments<\/key><array>(.*?)<\/array>/su.exec(plan.contents)?.[1];
+    const args = [...array!.matchAll(/<string>(.*?)<\/string>/gsu)].map(match => match[1]!.replaceAll("&apos;", "'").replaceAll("&quot;", '"').replaceAll("&gt;", ">").replaceAll("&lt;", "<").replaceAll("&amp;", "&"));
+    expect(args).toEqual([command.executable, ...command.args]);
+    const child = Bun.spawn(args, { cwd, env: { HOME: home, BUN_OPTIONS: `--preload=${injected}`, NODE_OPTIONS: `--require=${injected}`, TEXTBUTLER_INJECTED: "from-environment" }, stdout: "pipe", stderr: "pipe" });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+    expect(code).toBe(0); expect(stderr).toBe(""); expect(stdout).not.toContain("UNSAFE-PRELOAD");
+    expect(JSON.parse(stdout)).toEqual({ cwd: "/", home, args: ["menubar", "--foreground", "--data-dir", dataDir] });
   });
 });
 
@@ -151,19 +169,20 @@ describe("owner replies submenu", () => {
     expect(labels(blockedConversation.items)).toContain("A previous send needs reconciliation.");
     expect(blockedConversation.items.some(item => item.kind === "action" && item.id === "replies.suggest:contact-1")).toBe(false);
   });
-  test("reviewed drafts expose send and discard actions and nothing else can send", () => {
+  test("draft previews require full terminal review and only expose discard", () => {
     const items = snapshotItems(base({ replies: replies({ pending: [pending], drafts: [draft] }) }), { confirmedAgeSeconds: 0, fresh: true });
     wire(items);
     const menu = repliesMenu(items);
     const draftRow = menu.items.find(item => item.kind === "submenu" && item.label === "Draft · Alice Example");
     if (draftRow?.kind !== "submenu") throw new Error("missing draft row");
     expect(labels(draftRow.items)).toContain("\ud83e\udd16{ Yes, 7 works. }");
-    expect(draftRow.items.some(item => item.kind === "action" && item.id === "replies.send:draft:abc")).toBe(true);
+    expect(draftRow.items.some(item => item.kind === "action" && item.id === "replies.send:draft:abc")).toBe(false);
+    expect(labels(draftRow.items)).toContain("Preview only · full review in textbutler tui");
     expect(draftRow.items.some(item => item.kind === "action" && item.id === "replies.discard:draft:abc")).toBe(true);
     // The menu never offers a free-text send path.
     const ids = JSON.stringify(items);
     expect(ids).not.toContain("replies.text");
-    expect(ids.match(/"replies.send:[^"]*"/g)).toEqual(['"replies.send:draft:abc"']);
+    expect(ids.match(/"replies.send:[^"]*"/g)).toBeNull();
   });
   test("empty and unconfigured reply states stay explanatory", () => {
     const fresh = repliesMenu(snapshotItems(base({ replies: replies() }), { confirmedAgeSeconds: 0, fresh: true }));
@@ -174,14 +193,14 @@ describe("owner replies submenu", () => {
     const missing = repliesMenu(snapshotItems(base(), { confirmedAgeSeconds: 0, fresh: true }));
     expect(labels(missing.items)).toContain("Messaging automation is not configured");
   });
-  test("menu send and suggest actions reach the daemon as reviewed-draft commands", async () => {
+  test("stale menu send actions cannot bypass full draft review", async () => {
     const dataDir = await root();
     await start(dataDir);
     const options = companionOptions(dataDir);
     const signal = new AbortController().signal;
     // No messaging automation: every replies action fails closed at the daemon.
-    await expect(options.onAction("replies.send:draft:abc", signal)).rejects.toThrow("replies-send-unavailable");
-    await expect(options.onAction("replies.suggest:contact-1", signal)).rejects.toThrow("replies-suggest-unavailable");
+    await expect(options.onAction("replies.send:draft:abc", signal)).rejects.toThrow("full-draft-review-required");
+    await expect(options.onAction("replies.suggest:contact-1", signal)).rejects.toThrow("replies-suggest-unconfirmed");
     await expect(options.onAction("replies.discard:draft:abc", signal)).rejects.toThrow("replies-discard-unavailable");
   });
 });
@@ -250,4 +269,41 @@ describe("menubar CLI routing", () => {
     await expect(runTextbutlerCli(["menubar", "bogus"], { write: () => {} })).rejects.toThrow();
     await expect(runTextbutlerCli(["menubar", "status", "extra"], { write: () => {} })).rejects.toThrow();
   });
+});
+
+test("fully populated menu stays within the native runner's total node budget", () => {
+  const contacts = Array.from({ length: 20 }, (_, index) => ({ id: `contact-${index}`, name: `Contact ${index}`, subtitle: "Long relationship detail ".repeat(15),
+    settings: { enabled: false, responseMode: "smart" as const, keyword: "butler", provider: "claude" as const, disclosure: { character: "🤖", begin: "{", end: "}" } } }));
+  const accounts = Array.from({ length: 10 }, (_, index) => ({ id: `account-${index}`, label: `Account ${index}`, provider: "claude" as const, route: "claude-api" as const,
+    status: "ready" as const, detail: "Long account diagnostic ".repeat(15), defaultReplyModel: "model", classifierModel: "model" }));
+  const items = snapshotItems(base({ contacts, providerAccounts: accounts, messagingProviders: ["imessage", "whatsapp", "beeper"], replies: { scannedAt: "2026-09-19T00:00:00Z",
+    pending: contacts.slice(0, 10).map(contact => ({ contactId: contact.id, name: contact.name, provider: "beeper", enabled: false, pendingCount: 2,
+      lastInboundAt: "2026-09-19T00:00:00Z", preview: "long preview ".repeat(40), sendable: true, reason: null })),
+    drafts: contacts.slice(0, 10).map(contact => ({ id: `draft:${contact.id}`, contactId: contact.id, name: contact.name, summary: "Reply", preview: "long draft ".repeat(40), actionCount: 3, expiresAt: "2026-09-19T01:00:00Z" })) },
+    activity: Array.from({ length: 8 }, (_, index) => ({ id: `event-${index}`, at: "2026-09-19T00:00:00Z", contactId: null, title: "Activity", detail: "Long detail ".repeat(40) })) }),
+    { confirmedAgeSeconds: 0, fresh: true });
+  const actions = wire(items);
+  expect(actions.get("toggle-pause")).toBe(true);
+  expect(items.at(-1)?.kind).toBe("quit");
+  expect(labels(items)).toContain("More options and full replies in textbutler tui");
+});
+
+test("pending menu operations keep the job ID and a terminal failure clears the busy state", async () => {
+  const calls: string[] = [], signal = new AbortController().signal;
+  const options = companionOptions("/unused", async () => {}, "/unused/cli.ts", { jobWaitMs: 0, request: async request => {
+    calls.push(request.command);
+    if (request.command === "snapshot") return { protocol: "textbutler.control.v1", ok: true, kind: "snapshot", snapshot: base() };
+    if (request.command === "owner.job.read") return { protocol: "textbutler.control.v1", ok: false, code: "conflict", message: "The contact changed." };
+    return { protocol: "textbutler.control.v1", ok: true, kind: "job", jobId: "job-123" };
+  } });
+  await options.snapshot(signal);
+  await expect(options.onAction("contacts.discover", signal)).rejects.toThrow("unconfirmed");
+  const pending = await options.snapshot(signal);
+  expect(labels(pending)).toContain("textbutler jobs show job-123");
+  await expect(options.onAction("contacts.discover", signal)).rejects.toThrow("previous-operation-pending");
+  expect(calls.filter(command => command === "conversations.list")).toHaveLength(1);
+  await options.onAction("job.refresh", signal);
+  expect(labels(await options.snapshot(signal))).not.toContain("An operation is still pending");
+  await expect(options.onAction("contacts.discover", signal)).rejects.toThrow("unconfirmed");
+  expect(calls.filter(command => command === "conversations.list")).toHaveLength(2);
 });

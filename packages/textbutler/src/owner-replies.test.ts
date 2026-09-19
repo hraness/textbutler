@@ -19,6 +19,7 @@ import { OwnerReplies, type OwnerRepliesPorts } from "./owner-replies.ts";
 import type { OwnerRuntimeState } from "./control-service.ts";
 import type { ProviderHost } from "./provider-host.ts";
 import { ContactWorkspace } from "./workspace.ts";
+import type { ActionIntent } from "../../transport/src/index.ts";
 
 const NOW = Date.parse("2026-09-11T12:00:00.000Z");
 const cleanup: (() => Promise<void>)[] = [];
@@ -40,11 +41,15 @@ async function setup(options: {
   standingGrant?: boolean;
   ready?: boolean;
   failSubmit?: boolean;
+  failRevoke?: boolean;
+  failGrant?: boolean;
+  actions?: readonly ActionIntent[];
+  enabled?: boolean;
 } = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "butler-owner-"))), journal = RunJournal.memory();
   cleanup.push(async () => { journal.close(); await rm(root, { recursive: true, force: true }); });
   let revision = 0;
-  const contact: ContactSettings = { ...newContact("contact-1", "Synthetic", "enrollment:fixture"), enabled: true,
+  const contact: ContactSettings = { ...newContact("contact-1", "Synthetic", "enrollment:fixture"), enabled: options.enabled ?? true,
     provider: "codex", accountId: "account-one", replyModel: "reply-pinned", ...(options.disclosure ? { disclosure: options.disclosure } : {}) };
   const settings: Settings = { schemaVersion: 1, paused: false, maxActiveContacts: 5, contacts: [contact] };
   const identity = { provider: "imessage" as const, authId: "fixture", accountIdentity: "1".repeat(64), accountSubject: "synthetic-account", implementationIdentity: "2".repeat(64), sourceGeneration: "synthetic-db" };
@@ -65,17 +70,19 @@ async function setup(options: {
     if (method === "events") return { events: [], nextCursor: "0", caughtUp: true };
     if (method === "status") return { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"].map(kind => [kind, { available: true, reason: null }])) };
     if (method === "prepare") { const body = { ...params, bindingDigest: binding.bindingDigest, expiresAt: new Date(NOW + 120_000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` }; plans.set(plan.id as string, plan as never); return plan; }
-    if (method === "submit") { if (options.failSubmit) throw new Error("Synthetic submit failure"); const plan = plans.get(String(params.planId))!; mutableSent.push([...plan.actions]); return { id: `run:${sent.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
+    if (method === "submit") { if (options.failSubmit) throw new Error("Synthetic submit failure"); const plan = plans.get(String(params.planId))!, grant = grants.get(String(params.grantId))!;
+      if (grant.revoked || grant.maximumActions - grant.consumedActions < plan.actions.length) throw new Error("Synthetic grant exhausted");
+      mutableSent.push([...plan.actions]); return { id: `run:${sent.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
     if (method === "cancel") return { cancelled: true };
     if (method === "grant") {
       const { intentId: _intentId, ...request } = params as Record<string, unknown>;
       const grant = { ...(request as object), id: `grant:${++grantSequence}`, revoked: false, consumedActions: 0 } as AutomationGrant;
       grantRequests.push({ actions: grant.actions, maximumActions: grant.maximumActions, expiresAt: grant.expiresAt });
-      grants.set(grant.id, grant); return grant;
+      grants.set(grant.id, grant); if (options.failGrant) throw new Error("Synthetic lost grant response"); return grant;
     }
     if (method === "grant.get") { const grant = grants.get(String(params.grantId)); if (!grant) throw new Error("Unknown grant"); return grant; }
     if (method === "grant.by-intent") return { grant: null };
-    if (method === "revoke") { const grant = grants.get(String(params.grantId)); if (grant) grants.set(grant.id, { ...grant, revoked: true }); return { revoked: true }; }
+    if (method === "revoke") { if (options.failRevoke) throw new Error("Synthetic revoke failure"); const grant = grants.get(String(params.grantId)); if (grant) grants.set(grant.id, { ...grant, revoked: true }); return { revoked: true }; }
     throw new Error(`Unexpected fixture operation ${method}`);
   }, () => NOW);
   const automation = createAutomationOwnerPort({ client, providers: ["imessage"], now: () => NOW });
@@ -83,7 +90,7 @@ async function setup(options: {
   const adapter: AgentAdapter = { provider: "codex", qualification: qualified,
     async run(request: AgentRunRequest) {
       void request;
-      return { output: { summary: "Synthetic suggestion", actions: [{ kind: "text", text: "Yes, 7 works." }] }, processStopped: true };
+      return { output: { summary: "Synthetic suggestion", actions: options.actions ?? [{ kind: "text", text: "Yes, 7 works." }] }, processStopped: true };
     } };
   const router = new AgentMixer({ adapters: [adapter], leases: new SqliteAccountLeases(new Database(":memory:")), now: () => NOW });
   const modelCatalog: ModelCatalog = { provider: "codex", observedAt: NOW,
@@ -94,7 +101,7 @@ async function setup(options: {
       actions: ["text", "reaction"], expiresAt: new Date(NOW + 86_400_000).toISOString(), maximumActions: 100, minimumIntervalMs: 0, revoked: false, consumedActions: 0 };
     grants.set(standing.id, standing);
   }
-  const state: OwnerRuntimeState = { settings, bindings: { [contact.id]: binding }, grants: options.standingGrant ? { "contact-1": grants.get("grant:standing")! } : {} };
+  const state: OwnerRuntimeState = { revision: 1, settings, bindings: { [contact.id]: binding }, grants: options.standingGrant ? { "contact-1": grants.get("grant:standing")! } : {} };
   const published: (AutomationGrant | null)[] = [];
   const ports: OwnerRepliesPorts = {
     state: async () => state, journal, automation: () => automation, client: () => client,
@@ -108,7 +115,7 @@ async function setup(options: {
     now: () => NOW,
   };
   const replies = new OwnerReplies(ports);
-  return { replies, journal, state, sent, grants, grantRequests, published, contact, binding, messages,
+  return { replies, journal, state, sent, grants, grantRequests, published, contact, binding, messages, workspace, ports,
     bumpRevision: () => { revision += 1; },
     setReady: (ready: boolean) => { options.ready = ready; } };
 }
@@ -159,7 +166,7 @@ test("suggest drafts a disclosed reply for the pending run and never dispatches"
 test("sending a reviewed draft submits disclosed text, journals the send and clears state", async () => {
   const fixture = await setup();
   const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
-  const result = await fixture.replies.send({ draftId: draft!.id }, AbortSignal.timeout(5000));
+  const result = await fixture.replies.send({ draftId: draft!.id, expectedDigest: (await fixture.replies.readDraft(draft!.id)).digest }, AbortSignal.timeout(5000));
   expect(result.state).toBe("submitted");
   expect(fixture.sent).toEqual([[{ kind: "text", text: "🤖{ Yes, 7 works. }" }]]);
   expect(fixture.journal.isButlerMessage("contact-1", `sent:1:0`)).toBe(true);
@@ -191,8 +198,9 @@ test("cleared disclosure sends bare text while the journal still marks authorshi
 test("a stale draft context or changed disclosure rejects the send", async () => {
   const fixture = await setup();
   const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  const reviewed = await fixture.replies.readDraft(draft!.id);
   fixture.bumpRevision();
-  await expect(fixture.replies.send({ draftId: draft!.id }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  await expect(fixture.replies.send({ draftId: draft!.id, expectedDigest: reviewed.digest }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
   expect(fixture.sent).toEqual([]);
 });
 
@@ -200,8 +208,8 @@ test("a discarded or unknown draft cannot send", async () => {
   const fixture = await setup();
   const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
   expect(fixture.replies.discard(draft!.id)).toBe(true);
-  await expect(fixture.replies.send({ draftId: draft!.id }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
-  await expect(fixture.replies.send({ draftId: "draft:missing" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  await expect(fixture.replies.send({ draftId: draft!.id, expectedDigest: "a".repeat(64) }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  await expect(fixture.replies.send({ draftId: "draft:missing", expectedDigest: "a".repeat(64) }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
   expect(fixture.sent).toEqual([]);
 });
 
@@ -243,4 +251,155 @@ test("unconfigured contacts and v1 bindings cannot send", async () => {
   mutable["contact-1"] = { version: 1, routeId: "legacy", label: "Legacy" };
   await expect(v1.replies.send({ contactId: "contact-1", text: "No" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
   await expect(v1.replies.suggest("contact-1", AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+});
+
+test("scoped quota counts every action, including repeated text kinds", async () => {
+  const fixture = await setup({ actions: [{ kind: "text", text: "First" }, { kind: "text", text: "Second" }] });
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  const review = await fixture.replies.readDraft(draft!.id);
+  const result = await fixture.replies.send({ draftId: draft!.id, expectedDigest: review.digest }, AbortSignal.timeout(5000));
+  expect(result.state).toBe("submitted");
+  expect(fixture.grantRequests[0]).toMatchObject({ actions: ["text"], maximumActions: 2 });
+  expect(fixture.sent[0]).toEqual([...review.actions]);
+});
+
+test("a standing grant needs enough quota for the complete action batch", async () => {
+  const fixture = await setup({ standingGrant: true, actions: [{ kind: "text", text: "First" }, { kind: "text", text: "Second" }] });
+  fixture.grants.set("grant:standing", { ...fixture.grants.get("grant:standing")!, maximumActions: 1 });
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  const review = await fixture.replies.readDraft(draft!.id);
+  expect((await fixture.replies.send({ draftId: draft!.id, expectedDigest: review.digest }, AbortSignal.timeout(5000))).state).toBe("submitted");
+  expect(fixture.grants.get("grant:standing")!.revoked).toBe(true);
+  expect(fixture.grantRequests[0]!.maximumActions).toBe(2);
+});
+
+test.each([
+  [{ kind: "link", url: "https://example.test" }],
+  [{ kind: "reaction", messageId: "inbound-2", emoji: "👍", action: "add" }, { kind: "text", text: "See you" }],
+] satisfies ActionIntent[][])("rich-leading drafts review and send the same disclosure companion", async (...actions) => {
+  const fixture = await setup({ actions });
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  const review = await fixture.replies.readDraft(draft!.id);
+  expect(review.actions[0]).toEqual({ kind: "text", text: "🤖{ Synthetic suggestion }" });
+  expect(draft!.actionCount).toBe(actions.length + 1);
+  expect((await fixture.replies.send({ draftId: draft!.id, expectedDigest: review.digest }, AbortSignal.timeout(5000))).state).toBe("submitted");
+  expect(fixture.sent[0]).toEqual(review.actions.map(action => action.kind === "reaction"
+    ? { kind: "reaction", messageId: action.messageId, emoji: action.emoji, remove: action.action === "remove" } : action));
+  expect(fixture.grantRequests[0]!.maximumActions).toBe(review.actions.length);
+});
+
+test("cleared disclosure does not invent a companion for rich-only drafts", async () => {
+  const fixture = await setup({ disclosure: { character: "", begin: "", end: "" }, actions: [{ kind: "link", url: "https://example.test" }] });
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  expect((await fixture.replies.readDraft(draft!.id)).actions).toEqual([{ kind: "link", url: "https://example.test" }]);
+  expect(draft!.actionCount).toBe(1);
+});
+
+test("full review exposes every byte and action, and an incorrect digest cannot send", async () => {
+  const long = `${"A".repeat(1_000)} final important words`;
+  const fixture = await setup({ actions: [{ kind: "text", text: long }, { kind: "text", text: "Second message" }] });
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  expect(draft!.preview).not.toContain("final important words");
+  const review = await fixture.replies.readDraft(draft!.id);
+  expect(review.actions).toEqual([{ kind: "text", text: `🤖{ ${long} }` }, { kind: "text", text: "🤖{ Second message }" }]);
+  expect(review).toMatchObject({ contactId: "contact-1", name: "Synthetic", provider: "imessage", conversationId: fixture.binding.enrollmentId });
+  await expect(fixture.replies.send({ draftId: draft!.id, expectedDigest: "a".repeat(64) }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect(fixture.sent).toEqual([]);
+  expect(fixture.grantRequests).toEqual([]);
+});
+
+test("changing an attachment after review cannot change the submitted bytes", async () => {
+  const fixture = await setup({ enabled: false, actions: [{ kind: "attachment", file: "outbox/note.txt", mimeType: "text/plain", name: "note.txt" }] });
+  await fixture.workspace.write("outbox/note.txt", "Reviewed bytes");
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  const review = await fixture.replies.readDraft(draft!.id);
+  expect(review.assets).toHaveLength(1);
+  expect(review.assets[0]).toMatchObject({ path: "outbox/note.txt", bytes: 14 });
+  await fixture.workspace.write("outbox/note.txt", "Changed bytes");
+  await expect(fixture.replies.send({ draftId: draft!.id, expectedDigest: review.digest }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+  expect(fixture.sent).toEqual([]);
+  expect(fixture.journal.hasUncertainSend("contact-1")).toBe(false);
+  expect(fixture.grants.get("grant:1")!.revoked).toBe(true);
+});
+
+test("suggest refreshes all recent attributed context for disabled owner-review contacts", async () => {
+  const fixture = await setup({ enabled: false });
+  await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  const history = JSON.parse(await fixture.workspace.read("history/recent.json"));
+  expect(history.messages.map((message: { text: string }) => message.text)).toEqual(["Are you free tomorrow?", "Dinner at 7?"]);
+  expect(history.messages.every((message: { author: string }) => message.author === "contact")).toBe(true);
+});
+
+test("suggest refuses an incomplete current conversation", async () => {
+  const fixture = await setup({ ready: false });
+  await expect(fixture.replies.suggest("contact-1", AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+  expect(fixture.replies.view(fixture.state).drafts).toEqual([]);
+});
+
+test("uncertain grant creation blocks another grant and send until reconciliation", async () => {
+  const fixture = await setup({ failGrant: true });
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "First" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+  expect(fixture.journal.grantIntents()).toHaveLength(1);
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "Retry" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect(fixture.grantRequests).toHaveLength(1);
+  expect(fixture.sent).toEqual([]);
+});
+
+test("uncertain revocation retains the previous grant without creating a replacement", async () => {
+  const fixture = await setup({ standingGrant: true, failRevoke: true });
+  fixture.grants.set("grant:standing", { ...fixture.grants.get("grant:standing")!, consumedActions: 100 });
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "First" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+  expect(fixture.state.grants["contact-1"]?.id).toBe("grant:standing");
+  expect(fixture.grantRequests).toEqual([]);
+  expect(fixture.sent).toEqual([]);
+});
+
+test("in-progress grant recovery cannot be overwritten by an owner send", async () => {
+  const fixture = await setup();
+  const work = Promise.resolve(); fixture.ports.grantWork.set("contact-1", work);
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "No" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect(fixture.ports.grantWork.get("contact-1")).toBe(work);
+  expect(fixture.grantRequests).toEqual([]);
+});
+
+test("a returned grant awaiting recovery blocks a new owner grant", async () => {
+  const fixture = await setup({ standingGrant: true });
+  fixture.journal.recordPendingGrant("contact-1", fixture.grants.get("grant:standing")!);
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "No" }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect((await fixture.replies.scan(AbortSignal.timeout(5000))).pending[0]).toMatchObject({ sendable: false, reason: "A previous messaging grant needs reconciliation." });
+  expect(fixture.sent).toEqual([]);
+});
+
+test("contact settings changing during preparation cancel the reviewed send", async () => {
+  const fixture = await setup();
+  const { draft } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000)), review = await fixture.replies.readDraft(draft!.id);
+  fixture.ports.hooks.register({ id: "owner-settings-change", version: "1.0.0", hooks: { "reply.before-send": async () => {
+    (fixture.state as { settings: Settings }).settings = { ...fixture.state.settings,
+      contacts: [{ ...fixture.contact, revision: fixture.contact.revision + 1, disclosure: { character: "", begin: "", end: "" } }] };
+  } } });
+  await expect(fixture.replies.send({ draftId: draft!.id, expectedDigest: review.digest }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect(fixture.sent).toEqual([]);
+  expect(fixture.journal.hasUncertainSend("contact-1")).toBe(false);
+});
+
+test("a literal reply reviewed against an older owner snapshot never starts sending", async () => {
+  const fixture = await setup();
+  (fixture.state as { revision: number }).revision = 2;
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "Reviewed reply", expectedRevision: 1 }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect(fixture.sent).toEqual([]);
+  expect(fixture.grantRequests).toEqual([]);
+  expect(fixture.journal.recent("contact-1")).toEqual([]);
+});
+
+test("a current literal reply snapshot uses the same trimmed disclosure as review", async () => {
+  const fixture = await setup();
+  expect((await fixture.replies.send({ contactId: "contact-1", text: "  Reviewed reply\n", expectedRevision: 1 }, AbortSignal.timeout(5000))).state).toBe("submitted");
+  expect(fixture.sent).toEqual([[{ kind: "text", text: "🤖{ Reviewed reply }" }]]);
+});
+
+test("a literal review cannot use an injected state with no revision", async () => {
+  const fixture = await setup();
+  delete (fixture.state as { revision?: number }).revision;
+  await expect(fixture.replies.send({ contactId: "contact-1", text: "Reviewed reply", expectedRevision: 1 }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect(fixture.sent).toEqual([]);
 });

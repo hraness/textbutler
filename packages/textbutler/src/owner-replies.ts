@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { automationContextId, createGhostgetAutomationTransport, type AutomationGrant, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
+import { automationContextId, automationHash, createGhostgetAutomationTransport, type AutomationGrant, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { parseActionIntent, type ActionIntent } from "../../transport/src/index.ts";
-import { disclose, type ContactSettings, type Disclosure } from "./config.ts";
+import { type ContactSettings, type Disclosure } from "./config.ts";
 import { assertAutomationBinding, type AutomationBinding, type OwnerAutomationPort } from "./automation-owner.ts";
-import { pendingCluster } from "./attribution.ts";
-import type { OwnerConversationReadPort } from "./enrollment.ts";
+import { messageAuthor, pendingCluster } from "./attribution.ts";
+import { boundedHistory, type OwnerConversationReadPort } from "./enrollment.ts";
 import type { RunJournal } from "./journal.ts";
 import type { Hooks, HookContext } from "./hooks.ts";
 import type { ProviderHost } from "./provider-host.ts";
@@ -13,6 +13,8 @@ import { ControlFailure, type OwnerBinding, type OwnerRuntimeState } from "./con
 import { createRoutedButlerAgent } from "./routed-agent.ts";
 import type { AgentRequest, ButlerAgent } from "./runtime.ts";
 import type { MessageEvent } from "./decision.ts";
+import { discloseReplyActions } from "./reply-actions.ts";
+import type { ReplyDraftDetail } from "../../control/src/index.ts";
 
 export interface PendingReplyItem {
   readonly contactId: string;
@@ -57,6 +59,9 @@ interface ReplyDraft {
   readonly eventId: string;
   readonly createdAt: number;
   readonly expiresAt: number;
+  readonly contactRevision: number;
+  readonly bindingDigest: string;
+  readonly review: ReplyDraftDetail;
 }
 export interface PendingObservation { readonly count: number; readonly lastAt: number; readonly preview: string | null; readonly ready: boolean }
 
@@ -94,9 +99,10 @@ function preview(text: string | null): string | null {
 /** What the owner reviews is what the send carries: disclosed text plus the
  * count of any rich actions that follow it. */
 function draftPreview(draft: ReplyDraft): string {
-  const text = draft.actions.find(action => action.kind === "text");
-  const lead = text?.kind === "text" ? disclose(text.text, draft.disclosure) : draft.summary;
-  const extras = draft.actions.length - (text ? 1 : 0);
+  const actions = draft.review.actions;
+  const text = actions.find(action => action.kind === "text");
+  const lead = text?.kind === "text" ? text.text : draft.summary;
+  const extras = actions.length - (text ? 1 : 0);
   const value = extras > 0 ? `${lead} (+${extras} more action${extras === 1 ? "" : "s"})` : lead;
   return preview(value) ?? "";
 }
@@ -122,16 +128,22 @@ export class OwnerReplies {
     for (const [id, draft] of this.drafts) if (draft.expiresAt <= at) this.drafts.delete(id);
   }
 
+  private pendingGrantRecovery(contactId: string): boolean {
+    return this.ports.journal.grantIntents().some(intent => intent.contactId === contactId)
+      || this.ports.journal.pendingGrants().some(pending => pending.contactId === contactId);
+  }
+
   private item(contact: ContactSettings, binding: OwnerBinding | null, observation: PendingObservation | null, reason: string | null): PendingReplyItem {
     const journal = this.ports.journal;
-    const sendable = observation !== null && observation.ready && reason === null && binding?.version === 2
+    const recovery = this.pendingGrantRecovery(contact.id);
+    const sendable = observation !== null && observation.ready && reason === null && !recovery && binding?.version === 2
       && this.ports.automation() !== undefined && this.ports.client() !== undefined && !journal.hasUncertainSend(contact.id);
     return {
       contactId: contact.id, name: contact.label, provider: binding?.version === 2 ? binding.identity.provider : binding?.version === 1 ? "imessage" : "none",
       enabled: contact.enabled, pendingCount: observation?.count ?? 0,
       lastInboundAt: observation === null ? null : new Date(observation.lastAt).toISOString(),
       preview: preview(observation?.preview ?? null), sendable,
-      reason: reason ?? (observation === null ? null : !observation.ready ? "Messaging catchup is incomplete." : binding?.version !== 2 ? "This selection cannot send; re-enroll it through messaging." : journal.hasUncertainSend(contact.id) ? "A previous send needs reconciliation." : null),
+      reason: reason ?? (recovery ? "A previous messaging grant needs reconciliation." : observation === null ? null : !observation.ready ? "Messaging catchup is incomplete." : binding?.version !== 2 ? "This selection cannot send; re-enroll it through messaging." : journal.hasUncertainSend(contact.id) ? "A previous send needs reconciliation." : null),
     };
   }
 
@@ -149,7 +161,7 @@ export class OwnerReplies {
       id: draft.id, contactId: draft.contactId, name: names.get(draft.contactId) ?? draft.contactId,
       summary: draft.summary.slice(0, 512),
       preview: draftPreview(draft),
-      actionCount: draft.actions.length, expiresAt: new Date(draft.expiresAt).toISOString(),
+      actionCount: draft.review.actions.length, expiresAt: new Date(draft.expiresAt).toISOString(),
     } satisfies ReplyDraftView));
     return { scannedAt: this.scannedAt === null ? null : new Date(this.scannedAt).toISOString(), pending, drafts };
   }
@@ -219,6 +231,12 @@ export class OwnerReplies {
     this.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: enrollment.ready });
     const item = this.item(contact, binding, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: enrollment.ready }, null);
     if (cluster === null) return { draft: null, pending: item };
+    if (!enrollment.ready) fail("unavailable", "Messaging catchup is incomplete. Wait for a current conversation before requesting a suggestion.");
+    const history = boundedHistory(messages.filter(message => message.kind === "message" && message.direction !== "unknown")
+      .map(message => ({ id: message.id, text: message.text ?? "", at: Date.parse(message.occurredAt),
+        author: messageAuthor(message, contact, this.ports.journal) as "owner" | "contact" | "butler" })));
+    signal.throwIfAborted();
+    await (await this.ports.workspace(contact.id)).write("history/recent.json", JSON.stringify({ schemaVersion: 1, purpose: "context-only-never-trigger", messages: history }));
     const agent = this.replyAgent(providers);
     if (!await agent.qualified(contact)) fail("unavailable", "The selected agent account is not qualified. Check it under providers.");
     const latest = messages.find(message => message.id === cluster.latestId)!;
@@ -231,31 +249,64 @@ export class OwnerReplies {
     if (!summary.trim() || Buffer.byteLength(summary) > 4_096 || !Array.isArray(actions) || actions.length < 1 || actions.length > 7) throw new Error("Invalid agent suggestion");
     const intents = actions.map(action => parseActionIntent(action));
     if (intents.some(intent => intent === null)) throw new Error("Invalid agent suggestion");
+    const disclosed = discloseReplyActions(intents, summary, contact.disclosure);
+    const assets: ReplyDraftDetail["assets"][number][] = [];
+    const workspace = await this.ports.workspace(contact.id);
+    for (const action of disclosed) {
+      signal.throwIfAborted();
+      if ((action.kind === "attachment" || action.kind === "sticker") && !assets.some(asset => asset.path === action.file)) {
+        const admitted = await workspace.admitAsset(action.file);
+        assets.push({ path: action.file, sha256: admitted.sha256, bytes: admitted.bytes.length });
+      }
+    }
     signal.throwIfAborted();
     this.pruneDrafts();
     for (const [id, existing] of this.drafts) if (existing.contactId === contact.id) this.drafts.delete(id);
     if (this.drafts.size >= DRAFT_LIMIT) fail("capacity", "Too many open reply drafts. Discard one before suggesting again.");
-    const draft: ReplyDraft = { id: `draft:${randomUUID()}`, contactId: contact.id, summary, actions: Object.freeze(intents as ActionIntent[]),
-      disclosure: contact.disclosure, contextId: automationContextId(enrollment), eventId: latest.id, createdAt: this.ports.now(), expiresAt: this.ports.now() + DRAFT_TTL_MS };
+    const id = `draft:${randomUUID()}`, createdAt = this.ports.now(), expiresAt = createdAt + DRAFT_TTL_MS;
+    const detail = { id, contactId: contact.id, name: contact.label, provider: binding.identity.provider,
+      conversationId: binding.enrollmentId, summary, actions: disclosed, assets, expiresAt: new Date(expiresAt).toISOString() };
+    const contextId = automationContextId(enrollment);
+    const review: ReplyDraftDetail = { ...detail, digest: automationHash({ draft: detail, bindingDigest: binding.bindingDigest, contextId, contactRevision: contact.revision }) };
+    const draft: ReplyDraft = { id, contactId: contact.id, summary, actions: Object.freeze(intents as ActionIntent[]),
+      disclosure: contact.disclosure, contextId, eventId: latest.id, createdAt, expiresAt,
+      contactRevision: contact.revision, bindingDigest: binding.bindingDigest, review };
     this.drafts.set(draft.id, draft);
     return { draft: { id: draft.id, contactId: contact.id, name: contact.label, summary: summary.slice(0, 512),
-      preview: draftPreview(draft), actionCount: intents.length,
+      preview: draftPreview(draft), actionCount: disclosed.length,
       expiresAt: new Date(draft.expiresAt).toISOString() }, pending: item };
   }
 
   discard(draftId: string): boolean { return this.drafts.delete(draftId); }
 
+  /** The bounded preview never authorizes a send. Return the complete ordered
+   * batch and its recipient/content digest for explicit owner review. */
+  async readDraft(draftId: string): Promise<ReplyDraftDetail> {
+    this.pruneDrafts();
+    const draft = this.drafts.get(draftId);
+    if (!draft) fail("invalid-request", "This suggestion expired. Ask for a fresh one.");
+    const state = await this.ports.state(), contact = state.settings.contacts.find(value => value.id === draft.contactId);
+    const binding = state.bindings[draft.contactId];
+    if (!contact || contact.revision !== draft.contactRevision || binding?.version !== 2 || binding.bindingDigest !== draft.bindingDigest)
+      fail("conflict", "This contact changed since the suggestion. Request a fresh one.");
+    return structuredClone(draft.review);
+  }
+
   /** Explicit owner send: binds the exact draft or literal text to a fresh
    * plan, a live recipient grant and the journaled send transaction. */
-  async send(input: { draftId: string } | { contactId: string; text: string }, signal: AbortSignal): Promise<ReplySendResult> {
+  async send(input: { draftId: string; expectedDigest: string } | { contactId: string; text: string; expectedRevision?: number }, signal: AbortSignal): Promise<ReplySendResult> {
     const state = await this.ports.state();
+    if ("contactId" in input && input.expectedRevision !== undefined && input.expectedRevision !== state.revision)
+      fail("conflict", "Settings changed since the reply preview. Review the reply again before sending.");
     let contact: ContactSettings, actions: readonly ActionIntent[], draft: ReplyDraft | undefined, eventId: string;
     if ("draftId" in input) {
       this.pruneDrafts();
       draft = this.drafts.get(input.draftId);
       if (!draft) fail("invalid-request", "This suggestion expired. Ask for a fresh one.");
+      if (input.expectedDigest !== draft.review.digest) fail("conflict", "Review the complete draft and use its exact digest before sending.");
       const selected = state.settings.contacts.find(value => value.id === draft!.contactId);
       if (!selected) fail("invalid-request", "This contact is not configured by the owner.");
+      if (selected.revision !== draft.contactRevision) fail("conflict", "This contact changed since the suggestion. Request a fresh one.");
       if (selected.disclosure.character !== draft.disclosure.character || selected.disclosure.begin !== draft.disclosure.begin || selected.disclosure.end !== draft.disclosure.end)
         fail("conflict", "Disclosure settings changed since the suggestion. Request a fresh one.");
       contact = selected; actions = draft.actions; eventId = `owner:${draft.id}:${randomUUID()}`;
@@ -268,15 +319,20 @@ export class OwnerReplies {
     }
     const binding = state.bindings[contact.id];
     if (binding?.version !== 2) fail("unavailable", "This contact has no messaging enrollment that can send. Re-enroll it through messaging.");
+    if (draft && (draft.bindingDigest !== binding.bindingDigest || draft.review.conversationId !== binding.enrollmentId))
+      fail("conflict", "The messaging recipient changed since this suggestion. Request a fresh one.");
     const automation = this.ports.automation(), client = this.ports.client();
     if (!automation || !client) fail("unavailable", "Messaging automation is not configured.");
     if (this.ports.journal.hasUncertainSend(contact.id)) fail("conflict", "A previous send needs reconciliation before another reply.");
+    if (this.ports.grantWork.has(contact.id)) fail("conflict", "This conversation's messaging grant is changing. Wait for it to settle.");
+    if (this.pendingGrantRecovery(contact.id))
+      fail("conflict", "A previous messaging grant needs reconciliation before another reply.");
     const enrollment = await client.poll(binding.enrollmentId, signal); assertAutomationBinding(binding, enrollment);
     if (!enrollment.ready) fail("unavailable", "Messaging catchup is incomplete. The reply stays queued until the conversation is current.");
     const contextId = automationContextId(enrollment);
     if (draft && draft.contextId !== contextId) fail("conflict", "The conversation changed since this suggestion. Request a fresh one.");
-    const kinds = [...new Set(actions.map(action => action.kind))];
-    const disclosed = actions.map(action => action.kind === "text" ? { ...action, text: disclose(action.text, contact.disclosure) } : action);
+    const disclosed = draft?.review.actions ?? discloseReplyActions(actions, "", contact.disclosure);
+    const kinds = [...new Set(disclosed.map(action => action.kind))];
     if (disclosed.some(action => (action.kind === "reaction" || action.kind === "sticker") && action.messageId !== null)) {
       const page = await client.history(binding.enrollmentId, 200, signal); assertAutomationBinding(binding, page.enrollment);
       const known = new Set(page.messages.filter(message => message.kind === "message").map(message => message.id));
@@ -285,6 +341,9 @@ export class OwnerReplies {
       }
     }
     const runId = randomUUID();
+    signal.throwIfAborted();
+    if (this.ports.grantWork.has(contact.id)) fail("conflict", "This conversation's messaging grant is changing. Wait for it to settle.");
+    if (this.pendingGrantRecovery(contact.id)) fail("conflict", "A previous messaging grant needs reconciliation before another reply.");
     if (!this.ports.journal.claim(runId, contact.id, eventId, this.ports.now())) fail("conflict", "This conversation already has a reply in progress.");
     const journal = this.ports.journal, now = this.ports.now;
     let phase: "running" | "dispatching" = "running";
@@ -301,11 +360,21 @@ export class OwnerReplies {
       try {
         if ((await this.ports.hooks.emit("reply.before-send", hook)).veto) return finish("cancelled", "extension-veto");
         const transport = createGhostgetAutomationTransport({ client, enrollmentId: binding.enrollmentId,
-          admitAsset: async path => (await this.ports.workspace(contact.id)).admitAsset(path), now });
-        const grant = await this.sendGrant(automation, contact, binding, kinds, signal);
+          admitAsset: async path => {
+            const asset = await (await this.ports.workspace(contact.id)).admitAsset(path);
+            const reviewed = draft?.review.assets.find(value => value.path === path);
+            if (!reviewed || reviewed.sha256 !== asset.sha256 || reviewed.bytes !== asset.bytes.length) throw new Error("The reviewed attachment changed");
+            return asset;
+          }, now });
+        const grant = await this.sendGrant(automation, contact, binding, kinds, disclosed.length, signal);
         ephemeral = grant.ephemeral;
         const plan = await transport.prepare({ intentId: runId, conversationId: binding.enrollmentId, contextId, actions: disclosed });
         if (!plan.ok) { if (plan.error.code === "stale-context") fail("conflict", "The conversation changed. Request a fresh suggestion."); fail("unavailable", "The messaging plan could not be prepared."); }
+        const latest = await this.ports.state(), currentContact = latest.settings.contacts.find(value => value.id === contact.id);
+        const currentBinding = latest.bindings[contact.id];
+        if (!currentContact || currentContact.revision !== contact.revision || currentBinding?.version !== 2 || currentBinding.bindingDigest !== binding.bindingDigest)
+          fail("conflict", "The contact changed while preparing this reply. Review it again before sending.");
+        signal.throwIfAborted();
         journal.transition(runId, "running", "dispatching", "intent-recorded", now(), plan.value.digest);
         phase = "dispatching";
         const receipt = await transport.submit(plan.value, { mode: "delegated", grantId: grant.grantId }, signal);
@@ -336,21 +405,21 @@ export class OwnerReplies {
 
   /** Reuse a live standing grant or issue a tightly scoped owner-send grant.
    * The caller's work registration keeps recovery from revoking mid-dispatch. */
-  private async sendGrant(automation: OwnerAutomationPort, contact: ContactSettings, binding: AutomationBinding, kinds: readonly ActionIntent["kind"][], signal: AbortSignal): Promise<{ grantId: string; ephemeral: AutomationGrant | null }> {
+  private async sendGrant(automation: OwnerAutomationPort, contact: ContactSettings, binding: AutomationBinding, kinds: readonly ActionIntent["kind"][], actionCount: number, signal: AbortSignal): Promise<{ grantId: string; ephemeral: AutomationGrant | null }> {
     const state = await this.ports.state();
     const existing = state.grants[contact.id];
     if (existing) {
       const live = await automation.grantStatus(binding, existing.id, signal);
-      if (!live.revoked && Date.parse(live.expiresAt) > this.ports.now() + 60_000 && live.maximumActions - live.consumedActions >= kinds.length
+      if (!live.revoked && Date.parse(live.expiresAt) > this.ports.now() + 60_000 && live.maximumActions - live.consumedActions >= actionCount
         && kinds.every(kind => live.actions.includes(kind))) return { grantId: live.id, ephemeral: null };
       // Replace the stale standing grant so the scoped grant is the only
       // published authority for this conversation.
-      try { await automation.revoke(existing.id, AbortSignal.timeout(60_000)); } catch { /* The scoped grant still binds the same recipient. */ }
+      await automation.revoke(existing.id, AbortSignal.timeout(60_000));
     }
     const intentId = randomUUID();
     this.ports.journal.recordGrantIntent({ id: intentId, contactId: contact.id, enrollmentId: binding.enrollmentId, bindingDigest: binding.bindingDigest });
     const created = await automation.grantScoped(binding, { enrollmentId: binding.enrollmentId, expectedBindingDigest: binding.bindingDigest,
-      actions: kinds, expiresAt: new Date(this.ports.now() + 600_000).toISOString(), maximumActions: Math.max(kinds.length, 1), minimumIntervalMs: 0 }, intentId, signal);
+      actions: kinds, expiresAt: new Date(this.ports.now() + 600_000).toISOString(), maximumActions: actionCount, minimumIntervalMs: 0 }, intentId, signal);
     this.ports.journal.recordPendingGrant(contact.id, created, intentId);
     try {
       await this.ports.publishGrant(contact.id, created);

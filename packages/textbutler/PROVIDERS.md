@@ -58,8 +58,9 @@ bun run textbutler providers check ACCOUNT_ID
 The check verifies the exact runtime and credential, and queries Anthropic's
 Models API. It does not send a user prompt or make a paid model turn. A successful
 check lists the response and classifier models; it does not enable any contact
-or grant messaging authority. Account selection and contact activation require an explicit owner control
-client; they are not currently available in the menu. API usage is billed
+or grant messaging authority. Select an account in the guided terminal, in the menu for a disabled contact,
+or with `contacts account CONTACT ACCOUNT`. Enable the contact separately.
+Source-mode setup cannot turn an unavailable engine into a qualified one. API usage is billed
 separately from coding-agent subscriptions.
 
 Model availability expires after 24 hours and is refreshed within the same
