@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { chmod, mkdtemp, readFile, realpath, rm, symlink, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
@@ -13,6 +13,7 @@ import { ContactWorkspace } from "./workspace.ts";
 import { RunJournal } from "./journal.ts";
 import { createProviderHost } from "./provider-host.ts";
 import { parseHostConfig } from "./host-config.ts";
+import { parseControlResponse } from "../../control/src/index.ts";
 
 const roots: string[] = [], services: TextbutlerControlService[] = [];
 afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -126,10 +127,10 @@ describe("persistent owner control service", () => {
 });
 
 describe("owner reply triage through the control surface", () => {
-  async function replySetup() {
+  async function replySetup(options: { afterGrant?: () => Promise<void>; afterRevoke?: () => Promise<void>; failRevoke?: boolean; enabled?: boolean } = {}) {
     const REPLY_NOW = Date.now();
     const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-replies-")); roots.push(dataDir);
-    const contact = { ...newContact("synthetic-a", "Synthetic A", "enrollment:fixture"), enabled: true };
+    const contact = { ...newContact("synthetic-a", "Synthetic A", "enrollment:fixture"), enabled: options.enabled ?? true };
     await initializeOwnerState(dataDir, { schemaVersion: 1, paused: true, maxActiveContacts: 1, contacts: [contact] });
     const identity = { provider: "imessage" as const, authId: "fixture", accountIdentity: "1".repeat(64), accountSubject: "synthetic-account", implementationIdentity: "2".repeat(64), sourceGeneration: "synthetic-db" };
     const conversation = { coordinate: { provider: "imessage" as const, chatGuid: "iMessage;-;fixture@example.test", service: "iMessage" as const, observedChatRowId: 1 }, title: "Synthetic", kind: "single" as const, participants: ["fixture@example.test"] };
@@ -145,10 +146,10 @@ describe("owner reply triage through the control surface", () => {
       if (method === "prepare") { const body = { ...params, bindingDigest: binding.bindingDigest, expiresAt: new Date(REPLY_NOW + 120_000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` }; plans.set(plan.id as string, plan as never); return plan; }
       if (method === "submit") { const plan = plans.get(String(params.planId))!; mutableSent.push([...plan.actions]); return { id: "run:1", planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:1:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
       if (method === "cancel") return { cancelled: true };
-      if (method === "grant") { const { intentId: _intentId, ...request } = params as Record<string, unknown>; const grant = { ...request, id: `grant:${++grantSequence}`, revoked: false, consumedActions: 0 }; grantStore.set(grant.id as string, grant); return grant; }
+      if (method === "grant") { const { intentId: _intentId, ...request } = params as Record<string, unknown>; const grant = { ...request, id: `grant:${++grantSequence}`, revoked: false, consumedActions: 0 }; grantStore.set(grant.id as string, grant); await options.afterGrant?.(); return grant; }
       if (method === "grant.get") { const grant = grantStore.get(String(params.grantId)); if (!grant) throw new Error("Unknown grant"); return grant; }
       if (method === "grant.by-intent") return { grant: null };
-      if (method === "revoke") { const grant = grantStore.get(String(params.grantId)); if (grant) grantStore.set(grant.id as string, { ...grant, revoked: true }); return { revoked: true }; }
+      if (method === "revoke") { if (options.failRevoke) throw new Error("Synthetic revocation unavailable"); const grant = grantStore.get(String(params.grantId)); if (grant) grantStore.set(grant.id as string, { ...grant, revoked: true }); await options.afterRevoke?.(); return { revoked: true }; }
       throw new Error(`Unexpected fixture operation ${method}`);
     }, () => REPLY_NOW);
     const qualification: RuntimeQualification = { status: "qualified", profile: CONTACT_TOOL_PROFILE, runtimeVersion: "synthetic-test-only",
@@ -180,7 +181,7 @@ describe("owner reply triage through the control surface", () => {
       }
       return response;
     };
-    return { service, sent, db, run };
+    return { service, sent, db, run, dataDir, grantStore };
   }
   test("scan, suggest, send and discard stay behind owner commands", async () => {
     const { service, sent, run } = await replySetup();
@@ -191,7 +192,14 @@ describe("owner reply triage through the control surface", () => {
     expect(suggest).toMatchObject({ ok: true, kind: "reply-suggestion", draft: { contactId: "synthetic-a", preview: "🤖{ On it. }" } });
     expect(sent).toEqual([]);
     if (!suggest.ok || suggest.kind !== "reply-suggestion") throw new Error("Missing suggestion");
-    const sentReply = await run({ command: "replies.send", draftId: suggest.draft!.id });
+    expect(await run({ command: "replies.send", draftId: suggest.draft!.id })).toMatchObject({ ok: false, code: "invalid-request" });
+    const reviewed = await run({ command: "replies.draft.read", draftId: suggest.draft!.id });
+    if (!reviewed.ok || reviewed.kind !== "reply-draft") throw new Error("Missing complete draft");
+    expect(reviewed.draft.actions).toEqual([{ kind: "text", text: "🤖{ On it. }" }]);
+    expect(parseControlResponse(JSON.parse(JSON.stringify(reviewed)))).toEqual(reviewed);
+    expect(() => parseControlResponse({ ...reviewed, draft: { ...reviewed.draft, digest: "wrong" } })).toThrow();
+    expect(() => parseControlResponse({ ...reviewed, draft: { ...reviewed.draft, actions: [{ kind: "shell", command: "no" }] } })).toThrow();
+    const sentReply = await run({ command: "replies.send", draftId: suggest.draft!.id, expectedDigest: reviewed.draft.digest });
     expect(sentReply).toMatchObject({ ok: true, kind: "reply-sent", state: "submitted" });
     expect(sent).toEqual([[{ kind: "text", text: "🤖{ On it. }" }]]);
     const snapshot = await service.snapshot();
@@ -207,7 +215,8 @@ describe("owner reply triage through the control surface", () => {
       { protocol, command: "replies.scan" },
       { protocol, command: "replies.suggest", contactId: "synthetic-a" },
       { protocol, command: "replies.send", contactId: "synthetic-a", text: "Hi" },
-      { protocol, command: "replies.send", draftId: "draft:none" },
+      { protocol, command: "replies.send", draftId: "draft:none", expectedDigest: "a".repeat(64) },
+      { protocol, command: "replies.draft.read", draftId: "draft:none" },
       { protocol, command: "replies.discard", draftId: "draft:none" },
     ]) expect(await service.request(request as never)).toMatchObject({ ok: false, code: "unavailable" });
     expect((await service.snapshot()).replies).toBeUndefined();
@@ -217,12 +226,84 @@ describe("owner reply triage through the control surface", () => {
       { protocol, command: "replies.send", contactId: "synthetic-a", text: "" },
       { protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", draftId: "draft:1" },
       { protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", extra: 1 },
+      { protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", expectedRevision: 0 },
+      { protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", expectedRevision: undefined },
+      { protocol, command: "replies.send", draftId: "draft:1" },
+      { protocol, command: "replies.send", draftId: "draft:1", expectedDigest: "bad" },
       { protocol, command: "replies.suggest" },
       { protocol, command: "replies.suggest", contactId: "../bad" },
       { protocol, command: "replies.scan", contactId: "synthetic-a" },
       { protocol, command: "replies.discard" },
     ]) expect(() => parseControlRequest(request)).toThrow();
     expect(parseControlRequest({ protocol, command: "replies.send", contactId: "synthetic-a", text: "hi" })).toMatchObject({ command: "replies.send" });
-    expect(parseControlRequest({ protocol, command: "replies.send", draftId: "draft:1" })).toMatchObject({ command: "replies.send", draftId: "draft:1" });
+    expect(parseControlRequest({ protocol, command: "replies.send", contactId: "synthetic-a", text: "hi", expectedRevision: 4 })).toMatchObject({ command: "replies.send", expectedRevision: 4 });
+    expect(parseControlRequest({ protocol, command: "replies.send", draftId: "draft:1", expectedDigest: "a".repeat(64) })).toMatchObject({ command: "replies.send", draftId: "draft:1" });
+    expect(parseControlRequest({ protocol, command: "replies.draft.read", draftId: "draft:1" })).toMatchObject({ command: "replies.draft.read", draftId: "draft:1" });
+  });
+  test("literal replies bound to an old preview are rejected before an owner send job", async () => {
+    const { service, sent, run } = await replySetup();
+    const previous = await service.snapshot();
+    const changed = await service.request({ protocol, command: "global.settings.update", expectedRevision: previous.revision,
+      settings: { ...previous.settings, paused: !previous.settings.paused } });
+    expect(changed.ok).toBe(true);
+    const stale = await service.request({ protocol, command: "replies.send", contactId: "synthetic-a", text: "Reviewed reply", expectedRevision: previous.revision });
+    expect(stale).toMatchObject({ ok: false, code: "conflict" });
+    expect(sent).toEqual([]);
+    const current = await service.snapshot();
+    expect(await run({ command: "replies.send", contactId: "synthetic-a", text: "Reviewed reply", expectedRevision: current.revision })).toMatchObject({ ok: true, kind: "reply-sent", state: "submitted" });
+    expect(sent).toEqual([[{ kind: "text", text: "🤖{ Reviewed reply }" }]]);
+  });
+  test("shutdown cannot acknowledge an unpublished grant or erase uncertain revocation", async () => {
+    let arrived!: () => void, release!: () => void;
+    const grantArrived = new Promise<void>(resolve => { arrived = resolve; });
+    const grantResponse = new Promise<void>(resolve => { release = resolve; });
+    const fixture = await replySetup({ failRevoke: true, afterGrant: async () => { arrived(); await grantResponse; } });
+    const admitted = await fixture.service.request({ protocol, command: "replies.send", contactId: "synthetic-a", text: "Shutdown must retain custody" });
+    expect(admitted).toMatchObject({ ok: true, kind: "job" });
+    await grantArrived;
+    const closing = fixture.service.close();
+    services.splice(services.indexOf(fixture.service), 1);
+    release();
+    await closing.catch(() => undefined);
+    expect(fixture.sent).toEqual([]);
+    expect(fixture.grantStore.get("grant:1")?.revoked).toBe(false);
+    const settings = JSON.parse(await readFile(join(fixture.dataDir, "state", "settings.json"), "utf8"));
+    expect(settings.grants).toEqual({});
+    const recovered = await RunJournal.open(join(fixture.dataDir, "state", "runs.sqlite"));
+    try {
+      expect(recovered.pendingGrants()).toMatchObject([{ contactId: "synthetic-a", grant: { id: "grant:1" } }]);
+      expect(recovered.grantIntents()).toEqual([]);
+    } finally { recovered.close(); }
+  });
+  test("a job deadline during grant cleanup cannot erase a submitted send receipt", async () => {
+    let deadline: (() => void) | undefined, cleanupObserved = false;
+    const fixture = await replySetup({ enabled: false, afterRevoke: async () => {
+      cleanupObserved = true;
+      expect(fixture.sent).toHaveLength(1);
+      expect(deadline).toBeDefined();
+      deadline!();
+    } });
+    const originalSetTimeout = globalThis.setTimeout;
+    const interceptedTimeout = new Proxy(originalSetTimeout, { apply(target, thisArg, timerArgs) {
+      const [handler, timeout, ...args] = timerArgs;
+      if (timeout === 120_000 && typeof handler === "function") deadline = () => Reflect.apply(handler, undefined, args);
+      return Reflect.apply(target, thisArg, timerArgs);
+    } });
+    const timer = spyOn(globalThis, "setTimeout").mockImplementation(interceptedTimeout);
+    try {
+      const result = await fixture.run({ command: "replies.send", contactId: "synthetic-a", text: "Already accepted" });
+      expect(cleanupObserved).toBe(true);
+      expect(result).toMatchObject({ ok: true, kind: "reply-sent", state: "submitted" });
+      expect(fixture.sent).toEqual([[{ kind: "text", text: "🤖{ Already accepted }" }]]);
+      expect(fixture.service.runJournal().recent("synthetic-a", 1)).toMatchObject([{ state: "submitted" }]);
+      expect(fixture.grantStore.get("grant:1")?.revoked).toBe(true);
+    } finally { timer.mockRestore(); }
+  });
+  test("owner settings can explicitly clear disclosure markers", async () => {
+    const { service } = await setup();
+    const snapshot = await service.snapshot(), contact = snapshot.contacts[0]!;
+    const response = await service.request({ protocol, command: "contact.settings.update", contactId: contact.id, expectedRevision: snapshot.revision,
+      settings: { ...contact.settings, disclosure: { character: "", begin: "", end: "" } } });
+    expect(response).toMatchObject({ ok: true, kind: "snapshot", snapshot: { contacts: [{ settings: { disclosure: { character: "", begin: "", end: "" } } }, {}] } });
   });
 });

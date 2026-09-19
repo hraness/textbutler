@@ -14,6 +14,13 @@ See [provider setup](PROVIDERS.md) before enabling a contact. Source and synthet
 tests do not attest live delivery on a particular account. CLI and menu-bar use
 do not require a signed Mac release; windowed desktop app packaging has been removed.
 
+## First use
+
+Start with the [guided setup](../../docs/textbutler/getting-started.md) and
+[messaging app support](../../docs/textbutler/messaging-apps.md). Run
+`bun run textbutler tui` for setup, connections, contact selection and inbox review.
+The menu companion uses the shared Rust runner; no local Rust build is needed.
+
 ## Modules
 
 - `config.ts`: strict contact settings, smart-mode defaults, activation limits,
@@ -131,9 +138,8 @@ complete that setup in Ghostget. Restart Textbutler after editing host settings.
 The owner control protocol supports listing up to 200 recent Messages
 conversations and enrolling one direct contact, optionally importing at most 200
 recent text messages. Enrollment rechecks account incarnation and participant
-identity and creates a disabled contact. Attachments are not imported. These
-operations currently have no menu or CLI enrollment interface; the menu shows
-existing contact state. The native Contacts directory remains unavailable
+identity and creates a disabled contact. Attachments are not imported. Use the terminal or menu to select a conversation, or run
+`conversations list` followed by `contacts add CANDIDATE [--history]`. The native Contacts directory remains unavailable
 through the current Ghostget contract.
 
 Long reads use bounded owner jobs; the global Pause button remains available.
@@ -148,17 +154,16 @@ marker or run broad provider recovery merely to unblock a retry. The daemon
 does not automatically invoke Ghostget recovery or infer descendant cleanup from
 the immediate parent process exiting.
 The configuration above selects the legacy read-only conversation path. For
-automation, add `ghostget.automationAccounts`, an explicit list of at most one
-`{ "provider": "imessage", "authId": "your-imessage-account-id" }` and one
-`{ "provider": "whatsapp", "authId": "your-whatsapp-account-id" }`. Automation
+automation, add `ghostget.automationAccounts`, an explicit list of at most one account each for `imessage`, `whatsapp` and
+`beeper`, with `{ "provider": "beeper", "authId": "beeper-main" }` as an example. Automation
 account IDs use lowercase letters, digits and hyphens, start with a letter, and
 have at most 48 characters. Keep the legacy `authId` for compatibility.
 
 Provider configuration alone does not start WhatsApp synchronization. The owner
 control protocol has separate connection, enrollment and activation operations.
-These require an explicit owner client; the menu cannot initiate them. New
-contacts remain disabled until a ready agent account and messaging grant have
-been selected through that protocol.
+Use `messaging start PROVIDER`, the guided terminal, or the menu. New contacts
+remain disabled until a ready agent account and messaging grant have been
+selected. Connection checks alone do not enable replies.
 
 Enabling revalidates the messaging identity and grants only currently available
 actions, for at most 30 days and 100,000 actions. While the contact remains enabled,

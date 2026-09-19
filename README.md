@@ -2,54 +2,55 @@
 
 [![skills.sh](https://skills.sh/b/hraness/message-like-me)](https://skills.sh/hraness/message-like-me)
 
-Textbutler is a personal message butler for macOS, powered by the coding agent
-you choose. Activate a few contacts, give each relationship a private folder of
-context, and let a clearly identified assistant help when it is useful.
+Textbutler is a local message assistant for macOS. Its guided terminal and menu
+bar help you connect selected iMessage, WhatsApp and Beeper conversations, see
+what needs an answer, and review replies before sending them.
 
-The new product lives at [textbutler.app](https://textbutler.app). Its default
-response looks like `🤖{ hello this is my response }`. Each contact can choose
-the three symbols, a keyword, and smart or keyword-only response mode.
+**Current status: source pilot.** Messaging setup, conversation selection,
+private contact memory, inbox review and replies you write yourself are
+implemented. The source CLI has no qualified AI reply engine. Codex and Claude
+Code remain unavailable; Claude API requires a reviewed compiled runtime
+supplied by a trusted integration. Adding an API key or signing into a coding
+agent alone does not enable suggestions or automatic replies. Live delivery
+still needs verification on your chosen account and recipient.
 
-**Development status:** the source includes the macOS daemon lifecycle,
-owner-selected Ghostget conversation enrollment, optional history
-initialization, private memory, executable hooks, reply policy and send journal.
-The supported local surface is the `textbutler` CLI plus its native menu-bar
-companion. It runs from a prebuilt binary and does not require an app bundle,
-signing, notarization, or a download manager. AgentMixer includes a
-restricted Claude Agent SDK adapter and shared account custody. Live automated
-replies remain unavailable until Ghostget's durable events and scoped
-automation grants, and the provider's contact-only execution, are qualified.
-Codex execution and native rich actions are also unavailable. The website is
-informational; it has no connection to private messages or contact folders.
+Start with the [guided setup](docs/textbutler/getting-started.md) and
+[messaging app support](docs/textbutler/messaging-apps.md). Beeper can connect
+apps such as Signal, Telegram and Instagram through Ghostget's current text
+automation adapter. Its linked apps and account permissions determine what is
+available. The [architecture](docs/textbutler/architecture.md) records the
+runtime boundaries and remaining qualification work.
 
-The menu-bar companion uses the shared, unsigned desktop-foundation runner. The
-`textbutler menubar` commands download and verify a pinned release binary on
-first start; nothing compiles source or opens a windowed application.
+## Open the guided terminal
 
-Start with the [architecture and capability status](docs/textbutler/architecture.md),
-[Textbutler runtime](packages/textbutler/README.md),
-[AgentMixer](https://github.com/hraness/agentmixer#readme),
-[transport adapter](packages/transport/README.md), or the
-[menu companion adapter](packages/textbutler/src/menubar.ts).
+From a Textbutler checkout on your Mac, with Bun 1.3.14:
 
 ```sh
 bun install --frozen-lockfile --ignore-scripts
-bun run check:textbutler
+bun run textbutler tui
 ```
 
-The source is MIT licensed. New packages remain unpublished while their
-contracts are developed. The menu-bar CLI and daemon are the only supported
-Textbutler runtime surfaces. Message Like Me history readers and message-bundle
-contracts are retained below only as compatibility documentation for existing
-consumers; they are not Textbutler runtime components.
+Choose **Setup & readiness**, then **Connect messaging apps**. Textbutler uses
+an existing Ghostget installation for messaging sign-in and permissions. The
+guide explains how to select its executable and accounts, start the background
+service, and add one conversation. New installations start paused and new
+contacts have automatic replies off. Setup and conversation selection never
+send a message.
+
+Textbutler's source is MIT licensed and its new packages remain unpublished.
+The published Message Like Me package documented below installs the legacy
+history tools, not Textbutler. The website at
+[textbutler.app](https://textbutler.app) is informational and receives no private
+messages or contact folders.
 
 ## Run the Textbutler menu companion
 
-Start the companion in the background; it stays running until `menubar stop` or
-its menu-bar **Quit** action:
+The native companion downloads and verifies a pinned prebuilt
+desktop-foundation runner on first start. No local Rust build is needed. Start
+it from the terminal's **Menu bar companion** action or run:
 
 ```sh
-bun run textbutler menubar
+bun run textbutler menubar start
 bun run textbutler menubar status
 bun run textbutler menubar stop
 ```
@@ -64,35 +65,51 @@ bun run textbutler menubar uninstall
 
 `menubar doctor` reports the runner artifact, platform capability, and any
 operating-system approval step needed on an unsigned binary. The companion
-shows daemon state, contact and account readiness, capabilities, and recent
-activity. It controls global pause and opens the informational Textbutler
-website. It does not provide contact enrollment or account setup.
+offers pause, connection checks, conversation selection, contact and agent
+settings, inbox previews and recent activity. Use the terminal for complete
+draft review and sending. Menu startup is separate from daemon startup;
+quitting the menu leaves an installed background service running. Use
+`daemon install` or `daemon uninstall` to manage that service. Uninstall retains
+your settings and contact memory.
 
 ## Answer your own messages
 
-Separate from automatic replies, the daemon can triage what is waiting on you:
+In the terminal, choose **Inbox & replies**, select a conversation, then choose
+**Type a reply**. Review the recipient and complete text before typing `send`.
+This path needs a ready messaging connection but no AI account. Cancelling the
+review sends nothing.
+
+If a qualified AI reply engine becomes available, suggestions use a separate
+review step:
 
 ```sh
-bun run textbutler inbox                          # which enrolled conversations need a reply
-bun run textbutler replies suggest CONTACT        # draft a reply (never sends)
-bun run textbutler replies send draft:<id>        # send the exact reviewed draft
-bun run textbutler replies send CONTACT TEXT...   # send literal owner text
-bun run textbutler replies discard draft:<id>     # drop a suggestion
+bun run textbutler inbox
+bun run textbutler replies suggest CONTACT
+bun run textbutler replies show DRAFT
+bun run textbutler replies send DRAFT DIGEST
+bun run textbutler replies discard DRAFT
 ```
 
-`CONTACT` is the exact contact id or a unique name match. The menu's **Replies**
-submenu runs the same scan, offers per-conversation suggestions, and sends only
-the exact reviewed draft — free-text replies stay on the CLI. Suggestions expire
-after fifteen minutes and are rejected if the conversation or disclosure
-settings changed underneath them. An owner send reuses the contact's live grant
-when it covers the actions; otherwise the daemon issues a scoped ten-minute
-grant for just those action kinds.
+`CONTACT` is the exact contact ID or a unique name match. Use the complete draft
+and digest returned by `replies show`; previews alone cannot send. Suggestions
+expire after fifteen minutes. Changed contact settings, conversation context
+or attachment bytes require a fresh review. The CLI also supports an immediate
+explicit reply with `bun run textbutler replies send CONTACT TEXT...`.
+
+`submitted` means the messaging provider accepted the action, not that the
+recipient received or read it. A pending operation prints a job ID: inspect it
+with `bun run textbutler jobs show JOB_ID`. Do not repeat a send with an unknown
+outcome. Uncertain sends remain blocked until reconciled.
 
 Every text reply is wrapped in the contact's three disclosure symbols, rendered
 `🤖{ … }` by default. Each field may be cleared individually; clearing all three
-sends plain text. Cleared disclosure never makes butler output ambiguous
-internally — the send journal records the provider-accepted message IDs and
-history attributes them to the butler without relying on visible markers.
+sends plain text. The review shows the actual outgoing text. The send journal
+retains provider acceptance IDs when available; see the messaging guide for
+connection-specific attribution and delivery limits.
+
+Automatic replies remain a separate choice: they require a qualified agent,
+a ready messaging connection, explicit contact activation and global resume.
+Keep them paused until those requirements and the relevant live checks pass.
 
 ## Legacy Message Like Me history tools
 

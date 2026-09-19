@@ -1,4 +1,7 @@
-/** Owner-only desktop control protocol. Messaging authority is never a UI command. */
+import { parseActionIntent } from "../../transport/src/validation.ts";
+import type { ActionIntent } from "../../transport/src/types.ts";
+
+/** Owner-only desktop control protocol. Messaging authority remains in the daemon. */
 export const CONTROL_PROTOCOL = "textbutler.control.v1" as const;
 export type CapabilityId = "messages" | "contacts" | "agent" | "attachments" | "reactions" | "stickers" | "links" | "polls" | "mini-apps";
 export interface Capability { id: CapabilityId; status: "available" | "setup-required" | "unsupported"; detail: string }
@@ -30,6 +33,11 @@ export interface PendingReplyItem {
 }
 /** An owner-reviewed suggestion. Sending is always a separate explicit command. */
 export interface ReplyDraftView { id: string; contactId: string; name: string; summary: string; preview: string; actionCount: number; expiresAt: string }
+export interface ReplyDraftDetail {
+  id: string; contactId: string; name: string; provider: "imessage" | "whatsapp" | "beeper"; conversationId: string;
+  summary: string; actions: readonly ActionIntent[]; assets: readonly { path: string; sha256: string; bytes: number }[];
+  digest: string; expiresAt: string;
+}
 export interface RepliesView { scannedAt: string | null; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
 export interface DesktopSnapshot {
   protocol: typeof CONTROL_PROTOCOL;
@@ -62,8 +70,9 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "global.settings.update"; expectedRevision: number; settings: DesktopSnapshot["settings"] }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.scan" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.suggest"; contactId: string }
-  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; draftId: string }
-  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; contactId: string; text: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.draft.read"; draftId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; draftId: string; expectedDigest: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; contactId: string; text: string; expectedRevision?: number }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.discard"; draftId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "activity.list" };
 export type ControlResponse =
@@ -75,6 +84,7 @@ export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "memory"; contactId: string; revision: string; content: string }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "replies"; scannedAt: string; checked: number; unreadable: number; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-suggestion"; draft: ReplyDraftView | null; pending: PendingReplyItem }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-draft"; draft: ReplyDraftDetail }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-sent"; contactId: string; runId: string; state: "submitted" | "failed" | "partial" | "indeterminate" | "cancelled"; detail: string }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-discarded"; discarded: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: false; code: "disconnected" | "invalid-request" | "conflict" | "capacity" | "unavailable"; message: string };
@@ -167,6 +177,15 @@ function replyDraftView(value: unknown): ReplyDraftView {
   return { id: text(row.id, 120), contactId: text(row.contactId, 256), name: text(row.name, 256), summary: text(row.summary, 512),
     preview: text(row.preview, 512), actionCount: integer(row.actionCount, 0, 8), expiresAt: text(row.expiresAt, 64) };
 }
+function replyDraftDetail(value: unknown): ReplyDraftDetail {
+  const row = record(value), actions = list(row.actions, 8).map(parseActionIntent);
+  if (!actions.length) throw new Error("A reply draft needs actions.");
+  return { id: text(row.id, 120), contactId: text(row.contactId, 80), name: text(row.name, 256),
+    provider: oneOf(row.provider, ["imessage", "whatsapp", "beeper"]), conversationId: text(row.conversationId, 512),
+    summary: text(row.summary, 4096), actions,
+    assets: list(row.assets, 8).map(value => { const asset = record(value); return { path: text(asset.path, 1024), sha256: digest(asset.sha256), bytes: integer(asset.bytes, 1, 16 * 1024 * 1024) }; }),
+    digest: digest(row.digest), expiresAt: text(row.expiresAt, 64) };
+}
 function repliesView(value: unknown): RepliesView {
   const row = record(value);
   return { scannedAt: row.scannedAt === null ? null : text(row.scannedAt, 64),
@@ -221,6 +240,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
     if (draft !== null && (draft.contactId !== pending.contactId || !pending.sendable && pending.reason === null)) throw new Error("Inconsistent reply suggestion.");
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-suggestion", draft, pending };
   }
+  if (row.kind === "reply-draft") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-draft", draft: replyDraftDetail(row.draft) };
   if (row.kind === "reply-sent") {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-sent", contactId: text(row.contactId, 256), runId: text(row.runId, 120),
       state: oneOf(row.state, ["submitted", "failed", "partial", "indeterminate", "cancelled"]), detail: text(row.detail, 512) };

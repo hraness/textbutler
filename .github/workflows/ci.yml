@@ -69,3 +69,5 @@ jobs:
           set -euo pipefail
           mkdir -p "$HOME"
           bun test src/imessage.test.ts src/contacts.test.ts src/metrics.test.ts
+      - name: Test Textbutler owner controls and native custody with synthetic data
+        run: bun run check:textbutler

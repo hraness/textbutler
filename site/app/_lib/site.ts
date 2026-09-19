@@ -3,9 +3,10 @@ import type { Metadata } from 'next';
 export const SITE_NAME = 'Textbutler';
 export const SITE_ORIGIN = 'https://textbutler.app';
 export const SITE_DESCRIPTION =
-  'A personal message butler for Mac, with contact-specific memory, clearly identified replies, and guarded iMessage and WhatsApp connections. In development.';
+  'A local message assistant for Mac, with a guided inbox, replies you review, and iMessage, WhatsApp and Beeper connections. Source pilot; AI replies remain unavailable.';
 export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
+export const GETTING_STARTED_URL = `${GITHUB_URL}/blob/main/docs/textbutler/getting-started.md`;
 // The immutable legacy release coordinate; not a Textbutler app version.
 export const SOFTWARE_VERSION = '0.8.11';
 export const RELEASE_URL = `${GITHUB_URL}/releases/tag/v${SOFTWARE_VERSION}`;

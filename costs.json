@@ -1,6 +1,13 @@
 {
   "version": 1,
   "surfaces": {
+    "served:textbutler-local-runtime": {
+      "kind": "served",
+      "retention": "persistent",
+      "owner": "scripts/build-textbutler.ts",
+      "budget": { "bytesPerArtifact": 67108864 },
+      "note": "reproducible local pilot runtime bundles; integrity metadata does not qualify provider execution"
+    },
     "local:style-profile": {
       "kind": "authoritative",
       "retention": "account",

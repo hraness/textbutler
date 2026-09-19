@@ -81,6 +81,8 @@
     "check": "bun run check:cost-surfaces && bun run typecheck && bun run check:effect && bun run test && bun run check:skill && bun run check:standalone && bun run build && bun run check:public-graphs && bun run check:dist && bun run check:package && bun run check:textbutler",
     "check:textbutler": "bun test packages && tsc --noEmit -p packages/transport/tsconfig.json && tsc --noEmit -p packages/textbutler/tsconfig.json",
     "textbutler": "bun packages/textbutler/src/cli.ts",
+    "textbutler:build": "bun scripts/build-textbutler.ts",
+    "textbutler:install": "bun scripts/install-textbutler.ts",
     "prepack": "bun run check",
     "check:effect": "bun scripts/check-effect-architecture.ts",
     "check:public-graphs": "bun scripts/check-public-graphs.ts"

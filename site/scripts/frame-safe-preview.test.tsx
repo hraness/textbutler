@@ -8,7 +8,9 @@ test('server-renders an honest script-independent preview with no navigation', (
   const html = renderToStaticMarkup(<PreviewPage />);
 
   expect(html).toContain('A little help in your conversations');
-  expect(html).toContain('Explicit messaging and agent setup required');
+  expect(html).toContain('Source pilot. Start with replies you write yourself.');
+  expect(html).toContain('AI replies remain unavailable in the source CLI.');
+  expect(html).toContain('The native menu uses a prebuilt runner.');
   expect(html).toContain('no windowed app download');
   expect(html).toContain('Synthetic example · no message sent');
   expect(html).not.toMatch(/<(?:a|button|form|script)\b/u);

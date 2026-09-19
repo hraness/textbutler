@@ -8,7 +8,7 @@ import About from '../app/about/page.tsx';
 import Preview from '../app/preview/page.tsx';
 import { GET as getDiscoveryText } from '../app/llms.txt/route.ts';
 import { checkMarketingSnapshot } from '../styles/vendor/hraness-marketing/check.mjs';
-import { SOFTWARE_VERSION } from '../app/_lib/site.ts';
+import { GETTING_STARTED_URL, GITHUB_URL, SOFTWARE_VERSION } from '../app/_lib/site.ts';
 
 const siteRoot = resolve(import.meta.dir, '..');
 
@@ -39,7 +39,8 @@ test('renders Textbutler with the shared grammar and honest development status',
   expect(html).toContain('iMessage and WhatsApp');
   expect(html).toContain('Claude Code and Codex remain unavailable');
   expect(html).toContain('It is billed separately from a Claude Code subscription');
-  expect(html).toContain('an explicitly selected ready agent account');
+  expect(html).toContain('no AI account');
+  expect(html).toContain('The source CLI has no qualified AI reply engine');
   expect(html).toContain('Live delivery and rich actions still need verification on your account.');
   expect(html).toContain('No windowed app download is provided');
   expect(html).toContain(`Message Like Me v${SOFTWARE_VERSION}`);
@@ -61,7 +62,7 @@ test('keeps the hero outcome-led and free of contract vocabulary', () => {
   expect(heading).not.toMatch(/\.$/u);
   expect(heroCopy).toContain('your');
   const boundary = /<p\b[^>]*class="[^"]*\bhraness-marketing-hero__boundary\b[^"]*"[^>]*>([^<]+)<\/p>/u.exec(hero?.[0] ?? '')?.[1] ?? '';
-  expect(boundary).toBe('In development · macOS · iMessage + WhatsApp');
+  expect(boundary).toBe('Source pilot · macOS · iMessage + WhatsApp + Beeper');
   expect(boundary).not.toContain(SOFTWARE_VERSION);
   for (const word of HERO_VOCABULARY_TO_AVOID) expect(heroCopy).not.toMatch(new RegExp(`\\b${word}\\b`, 'u'));
 });
@@ -134,4 +135,23 @@ test('keeps machine-readable setup and unavailable choices consistent with the l
   expect(discovery).toContain('Textbutler CLI and menu companion source is available; there is no published Textbutler package or windowed app download.');
   expect(discovery).toContain('App Clips, mini apps, and Linq integration remain unavailable.');
   expect(discovery).toContain('Live delivery still needs verification on the selected account.');
+});
+
+test('offers guided source setup without implying a released AI engine or menu send approval', async () => {
+  const home = renderToStaticMarkup(<Home />);
+  const about = renderToStaticMarkup(<About />);
+  const discovery = await getDiscoveryText().text();
+  for (const content of [home, about, discovery]) {
+    expect(content).toContain(GETTING_STARTED_URL);
+    expect(content).toContain('compiled runtime');
+    expect(content).toContain('prebuilt');
+    expect(content).not.toContain('Claude API is available after setup');
+    expect(content).not.toContain(`${GITHUB_URL}/tree/main/apps/macos`);
+  }
+  expect(home).toContain('Start guided setup');
+  expect(home).toContain(`${GITHUB_URL}/blob/main/packages/textbutler/src/menubar.ts`);
+  expect(home).toContain('Clearing all three sends plain text');
+  expect(discovery).toContain('replies show DRAFT');
+  expect(discovery).toContain('replies send DRAFT DIGEST');
+  expect(discovery).toContain('A menu preview cannot send a draft.');
 });
