@@ -14,7 +14,7 @@ remain visible in setup and must be resolved before that claim is made.
 | First use | Guided terminal, actionable readiness, additive configuration, paused defaults | First-run testing with real owner-selected accounts and permissions |
 | Menu bar | Shared native Rust runner; setup, connections, contact controls, bounded menus and recoverable jobs | Confirm native lifecycle on each supported macOS release |
 | Reply review | Complete ordered action review, recipient/context digest, attachment byte verification; typed preview revision checks | Agreed-recipient live delivery and takeover tests |
-| Agent execution | Source and local pilot expose no qualified default AI engine | Reviewed runtime provenance for API execution, or a published confined native agent adapter with both classifier and reply profile evidence |
+| Agent execution | Source and local pilot expose no qualified default AI engine. The [native subscription route](native-subscription.md) supplies the Codex and Claude Code boundary, protocols and admission checks, with no launcher and no qualification | Reviewed runtime provenance for API execution, or a confined native supervisor with exact installed-runtime evidence and both classifier and reply profile evidence |
 | iMessage | Existing native Ghostget connection | Current account permissions and live transport qualification |
 | WhatsApp | Existing Ghostget linked-device connection and explicit sync | Current linked-device identity, sync and live transport qualification |
 | Beeper | Direct text conversations through Ghostget 0.18.14+; independent connection checks | Current Desktop API/account setup, canonical pending-send reconciliation, and edit/delete observation coverage |
@@ -34,6 +34,21 @@ into a full-screen workspace, XCB's Ratatui/Crossterm interface is an appropriat
 reference. Reusing its constrained agent execution requires a published adapter
 and qualification contract; launching its CLI with inherited tools or sessions
 would not provide that boundary.
+
+## Agent execution direction
+
+The selected direction is the Codex and Claude Code applications an owner
+already runs, rather than a separately billed API key. Those applications are
+used as inference components with no tools of their own: they propose one
+operation at a time, and Textbutler's existing contact-scoped broker decides
+whether to perform it. The source now carries that boundary, both provider
+protocols and their admission checks.
+
+The route ships disabled. It contains no process launcher and no qualification
+evidence, so native accounts report unavailable and explain why. Neither a
+matching build hash nor a signed-in account is qualification. The
+[native subscription route](native-subscription.md) lists the supervisor,
+runtime-evidence, per-purpose profile and live-account requirements that remain.
 
 ## Messaging expansion
 

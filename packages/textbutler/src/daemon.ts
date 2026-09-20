@@ -12,6 +12,7 @@ import { createGhostgetOwnerReadPort } from "./ghostget-owner-read.ts";
 import type { OwnerConversationReadPort } from "./enrollment.ts";
 import { DaemonCustody } from "./daemon-custody.ts";
 import { createProviderHost, type ManagedCodexAccountFactory } from "./provider-host.ts";
+import type { NativeSubscriptionHost } from "./native-subscription.ts";
 import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
 import { createGhostgetAutomationProcess } from "./ghostget-automation-process.ts";
 import { createAutomationOwnerPort } from "./automation-owner.ts";
@@ -33,7 +34,8 @@ export interface RunningDaemon { readonly socketPath: string; readonly service: 
 /** Foreground owner daemon. Explicit configured messaging accounts may start a
  * Ghostget control process; only enabled contacts with grants can run replies. */
 export async function startDaemon(options: { dataDir?: string; initialSettings?: Settings; enrollment?: OwnerConversationReadPort;
-  providerArtifact?: ClaudeApiAdapterOptions["runtimeArtifact"]; managedCodex?: ManagedCodexAccountFactory } = {}): Promise<RunningDaemon> {
+  providerArtifact?: ClaudeApiAdapterOptions["runtimeArtifact"]; managedCodex?: ManagedCodexAccountFactory;
+  nativeSubscriptions?: NativeSubscriptionHost } = {}): Promise<RunningDaemon> {
   const dataDir = await ensurePrivateDirectory(options.dataDir ?? defaultDataDirectory());
   const path = daemonSocketPath(dataDir);
   // SQLite retains an OS lock for this lifetime, with committed socket custody.
@@ -77,7 +79,8 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
     service = await TextbutlerControlService.open({ dataDir, ...(options.initialSettings === undefined ? {} : { initialSettings: options.initialSettings }), ...(enrollment === undefined ? {} : { enrollment }), ...(automation === undefined ? {} : { automation }), recoverRuns: true,
       ...(messaging === undefined ? {} : { client: messaging.client }), hooks: extensions.hooks,
       providers: leases => createProviderHost({ dataDir, config: host, leases, ...(options.providerArtifact === undefined ? {} : { runtimeArtifact: options.providerArtifact }),
-        ...(options.managedCodex === undefined ? {} : { managedCodex: options.managedCodex }) }) });
+        ...(options.managedCodex === undefined ? {} : { managedCodex: options.managedCodex }),
+        ...(options.nativeSubscriptions === undefined ? {} : { nativeSubscriptions: options.nativeSubscriptions }) }) });
     await service.recoverInactiveGrants();
     if (messaging) replyLoop = await createDaemonReplyLoop({ service, client: messaging.client, hooks: extensions.hooks, onStatus: value => service!.setRuntimeStatus(value) });
     else if (messagingUnavailable) service.setRuntimeStatus({ state: "unavailable", detail: "Ghostget automation setup or previous process custody needs owner attention. No automatic replies are running." });
