@@ -187,7 +187,7 @@ One narrow native command accepts the versioned control request. It connects to 
 
 ## Admission still required
 
-1. Use Ghostget 0.18.18 for native TextButler iMessage setup, including its required native helper resource bundle. Real account synchronization, recipient identity, rich actions and revocation still require a bounded owner-authorized live test; artifact admission and synthetic fixtures do not prove delivery.
+1. Use Ghostget 0.18.19 for native TextButler iMessage setup, including its native helper resource bundle and protected-folder startup fix. Real account synchronization, recipient identity, rich actions and revocation still require a bounded owner-authorized live test; artifact admission and synthetic fixtures do not prove delivery.
 2. Use a verified Textbutler bundle with reviewed composition admission and connect an admitted native xcb build through its zero-tool generation contract. Verify the exact provider/account, both classifier and reply behavior, cancellation and uncertain-custody recovery before enabling automatic replies. The separate Claude API path retains explicit account setup and packaged-runtime admission.
 3. Publish the CLI package with its pinned desktop-foundation SDK dependency. Verify the package bytes, the verified pinned runner download, singleton behavior, and the shared autostart install/uninstall lifecycle. A source checkout or missing companion must never trigger a build at launch.
 4. Keep historical repository and published package identities as compatibility and provenance anchors. The Textbutler site is assigned to `textbutler.app`; later identity migrations must preserve immutable artifacts and existing release protections.

@@ -12,8 +12,8 @@ import { loadHostConfig, type GhostgetHostConfig } from "./host-config.ts";
 export const IMESSAGE_SETUP_RESULT = "imessage-setup-result.json";
 export const IMESSAGE_SETUP_CUSTODY = "imessage-setup-custody.json";
 export const IMESSAGE_SETUP_BINDING = "imessage-setup-binding.json";
-// This release preserves imsg's required bundles in each operation directory.
-const VERSION = "0.18.18", PROTOCOL = "ghostget.control/1";
+// This release preserves native bundles and avoids opening unrelated protected folders.
+const VERSION = "0.18.19", PROTOCOL = "ghostget.control/1";
 const READ = "messaging.automation.read", SEND = "messaging.automation.send.text", ATTACHMENT = "messaging.automation.send.attachment";
 const OPERATIONS = [READ, SEND, ATTACHMENT] as const;
 const sha = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");

@@ -8,8 +8,9 @@ menu companion's private helper or open provider databases.
 
 The automation contract was first admitted with
 [Ghostget 0.18.2](https://github.com/hraness/ghostget/releases/tag/v0.18.2).
-Native TextButler iMessage setup now requires Ghostget 0.18.18, which preserves
-the native helper's required resource bundle during execution. Follow the
+Native TextButler iMessage setup now requires Ghostget 0.18.19, which preserves
+the native helper's required resource bundle and avoids opening unrelated protected
+folders during state validation. Follow the
 [current setup guide](getting-started.md#give-textbutler-access-to-imessage).
 Installation is explicit and starts no provider. Older generic CLI routes do
 not become automation grants.
