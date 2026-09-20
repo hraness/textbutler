@@ -56,8 +56,9 @@ setup steps and whether reply generation is actually available.
 ## Connect your messaging apps
 
 Textbutler uses an existing Ghostget installation for account sign-in, permissions
-and messaging access. Set up the account there first. You will need its physical
-executable path and the exact account ID; Textbutler does not guess an identity.
+and messaging access. You need its physical executable path and the exact account
+ID; Textbutler does not guess an identity. Native iMessage can use the app setup
+flow below. Set up other messaging accounts in Ghostget first.
 
 Choose **Connect messaging apps** in the terminal:
 
@@ -98,6 +99,50 @@ source service is installed.
 
 See [messaging app support](messaging-apps.md) for Beeper limitations and native
 alternatives, including requirements that affect Telegram AI processing.
+
+## Give TextButler access to iMessage
+
+Use the native app when you want macOS Full Disk Access to belong to TextButler.
+The app supervises its pinned runtime and background service. Build it from an
+already installed, verified payload on your Mac:
+
+```sh
+bun run textbutler:app build \
+  --from /absolute/installed/textbutler/version \
+  --output /absolute/new/app-build-directory
+bun run textbutler:app install --from /absolute/new/app-build-directory
+```
+
+The default destination is `~/Applications/TextButler.app`. Building and
+installing the app does not start replies or change macOS permissions. In
+**System Settings → Privacy & Security → Full Disk Access**, click **+**, press
+**Command-Shift-G**, enter `~/Applications/TextButler.app`, and choose **Open**.
+Enable its switch. macOS may require your password in its own dialog.
+
+Configure the exact Ghostget `src/cli.ts`, Bun runtime, private state directory
+and `imessage:ACCOUNT` binding using `setup` above. The native setup role supports
+Ghostget 0.18.16. It links only that account to this Mac's Messages store and
+enables Ghostget's account-specific automation read and text-send capabilities.
+Contact selection and automatic replies remain separate choices.
+
+With the background service stopped, run the setup role through its verified
+app launch:
+
+```sh
+bun run textbutler:app imessage-setup \
+  --data-dir "$HOME/Library/Application Support/Textbutler"
+```
+
+After app setup completes, use the installed `daemon install` command to
+register its background service. If an older service is installed, first use
+`daemon uninstall`; this preserves your settings and contacts. Startup verifies
+the native app receipt and all pinned artifacts. A changed app or runtime
+requires a verified rebuild and reinstall. Local apps use ad-hoc signatures,
+so macOS may require permission again after a rebuild. Check `doctor` and the
+messaging connection before enabling a contact.
+
+See [local data](local-data.md) for retained setup records and installation data
+removal. Repeating setup preserves an already linked account and its identity.
 
 ## Connect your AI subscription
 

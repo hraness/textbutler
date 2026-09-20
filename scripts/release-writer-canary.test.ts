@@ -381,6 +381,8 @@ describe("persistent production-ref writer canary", () => {
     )).toEqual({ runAttempt: 1, runId: 9001, workflowId });
   });
 
+  // Two real repositories and repeated full-range admissions exceed Bun's
+  // default 5s on a shared host; this tests receipts, not wall-clock latency.
   test("creates a routine receipt, rejects the first control epoch, accepts its digest, then resumes routine ranges", async () => {
     const input = fixture();
     const receipt = await createWriterCanaryPreflight({
@@ -465,7 +467,7 @@ describe("persistent production-ref writer canary", () => {
       schema: "message-like-me-canary-workflow-range-v1",
       verifiedSha: laterTarget,
     });
-  });
+  }, 30_000);
 
   test("transports a maximum 250-commit control receipt through canary outputs", async () => {
     const changed = fixture(true);

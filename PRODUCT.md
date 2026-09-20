@@ -6,10 +6,11 @@
 
 web
 
-The product is a macOS-only CLI with a separate user-session daemon and an
-unbundled native menu-bar companion. There is no desktop window or app bundle. This platform marker does not
-imply Windows, Linux, iOS, or browser-hosted messaging support. The public
-website is informational.
+The product is a macOS-only CLI with a separate user-session daemon and a
+native menu-bar companion. A locally built TextButler.app supervises the verified
+runtime so macOS can grant iMessage access to the app. It has no desktop window.
+This platform marker does not imply Windows, Linux, iOS, or browser-hosted
+messaging support. The public website is informational.
 
 ## Users
 
@@ -63,8 +64,9 @@ The existing repository contains bounded history ingestion, provenance-aware
 profiles, and frozen shared message contracts. New source packages contain the
 Textbutler runtime, provider-independent transport and external xcb connection.
 Automated fixtures are synthetic. They are not evidence of live provider
-qualification or actual message delivery. Desktop app packaging has been removed. The CLI and menu-bar companion are the
-only local runtime surfaces.
+qualification or actual message delivery. The optional native app is built and
+ad-hoc signed on the owner's Mac; it is not a notarized public distribution.
+The CLI and menu-bar companion remain the user interfaces.
 
 ## Open Decisions and Working Defaults
 

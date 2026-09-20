@@ -3,6 +3,7 @@ import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFil
 import { join } from "node:path";
 import { createLaunchAgentLifecycle, LAUNCH_AGENT_LABEL, type LaunchAgentHost, type LaunchctlResult } from "./launch-agent.ts";
 import { runTextbutlerCli } from "./cli.ts";
+import { MACOS_APP_BUNDLE_ID, type MacosAppIdentity } from "./macos-app.ts";
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -14,20 +15,20 @@ async function fixture() {
   const uid = process.getuid!(); const target = `gui/${uid}/${LAUNCH_AGENT_LABEL}`;
   const plistPath = join(home, "Library", "LaunchAgents", `${LAUNCH_AGENT_LABEL}.plist`), receiptPath = join(dataDir, "state", "launch-agent.json");
   const calls: readonly string[][] = [];
-  const state = { job: null as { path: string; args: string[]; program: string } | null, bootstrap: "ok", bootout: "ok", process: "alive" as "alive" | "dead" | "unknown" };
+  const state = { job: null as { path: string; args: string[]; program: string; generation: string | null } | null, bootstrap: "ok", bootout: "ok", process: "alive" as "alive" | "dead" | "unknown" };
   const complete = (exitCode = 0, stdout = "", stderr = ""): LaunchctlResult => ({ outcome: "completed", exitCode, stdout, stderr });
   const loadJob = async (): Promise<void> => {
     const plist = await readFile(plistPath, "utf8"); const array = /<key>ProgramArguments<\/key><array>(.*?)<\/array>/su.exec(plist)?.[1];
     if (array === undefined) throw new Error("No fixed ProgramArguments");
     const args = [...array.matchAll(/<string>(.*?)<\/string>/gsu)].map(match => decode(match[1]!));
-    state.job = { path: plistPath, program: args[0]!, args };
+    state.job = { path: plistPath, program: args[0]!, args, generation: /<key>TEXTBUTLER_LAUNCH_AGENT_GENERATION<\/key><string>(.*?)<\/string>/u.exec(plist)?.[1] ?? null };
   };
   const host: LaunchAgentHost = { platform: "darwin", uid, home, runtime, entrypoint, processState: () => state.process, async run(args) {
     (calls as string[][]).push([...args]);
     if (args[0] === "print") {
       expect(args).toEqual(["print", target]);
       if (!state.job) return complete(113, "", `Bad request.\nCould not find service "${LAUNCH_AGENT_LABEL}" in domain for user gui: ${uid}\n`);
-      return complete(0, `${target} = {\n\tpath = ${state.job.path}\n\tprogram = ${state.job.program}\n\targuments = {\n${state.job.args.map(arg => `\t\t${arg}\n`).join("")}\t}\n\tstate = running\n\tpid = 1234567\n}\n`);
+      return complete(0, `${target} = {\n\tpath = ${state.job.path}\n\tprogram = ${state.job.program}\n\targuments = {\n${state.job.args.map(arg => `\t\t${arg}\n`).join("")}\t}\n${state.job.generation === null ? "" : `\tenvironment = {\n\t\tTEXTBUTLER_LAUNCH_AGENT_GENERATION => ${state.job.generation}\n\t}\n`}\tstate = running\n\tpid = 1234567\n}\n`);
     }
     if (args[0] === "bootstrap") {
       expect(args).toEqual(["bootstrap", `gui/${uid}`, plistPath]);
@@ -195,4 +196,50 @@ test("the previous startup contract remains removable without silent replacement
   expect((await f.lifecycle.uninstall(f.dataDir)).installation).toBe("absent");
   expect((await f.lifecycle.install(f.dataDir)).installation).toBe("installed");
   expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(2);
+});
+
+function nativeIdentity(f: Awaited<ReturnType<typeof fixture>>): MacosAppIdentity {
+  return { schemaVersion: 1, bundleId: MACOS_APP_BUNDLE_ID, signing: "ad-hoc", messagesBundleId: "com.apple.MobileSMS", automationConsent: "native-api", home: f.home, dataDir: f.dataDir,
+    runtime: f.runtime, entrypoint: f.entrypoint, appPath: join(f.home, "Applications", "TextButler.app"),
+    runtimeSha256: "a".repeat(64), entrypointSha256: "b".repeat(64), executableSha256: "c".repeat(64), infoPlistSha256: "d".repeat(64), signatureSha256: "e".repeat(64), sourceSha256: "f".repeat(64) };
+}
+test("an admitted app is the direct launchd executable with a separate bundle identity and shutdown grace", async () => {
+  const f = await fixture(), application = nativeIdentity(f), lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => application });
+  expect(await lifecycle.install(f.dataDir)).toMatchObject({ installation: "installed", service: "running" });
+  const plist = await readFile(f.plistPath, "utf8"), receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  expect(f.state.job!.args).toEqual([join(application.appPath, "Contents", "MacOS", "TextButler"), "--daemon"]);
+  expect(plist).toContain(`<key>AssociatedBundleIdentifiers</key><array><string>${MACOS_APP_BUNDLE_ID}</string></array>`);
+  expect(plist).toContain("<key>ExitTimeOut</key><integer>60</integer>");
+  expect(plist).toContain(`<key>TEXTBUTLER_LAUNCH_AGENT_GENERATION</key><string>${receipt.generation}</string>`);
+  expect(receipt).toMatchObject({ schemaVersion: 3, application });
+  expect(await lifecycle.install(f.dataDir)).toMatchObject({ installation: "installed" });
+  expect(f.calls.filter(args => args[0] === "bootstrap")).toHaveLength(1);
+  expect(await lifecycle.uninstall(f.dataDir)).toMatchObject({ installation: "absent" });
+});
+test("moving from the legacy Bun service to the app requires normal removal and retains settings", async () => {
+  const f = await fixture(); await f.lifecycle.install(f.dataDir);
+  const settingsPath = join(f.dataDir, "state", "settings.json"), before = await readFile(settingsPath, "utf8");
+  const lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => nativeIdentity(f) });
+  await expect(lifecycle.install(f.dataDir)).rejects.toThrow("another app identity");
+  expect(f.state.job!.args[0]).toBe("/usr/bin/env");
+  await lifecycle.uninstall(f.dataDir); await lifecycle.install(f.dataDir);
+  expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(3);
+  expect(await readFile(settingsPath, "utf8")).toBe(before);
+});
+test("changed app admission never falls back to shared Bun or changes an owned service", async () => {
+  const f = await fixture(), application = nativeIdentity(f);
+  const lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => application }); await lifecycle.install(f.dataDir);
+  await expect(createLaunchAgentLifecycle({ ...f.host, application: async () => ({ ...application, executableSha256: "0".repeat(64) }) }).install(f.dataDir)).rejects.toThrow("another app identity");
+  await expect(createLaunchAgentLifecycle({ ...f.host, application: async () => { throw new Error("changed app"); } }).install(f.dataDir)).rejects.toThrow("changed app");
+  expect(f.calls.filter(args => args[0] === "bootstrap")).toHaveLength(1);
+  // Removal uses the exact recorded job even if the install receipt is now
+  // unavailable. It does not need to execute the changed app to stop launchd.
+  expect(await createLaunchAgentLifecycle({ ...f.host, application: async () => { throw new Error("changed app"); } }).uninstall(f.dataDir)).toMatchObject({ installation: "absent" });
+});
+test("schema3 refuses another loaded generation even at the same executable and plist path", async () => {
+  const f = await fixture(), lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => nativeIdentity(f) }); await lifecycle.install(f.dataDir);
+  f.state.job!.generation = "00000000-0000-0000-0000-000000000000";
+  expect(await lifecycle.status(f.dataDir)).toMatchObject({ installation: "conflict", service: "unknown" });
+  await expect(lifecycle.uninstall(f.dataDir)).rejects.toThrow("no longer matches");
+  expect(f.calls.filter(args => args[0] === "bootout")).toHaveLength(0);
 });

@@ -10,6 +10,7 @@ import type { ControlRequest, ControlResponse } from "../../control/src/index.ts
 import { awaitOwnerJob, handleOwnerCommand, OWNER_COMMAND_HELP, OwnerCliError, pendingJobOutput, resolveOwnerContact } from "./owner-cli.ts";
 import { runDoctor, runSetup } from "./onboarding.ts";
 import { runTextbutlerTui } from "./tui.ts";
+import { runIMessageSetup } from "./imessage-setup.ts";
 
 export const CLI_USAGE = `Textbutler — your local messaging assistant
 
@@ -48,6 +49,7 @@ Background service:
   daemon run                         Run in this terminal
   daemon install|uninstall|status     Manage login startup and service status
   menubar [start|stop|status|doctor|install|uninstall]
+  app imessage-setup                 Link the configured iMessage account from TextButler.app
 
 Optional support:
   support [protocol --json|offer --json|shown ID|release ID|dismiss|snooze|enable|status --json]
@@ -73,6 +75,7 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
   const print = (value: unknown): void => { output.write(`${JSON.stringify(value)}\n`); };
   const request = (request: ControlRequest): Promise<ControlResponse> => requestDaemon({ dataDir, request });
   if (args[0] === "setup") return await runSetup(args.slice(1), dataDir, output);
+  if (command === "app imessage-setup") { if (option === -1) throw new Error(CLI_USAGE); const result = await runIMessageSetup(dataDir); print(result); return result.ok ? 0 : 1; }
   if (command === "tui") return await runTextbutlerTui(dataDir, output, { ...(options.entrypoint ? { entrypoint: options.entrypoint } : {}) });
   if (command === "doctor") return await runDoctor(dataDir, output);
   try {
