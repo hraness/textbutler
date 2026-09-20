@@ -34,12 +34,13 @@ export type RoutedAgentOptions = Readonly<{
 
 /** Readiness binds the purpose profile and model catalog; runTask still checks
  * the actual installed adapter and original runtime lease at admission. */
-export function selectButlerModel(selection: ProviderSelection, contact: ContactSettings, purpose: ButlerPurpose,
+export function selectButlerModel(selection: ProviderSelection, contact: Pick<ContactSettings, "provider" | "classifierModel" | "replyModel">, purpose: ButlerPurpose,
   at: number, managedAvailable: boolean): string {
   if (selection.kind === "managed") {
     const q = selection.qualification, expected = contactCapabilityIdentity(purpose);
     identifier(selection.route.id);
-    if (!managedAvailable || contact.provider !== "codex" || selection.route.provider !== "codex" || selection.route.authentication !== "subscription"
+    if (!managedAvailable || contact.provider !== "codex" && contact.provider !== "claude"
+    || selection.route.provider !== contact.provider || selection.route.authentication !== "subscription"
     || q.status !== "qualified" || !Number.isSafeInteger(q.expiresAt) || q.expiresAt < at + TASK_LIMITS.maxRunMs + TASK_LIMITS.maxCleanupMs
     || typeof q.runtimeDigest !== "string" || !/^[a-f0-9]{64}$/u.test(q.runtimeDigest)
     || typeof q.evidenceDigest !== "string" || !/^[a-f0-9]{64}$/u.test(q.evidenceDigest)

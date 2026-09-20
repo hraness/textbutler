@@ -3,7 +3,10 @@
 Textbutler keeps **Claude API**, **Claude Code** and **Codex** as separate account
 choices. Selecting Claude Code or Codex never borrows an API credential or starts
 separately billed API work. Native coding-agent choices currently report
-unavailable while their execution confinement is being qualified.
+unavailable while their execution confinement is being qualified. The boundary
+those two routes will run inside, and the evidence each still needs, are
+described in
+[the native subscription route](../../docs/textbutler/native-subscription.md).
 
 The Claude API route uses a host-interpreted tool loop. It exposes contact files,
 bounded public HTTPS reads and staged messaging intentions. It starts no agent

@@ -15,6 +15,7 @@ import type { ProviderAccountConfig, HostConfig } from "./host-config.ts";
 import type { ContactSettings } from "./config.ts";
 import type { ProviderSelection } from "./routed-agent.ts";
 import { parseProviderLoginChallenge, type ProviderLoginChallenge, type ProviderAccountDiagnostic } from "../../control/src/index.ts";
+import { assertNativeSubscriptionHost, nativeSubscriptionProvider, type NativeSubscriptionAccount, type NativeSubscriptionHost } from "./native-subscription.ts";
 
 export type { ProviderAccountDiagnostic } from "../../control/src/index.ts";
 export interface ProviderHost {
@@ -50,8 +51,16 @@ export function createProviderHost(options: {
   managedCodex?: ManagedCodexAccountFactory;
   /** Explicit qualified host adapters, never owner settings or default activation. */
   taskAdapters?: readonly AgentTaskAdapter[];
+  nativeSubscriptions?: NativeSubscriptionHost;
   now?: () => number;
 }, dependencies: Dependencies = { createAdapter: createClaudeApiAdapter, discover: discoverClaudeModels }): ProviderHost {
+  const native = options.nativeSubscriptions;
+  if (native !== undefined) assertNativeSubscriptionHost(native);
+  /** One owner per account: a supplied managed Codex factory keeps its own
+   * account, so accounts, checks, selection and tasks cannot disagree. */
+  const nativeAccount = (accountId: string): boolean => native !== undefined
+    && nativeSubscriptionProvider(accountId) !== null
+    && (accountId !== "native-codex" || options.managedCodex === undefined);
   const accounts: readonly ProviderAccountConfig[] = [
     { id: "native-codex", label: "Codex", route: "codex" },
     { id: "native-claude-code", label: "Claude Code", route: "claude-code" },
@@ -64,7 +73,7 @@ export function createProviderHost(options: {
   let closing: Promise<void> | undefined;
   // Observe the real runtime acquisition/release, without acquiring another
   // lease or inferring stopped custody from an exception or expired TTL.
-  const taskRouter = new AgentMixer({ adapters: [], taskAdapters: options.taskAdapters ?? [], now, leases: {
+  const taskLeaseStore: AccountLeaseStore = {
     acquire(input) { const lease = options.leases.acquire(input); taskLeases.set(input.accountId, lease); return lease; },
     renew: (lease, at, ttl) => options.leases.renew(lease, at, ttl),
     release(lease) {
@@ -73,7 +82,8 @@ export function createProviderHost(options: {
         && owned.expiresAt === lease.expiresAt) taskLeases.delete(lease.accountId);
       return released;
     },
-  } });
+  };
+  const taskRouter = new AgentMixer({ adapters: [], taskAdapters: options.taskAdapters ?? [], now, leases: taskLeaseStore });
   function managedExclusive<T>(id: string, external: AbortSignal, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const signal = AbortSignal.any([external, shutdown.signal]); signal.throwIfAborted();
     if (managedSlots.has(id)) throw new Error("Managed Codex account is busy.");
@@ -174,6 +184,10 @@ export function createProviderHost(options: {
   }
   const check = async (accountId: string, signal: AbortSignal, allowCredentialChange = true) => {
     signal.throwIfAborted();
+    if (nativeAccount(accountId)) {
+      if (managedFailures.has(accountId)) throw Error("Native subscription account needs recovery.");
+      await managedExclusive(accountId, signal, scoped => native!.check(accountId as NativeSubscriptionAccount, scoped)); return;
+    }
     if (accounts.some(account => account.id === accountId && account.route === "codex")) {
       await managedOperation(accountId, signal, async (controller, scoped) => { await controller.check(scoped); }); return;
     }
@@ -189,6 +203,12 @@ export function createProviderHost(options: {
     router: new AgentMixer({ adapters: [route, unqualifiedAdapter("codex")], leases: options.leases, now }),
     accounts() { return accounts.map(account => {
       const provider = account.route === "codex" ? "codex" as const : "claude" as const;
+      if (nativeAccount(account.id)) {
+        const diagnostic = native!.accounts().find(row => row.id === account.id);
+        if (diagnostic) return shutdown.signal.aborted || managedFailures.has(account.id) ? { ...diagnostic, status: "unavailable" as const,
+          detail: shutdown.signal.aborted ? "The native subscription host is closed." : "The native subscription process needs recovery.",
+          defaultReplyModel: null, classifierModel: null } : diagnostic;
+      }
       if (account.route === "codex" && options.managedCodex) {
         const snapshot = managed.get(account.id)?.snapshot();
         const state = managedFailures.has(account.id) ? "recovery-required" as const : shutdown.signal.aborted ? "closed" as const : snapshot?.state ?? "unchecked" as const;
@@ -227,9 +247,10 @@ export function createProviderHost(options: {
       let delegated = false;
       try {
         const request = snapshotTaskRequest(input), id = request.accountId;
-        if (request.route.provider !== "codex" || request.route.authentication !== "subscription"
+        const nativeTask = nativeAccount(id) && nativeSubscriptionProvider(id) === request.route.provider && request.route.authentication === "subscription";
+        if (managedFailures.has(id) || !nativeTask && (request.route.provider !== "codex" || request.route.authentication !== "subscription"
           || !options.managedCodex || managedFailures.has(id) || !accounts.some(account => account.id === id && account.route === "codex"))
-          throw new Error("Managed Codex task route is unavailable.");
+        ) throw new Error("Managed subscription task route is unavailable.");
         return await managedExclusive(id, request.signal, async signal => {
           delegated = true;
           try {
@@ -257,7 +278,8 @@ export function createProviderHost(options: {
               managed.delete(id);
             }
             signal.throwIfAborted();
-            return await taskRouter.runTask(Object.freeze({ ...handedOff, signal }), broker);
+            const task = Object.freeze({ ...handedOff, signal });
+            return nativeTask ? await native!.runTask(task, broker, { leases: taskLeaseStore, now }) : await taskRouter.runTask(task, broker);
           } finally {
             if (taskLeases.has(id)) managedFailures.add(id);
             await broker.close();
@@ -265,7 +287,11 @@ export function createProviderHost(options: {
         });
       } finally { if (!delegated) await broker.close(); }
     },
-    async selection(contact) {
+    async selection(contact, purpose = "respond") {
+      if (nativeAccount(contact.accountId) && nativeSubscriptionProvider(contact.accountId) === contact.provider) {
+        if (shutdown.signal.aborted || managedFailures.has(contact.accountId)) throw Error("Native subscription account is unavailable.");
+        return native!.selection(contact.accountId as NativeSubscriptionAccount, purpose);
+      }
       const account = accounts.find(account => account.id === contact.accountId);
       if (!account || account.route !== "claude-api" || contact.provider !== "claude" || shutdown.signal.aborted) throw new Error("The selected coding-agent account is unavailable; no API substitution is permitted.");
       const modelCatalog = catalogs.get(account.id), adapter = adapters.get(account.id);
@@ -288,7 +314,8 @@ export function createProviderHost(options: {
           const receipt = await controller.close();
           return receipt.released === true && receipt.state === "closed" && controller.snapshot().state === "closed";
         }));
-        if (taskLeases.size || receipts.some(result => result.status === "rejected" || result.value !== true))
+        const nativeClosed = await Promise.allSettled(native ? [native.close()] : []);
+        if (taskLeases.size || nativeClosed.some(result => result.status === "rejected") || receipts.some(result => result.status === "rejected" || result.value !== true))
           throw new Error("Managed Codex account process recovery is required.");
       });
       closing = task;
