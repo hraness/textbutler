@@ -50,7 +50,7 @@ describe("inert local Textbutler distribution", () => {
     expect((await verifyDistribution(installed.directory)).manifest.providerAdmission).toBe("external-xcb");
     expect((await readdir(installed.directory)).sort()).toEqual([...DISTRIBUTION_FILES, "manifest.json"].sort());
     expect((await readFile(join(installed.directory, "runtime.mjs"))).equals(f.files.get("runtime.mjs")!)).toBe(true);
-    expect(await readdir(f.prefix)).toEqual(["bin", "share"]);
+    expect((await readdir(f.prefix)).sort()).toEqual(["bin", "share"]);
   });
   test("installation is content-addressed, preserves existing application data and is idempotent", async () => {
     const f = await fixture(), state = join(f.root, "state.json");

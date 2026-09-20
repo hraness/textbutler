@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { installTextbutler } from "./install-textbutler.ts";
 import { DISTRIBUTION_FILES, publishArtifact, renderLauncher, sha256, validateBun, verifyDistribution, type DistributionFile, type DistributionManifest } from "./textbutler-distribution.ts";
@@ -91,11 +91,13 @@ test("interruption before activation leaves the old command and retry completes 
 });
 test("upgrade revalidates the exact command immediately before atomic replacement", async () => {
   const f = await fixture(), old = await installTextbutler({ from: f.old.from, prefix: f.prefix }), before = await readFile(old.command);
-  const oldIdentity = await lstat(old.command);
+  const oldIdentity = await lstat(old.command), held = join(f.root, "original-launcher-held");
   await expect(installTextbutler({ from: f.next.from, prefix: f.prefix, upgrade: true }, {
-    async beforeUpgradeCommit() { await unlink(old.command); await writeFile(old.command, before, { mode: 0o500 }); },
+    // Keep the original inode allocated: Linux may reuse it after unlink.
+    async beforeUpgradeCommit() { await rename(old.command, held); await writeFile(old.command, before, { mode: 0o500 }); },
   })).rejects.toThrow("changed before upgrade");
   expect(await readFile(old.command)).toEqual(before);
+  expect((await lstat(held)).ino).toBe(oldIdentity.ino);
   expect((await lstat(old.command)).ino).not.toBe(oldIdentity.ino);
 });
 test("upgrade preserves an unrelated existing launcher backup", async () => {
