@@ -22,6 +22,10 @@ Start here:
 Setup options:
   setup [--ghostget ABS] [--runtime ABS] [--state-home ABS]
         [--account PROVIDER:AUTHID ...]
+        [--xcb ABS --xcb-state ABS --xcb-account PROVIDER:ACCOUNT
+         --xcb-model PROVIDER/MODEL[/EFFORT] ...]
+  XCB providers: claude, codex. Sign in with XCB first; setup pins the executable.
+  Use one explicit account and full model key per provider. Restart after setup.
   init                               Initialize private settings, paused
 
 ${OWNER_COMMAND_HELP}
@@ -29,6 +33,8 @@ ${OWNER_COMMAND_HELP}
 Agents:
   providers list                     Show configured agent accounts
   providers check ACCOUNT            Verify one explicitly selected account
+  providers check native-codex       Check the configured XCB Codex subscription
+  providers check native-claude-code Check the configured XCB Claude subscription
 
 Review and reply:
   inbox                              Find enrolled conversations to answer

@@ -34,7 +34,10 @@ test('puts guided setup and complete draft review before the legacy installation
   expect(html).toContain('bun run textbutler tui');
   expect(html).toContain('docs/textbutler/getting-started.md');
   expect(html).toContain('source pilot');
-  expect(html).toContain('no qualified AI reply engine');
+  expect(html).toContain('verified Textbutler bundle with reviewed');
+  expect(html).toContain('composition admission and connect to a separately installed');
+  expect(html).toContain('href="https://github.com/hraness/xcb"');
+  expect(html).toMatch(/source\s+daemon has no embedded composition admission and cannot enable subscription\s+inference/u);
   expect(html).toContain('bun run textbutler replies show DRAFT');
   expect(html).toContain('bun run textbutler replies send DRAFT DIGEST');
   expect(html.indexOf('id="open-the-guided-terminal"')).toBeLessThan(html.indexOf('id="install-and-first-run"'));

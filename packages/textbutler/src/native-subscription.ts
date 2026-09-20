@@ -43,6 +43,8 @@ export function createNativeSubscriptionHost(options: Readonly<{
   adapters: readonly AgentTaskAdapter[];
   accounts(): readonly ProviderAccountDiagnostic[];
   check(accountId: NativeSubscriptionAccount, signal: AbortSignal): Promise<void>;
+  /** Optional metadata refresh; it grants no qualification or task authority. */
+  beforeSelection?(accountId: NativeSubscriptionAccount, purpose: ButlerPurpose, signal: AbortSignal): Promise<void>;
   selection(accountId: NativeSubscriptionAccount, purpose: ButlerPurpose): Promise<NativeSubscriptionChoice>;
   close(): Promise<void>;
   now?: () => number;
@@ -58,6 +60,7 @@ export function createNativeSubscriptionHost(options: Readonly<{
   async function select(id: NativeSubscriptionAccount, purpose: ButlerPurpose): Promise<NativeSubscriptionSelection> {
     account(id); active();
     if (purpose !== "classify" && purpose !== "respond") throw Error("NATIVE_SUBSCRIPTION_PURPOSE_INVALID");
+    await options.beforeSelection?.(id, purpose, shutdown.signal); active();
     const observed = observe().find(row => row.id === id);
     if (!observed || observed.provider !== nativeSubscriptionProvider(id) || observed.route !== (id === "native-codex" ? "codex" : "claude-code")
       || observed.status !== "ready") throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_UNAVAILABLE");

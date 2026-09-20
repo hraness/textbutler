@@ -1,6 +1,14 @@
 {
   "version": 1,
   "surfaces": {
+    "local:xcb-application-exchange": {
+      "kind": "derived",
+      "retention": "ephemeral",
+      "source": "contact-scoped task context and XCB application settlement",
+      "owner": "packages/textbutler/src/xcb-client.ts",
+      "budget": { "requestBytes": 1048576, "responseBytes": 2097152, "stderrBytes": 65536, "stepsPerTask": 16 },
+      "note": "bounded private stdio; no prompt or provider stderr logging; subscription metering and credential custody remain in XCB"
+    },
     "served:textbutler-local-runtime": {
       "kind": "served",
       "retention": "persistent",

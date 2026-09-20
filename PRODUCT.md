@@ -21,7 +21,13 @@ Choose a few contacts, give each relationship a folder of context, and let a but
 
 ## Positioning
 
-The owner brings Codex or Claude Code and their account. Ghostget owns access to Messages and Contacts. Textbutler owns contact selection, memory, disclosure, timing, and response policy. Agentrouter provides reusable account and provider execution foundations without messaging-specific logic.
+The owner connects a Claude Code or Codex subscription through
+[xcb](https://github.com/hraness/xcb). xcb owns provider authentication,
+confinement, account custody and zero-tool generation. Ghostget owns messaging
+access. Textbutler owns contact selection, memory, disclosure, timing, response
+policy and sending. A verified Textbutler build must pass its own reviewed composition admission
+before subscription inference is available. Its MIT-licensed source is a reference application for
+developers building on xcb's native application API.
 
 ## Operating Context
 
@@ -29,7 +35,7 @@ The Mac must be awake and signed in for local messaging. Quitting the menu compa
 
 ## Capabilities and Constraints
 
-- Coding agents may access only the selected contact workspace, request public web resources, and propose scoped message actions. No shell or arbitrary process tools are available to the agent.
+- Subscription providers receive zero tools through xcb. They propose bounded operations that Textbutler's broker may perform within one selected contact workspace, public web access and staged messaging actions. No shell or arbitrary process tools are exposed.
 - The agent may evolve contextual guidance and memory. Trusted activation settings, provider credentials, executable extensions, routing, and permission grants remain outside its workspace.
 - Human activity, global pause, contact pause, deduplication, and rate limits take precedence over an LLM decision. The cheap classifier can choose silence; it cannot expand authority.
 - Rich actions include files, reactions, stickers, links, and mini-app experiences when the transport explicitly supports them. Unsupported capabilities are visible rather than silently imitated.
@@ -55,7 +61,7 @@ provider seam; Textbutler's supported surface is the CLI and status item.
 
 The existing repository contains bounded history ingestion, provenance-aware
 profiles, and frozen shared message contracts. New source packages contain the
-Textbutler runtime, provider-independent transport, and Agentrouter foundations.
+Textbutler runtime, provider-independent transport and external xcb connection.
 Automated fixtures are synthetic. They are not evidence of live provider
 qualification or actual message delivery. Desktop app packaging has been removed. The CLI and menu-bar companion are the
 only local runtime surfaces.

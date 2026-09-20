@@ -8,11 +8,14 @@ what needs an answer, and review replies before sending them.
 
 **Current status: source pilot.** Messaging setup, conversation selection,
 private contact memory, inbox review and replies you write yourself are
-implemented. The source CLI has no qualified AI reply engine. Codex and Claude
-Code remain unavailable; Claude API requires a reviewed compiled runtime
-supplied by a trusted integration. Adding an API key or signing into a coding
-agent alone does not enable suggestions or automatic replies. Live delivery
-still needs verification on your chosen account and recipient.
+implemented. AI replies require a verified Textbutler bundle with reviewed
+composition admission and connect to a separately installed
+[xcb](https://github.com/hraness/xcb) native runtime with an explicit subscription
+account and model. Textbutler is an MIT-licensed reference application for xcb's
+zero-tool generation API; xcb keeps provider credentials and custody. Account
+setup, current runtime admission and live verification on your chosen messaging
+account and recipient are required before relying on automatic replies. See the
+[subscription guide](docs/textbutler/native-subscription.md).
 
 Start with the [guided setup](docs/textbutler/getting-started.md) and
 [messaging app support](docs/textbutler/messaging-apps.md). Beeper can connect
@@ -36,6 +39,12 @@ guide explains how to select its executable and accounts, start the background
 service, and add one conversation. New installations start paused and new
 contacts have automatic replies off. Setup and conversation selection never
 send a message.
+
+For AI replies, build and install with `bun run textbutler:install`, then run
+`~/.local/bin/textbutler`. The builder requires the reviewed composition receipt
+to match current source bytes and both contact capability profiles. A source
+daemon has no embedded composition admission and cannot enable subscription
+inference. Source commands remain useful for setup and manual reply controls.
 
 Textbutler's source is MIT licensed and its new packages remain unpublished.
 The published Message Like Me package documented below installs the legacy
@@ -79,7 +88,7 @@ In the terminal, choose **Inbox & replies**, select a conversation, then choose
 This path needs a ready messaging connection but no AI account. Cancelling the
 review sends nothing.
 
-If a qualified AI reply engine becomes available, suggestions use a separate
+After the connected AI account passes its readiness check, suggestions use a separate
 review step:
 
 ```sh

@@ -1,12 +1,46 @@
 # Set up an agent account
 
 Textbutler keeps **Claude API**, **Claude Code** and **Codex** as separate account
-choices. Selecting Claude Code or Codex never borrows an API credential or starts
-separately billed API work. Native coding-agent choices currently report
-unavailable while their execution confinement is being qualified. The boundary
-those two routes will run inside, and the evidence each still needs, are
-described in
-[the native subscription route](../../docs/textbutler/native-subscription.md).
+choices. Claude Code and Codex use an explicitly configured
+[xcb](https://github.com/hraness/xcb) native runtime. Selecting either never
+borrows an API credential or starts separately billed API work. xcb owns
+subscription sign-in, confinement and provider custody; Textbutler owns contact
+policy and the broker that interprets operation proposals.
+
+## Connect a subscription with xcb
+
+Use a verified Textbutler bundle with reviewed composition admission and an
+xcb build with native `generate` support. `bun run textbutler:install` validates
+the recorded source/profile evidence before building; absent or stale evidence
+blocks the build. Run its installed daemon for AI replies. A source daemon
+remains unadmitted even when the xcb account is ready. Complete the selected provider's
+sign-in and admission in xcb, then copy the exact account ID and full observed
+model key from `xcb accounts` and `xcb models`. With Textbutler stopped, run:
+
+```sh
+bun run textbutler setup \
+  --xcb /absolute/path/to/xcb \
+  --xcb-state /absolute/path/to/xcb-state \
+  --xcb-account claude:ACCOUNT_ID \
+  --xcb-model FULL_MODEL_KEY
+```
+
+Use `codex:ACCOUNT_ID` for a Codex subscription. Setup pins the executable hash,
+keeps credentials in xcb and preserves paused settings. After restarting the
+installed daemon, run `providers list`, then `providers check TEXTBUTLER_ACCOUNT_ID` using
+the listed ID. This reads xcb capabilities and admission without making a model
+turn. Select that account for a contact after its readiness check succeeds, then
+try an unsent suggestion. Contact enablement and global resume remain separate
+owner actions. Setup preserves existing account/model and binary bindings;
+changed bindings require review of private host configuration while stopped.
+
+Account metadata and executable integrity do not prove live inference or message
+delivery. Consult [the subscription contract](../../docs/textbutler/native-subscription.md)
+for generation limits, custody, recovery and the exact-runtime acceptance
+requirements. Textbutler's MIT source is the application example; each host
+still supplies its own admitted xcb/provider installation.
+
+## Claude API: separate trusted runtime required
 
 The Claude API route uses a host-interpreted tool loop. It exposes contact files,
 bounded public HTTPS reads and staged messaging intentions. It starts no agent
@@ -15,7 +49,7 @@ The trusted packaged host must supply the reviewed compiled runtime identity;
 `state/host.json` cannot supply or waive that identity. A source checkout reports
 this route unavailable unless a trusted embedding integration supplies it.
 
-## Configure the private account reference
+### Configure the private API account reference
 
 Under the Textbutler data directory, create `state/provider-credentials` as an
 owner-only physical directory with mode `0700`. Put the chosen Anthropic API key
@@ -49,7 +83,7 @@ support, then chooses the lowest estimated classification cost for a
 At most eight owner-configured accounts are accepted. Restart the daemon after
 changing host configuration.
 
-## Check and select the account
+### Check and select the API account
 
 With the daemon running, run:
 

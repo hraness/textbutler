@@ -1,8 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmod, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, link, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runSetup, readReadiness } from "./onboarding.ts";
 import { loadHostConfig } from "./host-config.ts";
+import { startDaemon } from "./daemon.ts";
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 async function fixture() { const root = await mkdtemp(join(await realpath("/tmp"), "tb-setup-")); roots.push(root); return root; }
@@ -60,4 +62,75 @@ test("adding Beeper preserves native and agent settings, and refuses an unexecut
   expect(after.ghostget?.authId).toBe("messages");
   expect(after.ghostget?.automationAccounts?.map(account => account.provider)).toEqual(["imessage", "beeper"]);
   expect(after.providerAccounts?.[0]?.id).toBe("my-agent");
+});
+
+async function xcbFixture() {
+  const root = await fixture(), executable = join(root, "xcb"), stateHome = join(root, "xcb-state");
+  // Setup must hash this file without running it or reading XCB credentials.
+  await writeFile(executable, "#!/bin/sh\nexit 99\n", { mode: 0o700 });
+  await mkdir(stateHome, { mode: 0o700 });
+  await writeFile(join(stateHome, "owner-sentinel"), "retain subscription state", { mode: 0o600 });
+  const args = ["--xcb", executable, "--xcb-state", stateHome, "--xcb-account", "codex:synthetic-account", "--xcb-model", "codex/synthetic-model/high"];
+  return { root, executable, stateHome, args };
+}
+test("XCB setup pins executable bytes, preserves all existing settings, and adds providers explicitly", async () => {
+  const { root, executable, stateHome, args } = await xcbFixture();
+  await runSetup(["--ghostget", executable, "--account", "imessage:messages"], root, quiet);
+  const file = join(root, "state/host.json"), original = await loadHostConfig(root), settings = await readFile(join(root, "state/settings.json"), "utf8");
+  await writeFile(file, JSON.stringify({ ...original, providerAccounts: [{ id: "other", label: "Other", route: "claude-code" }] }), { mode: 0o600 });
+  await runSetup(args, root, quiet);
+  const pinned = await loadHostConfig(root), bytes = await readFile(file, "utf8");
+  expect(pinned.xcb).toEqual({ executable, stateHome, sha256: createHash("sha256").update(await readFile(executable)).digest("hex"),
+    accounts: [{ provider: "codex", accountId: "synthetic-account", model: "codex/synthetic-model/high" }] });
+  expect(pinned.ghostget).toEqual(original.ghostget);
+  expect(pinned.providerAccounts?.[0]?.id).toBe("other");
+  await runSetup(args, root, quiet);
+  expect(await readFile(file, "utf8")).toBe(bytes);
+  await runSetup(["--xcb", executable, "--xcb-state", stateHome, "--xcb-model", "claude/synthetic-claude", "--xcb-account", "claude:second-account"], root, quiet);
+  expect((await loadHostConfig(root)).xcb?.accounts).toHaveLength(2);
+  expect(await readFile(join(root, "state/settings.json"), "utf8")).toBe(settings);
+  expect(await readFile(join(stateHome, "owner-sentinel"), "utf8")).toBe("retain subscription state");
+  const readiness = await readReadiness(root), agent = readiness.steps.find(step => step.id === "agent");
+  expect(readiness.canGenerateReplies).toBe(false);
+  expect(agent).toMatchObject({ status: "blocked", command: "textbutler providers check native-codex" });
+});
+test("XCB setup refuses implicit mappings, changed pins, and silent account or model switches", async () => {
+  const { root, executable, args } = await xcbFixture();
+  for (const malformed of [args.slice(0, -2), [...args, "--xcb-model", "codex/other"], args.map(value => value === "codex/synthetic-model/high" ? "claude/other" : value)]) {
+    await expect(runSetup(malformed, root, quiet)).rejects.toThrow();
+  }
+  await expect(stat(join(root, "state"))).rejects.toThrow();
+  await runSetup(args, root, quiet);
+  const file = join(root, "state/host.json"), saved = await readFile(file, "utf8");
+  for (const [before, after] of [["codex:synthetic-account", "codex:other"], ["codex/synthetic-model/high", "codex/other/high"]]) {
+    await expect(runSetup(args.map(value => value === before ? after! : value), root, quiet)).rejects.toThrow("different account or model");
+  }
+  await writeFile(executable, "#!/bin/sh\nexit 98\n");
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("digest");
+  expect(await readFile(file, "utf8")).toBe(saved);
+});
+test("XCB setup rejects linked, writable or non-executable binaries and unsafe state homes", async () => {
+  const { root, executable, stateHome, args } = await xcbFixture();
+  await chmod(executable, 0o600);
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical XCB executable");
+  await chmod(executable, 0o722);
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical XCB executable");
+  await chmod(executable, 0o700);
+  const other = join(root, "other-xcb");
+  await link(executable, other);
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical XCB executable");
+  await rm(other); await symlink(executable, other);
+  await expect(runSetup(args.map(value => value === executable ? other : value), root, quiet)).rejects.toThrow("physical XCB executable");
+  await chmod(stateHome, 0o755);
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("private, physical state directory");
+  await expect(stat(join(root, "state"))).rejects.toThrow();
+});
+test("XCB configuration cannot change while the daemon owns settings", async () => {
+  const { root, args } = await xcbFixture();
+  const daemon = await startDaemon({ dataDir: root });
+  try {
+    await expect(runSetup(args, root, quiet)).rejects.toThrow("Stop the Textbutler service");
+    expect((await loadHostConfig(root)).xcb).toBeUndefined();
+    expect((await daemon.service.snapshot()).settings.paused).toBe(true);
+  } finally { await daemon.close(); }
 });

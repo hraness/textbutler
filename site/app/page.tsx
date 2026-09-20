@@ -44,7 +44,7 @@ const HOME_QUESTIONS = [
   },
   {
     question: 'Will it interrupt my conversations?',
-    answer: 'The source pilot sends only after you explicitly choose to send a reply. Automatic replies remain unavailable without a qualified AI engine. The automatic modes are designed to wait through message bursts, yield after a recent message from you, and recheck the conversation before sending. The current connections do not expose typing activity.',
+    answer: 'Manual replies send only after your explicit choice. Automatic replies require a verified installed Textbutler bundle, current xcb and application admission, an enabled contact and global resume. They wait through message bursts, yield after a recent message from you, and recheck the conversation before sending. The current connections do not expose typing activity.',
   },
   {
     question: 'Will people know the butler is responding?',
@@ -52,11 +52,11 @@ const HOME_QUESTIONS = [
   },
   {
     question: 'What can the agent access?',
-    answer: 'The intended agent boundary is one contact folder, bounded public web requests and proposed actions for that conversation. Trusted code checks and sends those actions. The source CLI has no qualified AI reply engine; adding credentials does not unlock one. Claude Code and Codex remain unavailable while their execution boundaries are being qualified.',
+    answer: 'xcb provides subscription inference with no provider tools. Textbutler interprets proposals through its broker for one contact folder, bounded public web requests and staged conversation actions. Trusted Textbutler code checks and sends those actions. Provider credentials and process custody stay in xcb; adding credentials alone cannot admit this route.',
   },
   {
     question: 'Which agent can I use?',
-    answer: 'No AI reply engine is ready in the source CLI. Claude API requires a reviewed compiled runtime supplied by a trusted integration, plus account and model checks. It is billed separately from a Claude Code subscription. Claude Code and Codex remain unavailable. Textbutler never silently substitutes an API account for a subscription.',
+    answer: 'A verified installed Textbutler bundle can connect Claude Code or Codex subscriptions through xcb. It requires reviewed composition evidence for Textbutler, current xcb provider/runtime admission and explicit account/model checks. The source daemon has no composition admission and keeps AI replies unavailable. Claude API requires its own reviewed compiled runtime. It is billed separately from a Claude Code subscription. Textbutler never silently substitutes an API account for a subscription.',
   },
   {
     question: 'Does this website receive my messages?',
@@ -144,7 +144,7 @@ export default function Home() {
             <dl className="architecture-rows">
               <div><dt>Textbutler</dt><dd>Contacts, response timing, visible disclosure, scoped memory, pause, and action policy.</dd></div>
               <div><dt>Ghostget</dt><dd>iMessage, WhatsApp and Beeper connections, account permissions, conversation identity, and available message actions.</dd></div>
-              <div><dt>AgentMixer</dt><dd>Contact-scoped agent tools and explicit account selection. AI replies remain unavailable in the source CLI until an execution route is qualified.</dd></div>
+              <div><dt><a href="https://github.com/hraness/xcb">xcb</a></dt><dd>Subscription inference with no provider tools, separate credential storage and provider custody. Textbutler is an MIT-licensed reference application; both installations require current admission evidence.</dd></div>
               <div><dt>Your hooks</dt><dd>Developer-authored extensions for context and response decisions. Trusted executable hooks stay separate from the agent’s editable memory.</dd></div>
             </dl>
             <p className="mlm-section-link"><a href={ARCHITECTURE_URL}>Read the architecture and capability limits</a></p>
@@ -156,14 +156,14 @@ export default function Home() {
             { label: 'Capabilities, not promises', detail: 'Rich actions depend on the selected connection and its permissions. Unsupported features, including mini apps, stay visible as unavailable.' },
           ]} />
 
-          <MarketingSection heading="Start with a reply you review" headingId="development-title" id="development" label="" summary="Try the source pilot for messaging setup, inbox review and replies you write. AI suggestions and automatic replies have no ready engine in the source CLI.">
+          <MarketingSection heading="Start with a reply you review" headingId="development-title" id="development" label="" summary="Try the source pilot for messaging setup, inbox review and replies you write. AI replies require a verified installed bundle and a separately configured xcb subscription connection.">
             <TopicIcon slug="control" />
-            <div className="development-status"><div><h3>Start in the guided terminal</h3><p>Run <code>bun run textbutler tui</code> from your checkout. Set up Ghostget, add one conversation and try a reply you write yourself. The optional native menu uses a prebuilt runner. New installations start paused.</p><a href={GETTING_STARTED_URL}>Follow the setup guide</a></div><div><h3>AI replies remain unavailable</h3><p>The source CLI has no qualified AI reply engine. Claude API requires a reviewed compiled runtime supplied by a trusted integration. Native Claude Code and Codex remain unavailable. Live delivery and rich actions still need verification on your account.</p><a href={`${GITHUB_URL}/blob/main/packages/textbutler/src/menubar.ts`}>Inspect the menu companion source</a></div></div>
+            <div className="development-status"><div><h3>Start in the guided terminal</h3><p>Run <code>bun run textbutler tui</code> from your checkout. Set up Ghostget, add one conversation and try a reply you write yourself. The optional native menu uses a prebuilt runner. New installations start paused.</p><a href={GETTING_STARTED_URL}>Follow the setup guide</a></div><div><h3>Connect AI through xcb</h3><p>Install a verified Textbutler bundle with reviewed composition evidence, then connect an admitted xcb runtime and an explicit Claude Code or Codex account. The source daemon remains unadmitted. A successful setup alone does not prove live inference. Live delivery and rich actions still need verification on your account.</p><a href={`${GITHUB_URL}/blob/main/docs/textbutler/native-subscription.md`}>Read the subscription connection guide</a></div></div>
             <p className="legacy-note">Looking for the original history tools? <a href={RELEASE_URL}>Message Like Me v{SOFTWARE_VERSION}</a> remains available as a legacy release. It does not install Textbutler or enable automatic replies. <Link href="/sources">View legacy history sources.</Link></p>
           </MarketingSection>
 
           <MarketingQuestionList className="mlm-marketing-questions" heading="A few things to know" headingId="questions-title" id="questions" label="" questions={HOME_QUESTIONS.map(({ answer, question }) => ({ answer: <p>{answer}</p>, question }))} />
-          <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation and review a reply. Keep automatic replies paused while their execution routes are qualified." />
+          <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation and review a reply. Enable automatic replies only after account checks and a live test with your chosen recipient." />
         </MarketingPage>
       </main>
       <SiteFooter path="/" />

@@ -7,9 +7,14 @@ replies, isolates contact memory, adds disclosure, and journals outward intent.
 The automation connection polls Ghostget's durable incoming-message feed and
 uses recipient-bound grants for enabled contacts. New installations start paused.
 Only configured, ready messaging connections and admitted agent accounts can
-run replies. Claude API is an explicit, separately billed account choice;
-Claude Code and Codex remain unavailable until their native execution boundaries
-are qualified. Source-mode startup does not supply an API runtime attestation.
+run replies. Subscription inference requires a verified Textbutler bundle with
+reviewed source composition admission; source daemon startup remains unadmitted.
+Claude Code and Codex subscription inference uses an explicitly
+configured [xcb](https://github.com/hraness/xcb) native `generate` process.
+xcb keeps credentials and provider custody; Textbutler interprets structured
+proposals through its contact broker. This MIT-licensed package is a reference
+application for that API. Claude API is a separate billed choice; source-mode
+startup and the local installer do not supply its trusted runtime attestation.
 See [provider setup](PROVIDERS.md) before enabling a contact. Source and synthetic
 tests do not attest live delivery on a particular account. CLI and menu-bar use
 do not require a signed Mac release; windowed desktop app packaging has been removed.
@@ -35,7 +40,7 @@ The menu companion uses the shared Rust runner; no local Rust build is needed.
   quarantined, never retried automatically.
 - `runtime.ts`: compose, validate, recheck, prepare, journal, and submit through
   qualified injected ports. No model-facing tool dispatches during composition.
-- `routed-agent.ts`: the concrete Agentrouter consumer, with separate tool-free
+- `routed-agent.ts`: the compatibility routing consumer, with separate tool-free
   classification and contact-bound composition. Provider qualification still
   applies at the router's execution boundary.
 - `contact-capabilities.ts`: separate managed classifier and reply profiles that
@@ -46,9 +51,12 @@ The menu companion uses the shared Rust runner; no local Rust build is needed.
   selection, account/participant binding, and bounded context-only history.
 - `host-config.ts`: private owner configuration of the installed Ghostget CLI;
   no account or message reads occur just by loading configuration.
+- `xcb-host.ts`: pinned external xcb execution, account/model binding, bounded
+  zero-tool generation and settlement validation. Provider credentials stay in
+  xcb's private state; Textbutler handles the contact's operation proposals.
 - `provider-host.ts`: explicit account selection, current model availability,
   credential generation fencing, shared account leases, and optional trusted
-  [managed Codex account controls](https://github.com/hraness/agentmixer/blob/main/MANAGED-CODEX.md). Its managed
+  [managed Codex account controls](https://github.com/hraness/xcb/blob/main/MANAGED-CODEX.md). Its managed
   task entry joins the exact account controller before the runtime acquires one
   task lease; owner operations remain busy through task cleanup. Pending sign-in
   cannot be canceled by a reply, and uncertain cleanup retains recovery state.
@@ -61,11 +69,15 @@ The menu companion uses the shared Rust runner; no local Rust build is needed.
 - `launch-agent.ts`: explicit per-user background-service install, status and
   uninstall, with exact artifact and loaded-service identity checks.
 
-Managed task wiring is an internal integration seam. It supplies no default
-adapter or qualification and does not make native accounts ready. Activation
-requires a current model catalog and separately qualified classifier and reply
-profiles; the host checks both before granting automation for smart mode. Native
-subscription routing never substitutes a separately billed API account.
+The external xcb connection supplies the subscription execution path. The
+builder checks a reviewed composition receipt against its source inventory and
+both contact profiles before embedding application admission. Missing or stale
+evidence rejects the build; xcb sign-in and source hashes cannot manufacture it. Its setup
+pins an executable and account/model binding; it does not manufacture provider
+qualification or activate contacts. Both classifier and reply behavior must
+pass the connection's checks before smart-mode activation. The older managed
+task seam remains separately gated. Native subscription routing never
+substitutes a separately billed API account.
 
 ## Run from source
 
@@ -78,7 +90,10 @@ bun run textbutler doctor
 
 Use `bun run textbutler --help` for the current command syntax. For foreground
 development, run `bun run textbutler daemon run`; closing that terminal stops
-the process. The menu companion is the shared desktop-foundation runner,
+the process. The source daemon supports the manual pilot but cannot perform
+subscription inference. For AI replies, install the verified bundle with
+`bun run textbutler:install` and use `~/.local/bin/textbutler daemon run` or
+`~/.local/bin/textbutler daemon install`. The menu companion is the shared desktop-foundation runner,
 fetched and verified as a pinned release binary on first start:
 
 ```sh
