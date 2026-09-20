@@ -121,8 +121,8 @@ Enable its switch. macOS may require your password in its own dialog.
 
 Configure the exact Ghostget `src/cli.ts`, Bun runtime, private state directory
 and `imessage:ACCOUNT` binding using `setup` above. The native setup role supports
-Ghostget 0.18.16. It links only that account to this Mac's Messages store and
-enables Ghostget's account-specific automation read and text-send capabilities.
+Ghostget 0.18.20. It links only that account to this Mac's Messages store and
+enables Ghostget's account-specific automation read, text and attachment-send capabilities.
 Contact selection and automatic replies remain separate choices.
 
 With the background service stopped, run the setup role through its verified
@@ -141,8 +141,24 @@ requires a verified rebuild and reinstall. Local apps use ad-hoc signatures,
 so macOS may require permission again after a rebuild. Check `doctor` and the
 messaging connection before enabling a contact.
 
+To upgrade an installed app, stop the service and finish or reconcile any
+pending setup attempt, then build from the new installed payload. Install it
+with the following command:
+
+```sh
+bun run textbutler:app install --from /absolute/new/app-build-directory --upgrade
+```
+
+The upgrade verifies both versions and retains the previous signed
+app and receipt. If it reports an uncertain transition, preserve its records
+and reconcile that transition before retrying. Recheck Full Disk Access and
+Messages Automation after the upgrade.
+
 See [local data](local-data.md) for retained setup records and installation data
 removal. Repeating setup preserves an already linked account and its identity.
+
+For JSON commands to read, summarize, compose and send messages from another
+agent, see the [agent CLI guide](agent-cli.md).
 
 ## Connect your AI subscription
 

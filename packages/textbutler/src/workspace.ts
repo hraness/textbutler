@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readdir, realpath, rename, unlink } from "node:fs/promises";
+import { link, lstat, mkdir, open, readdir, realpath, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -97,6 +97,39 @@ export class ContactWorkspace {
 
   async write(path: string, text: string, createOnly = false): Promise<void> {
     await this.writeVersioned(path, text, createOnly ? null : undefined);
+  }
+
+  /** Explicit owner CLI import only; not exposed through the model file tools.
+   * Content identity makes repeat imports idempotent. Publish complete private
+   * bytes without replacing an existing contact file. */
+  async importAsset(input: Uint8Array, extension = "bin"): Promise<{ path: string; sha256: string; bytes: number }> {
+    if (!(input instanceof Uint8Array) || input.byteLength < 1 || input.byteLength > MAX_ASSET_BYTES || !/^[a-z0-9]{1,10}$/u.test(extension))
+      throw new Error("Media must be 1 byte to 16 MiB with a supported file extension");
+    const bytes = Buffer.from(input), sha256 = createHash("sha256").update(bytes).digest("hex");
+    const path = `outbox/owner-${sha256}.${extension}`, destination = this.path(path);
+    const existing = async () => {
+      const observed = await this.admitAsset(path);
+      if (observed.sha256 !== sha256 || observed.bytes.length !== bytes.length) throw new Error("Imported media identity changed");
+      return { path, sha256, bytes: bytes.length };
+    };
+    try { return await existing(); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    await this.checkParent(destination);
+    if ((await this.list()).length >= MAX_FILES) throw new Error("Too many contact files");
+    const staged = join(this.root, ".staging", randomUUID());
+    await this.checkParent(staged);
+    const file = await open(staged, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600), owned = await file.stat();
+    try {
+      await file.writeFile(bytes); await file.sync(); await this.checkParent(destination);
+      try { await link(staged, destination); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+    } finally {
+      await file.close();
+      const current = await lstat(staged);
+      if (!current.isFile() || current.dev !== owned.dev || current.ino !== owned.ino) throw new Error("Media staging identity changed");
+      await unlink(staged);
+    }
+    const directory = await open(dirname(destination), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    try { await directory.sync(); } finally { await directory.close(); }
+    return await existing();
   }
 
   async readVersioned(path: string): Promise<{ text: string; revision: string }> {

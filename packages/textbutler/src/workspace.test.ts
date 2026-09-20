@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmod, link, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ContactWorkspace } from "./workspace.ts";
@@ -78,4 +78,28 @@ test("attachment admission refuses links and oversized assets", async () => {
   for (const path of ["outbox/link.bin", "outbox/hard.bin", "../other.bin"]) await expect(workspace.admitAsset(path)).rejects.toThrow();
   await writeFile(join(workspace.root, "outbox", "large.bin"), Buffer.alloc(16 * 1024 * 1024 + 1), { mode: 0o600 });
   await expect(workspace.admitAsset("outbox/large.bin")).rejects.toThrow();
+});
+test("owner binary import is private, complete and idempotent without widening model text tools", async () => {
+  const { workspace } = await setup(), bytes = Buffer.alloc(2 * 1024 * 1024, 255);
+  const imported = await workspace.importAsset(bytes, "jpg");
+  expect(imported.bytes).toBe(bytes.length);
+  expect((await workspace.admitAsset(imported.path)).bytes).toEqual(bytes);
+  expect((await lstat(join(workspace.root, imported.path))).mode & 0o777).toBe(0o600);
+  expect((await lstat(join(workspace.root, imported.path))).nlink).toBe(1);
+  const inode = (await lstat(join(workspace.root, imported.path))).ino;
+  expect(await workspace.importAsset(bytes, "jpg")).toEqual(imported);
+  expect((await lstat(join(workspace.root, imported.path))).ino).toBe(inode);
+  await expect(workspace.read(imported.path)).rejects.toThrow();
+  await writeFile(join(workspace.root, imported.path), "changed", { mode: 0o600 });
+  await expect(workspace.importAsset(bytes, "jpg")).rejects.toThrow("identity changed");
+  expect(await readFile(join(workspace.root, imported.path), "utf8")).toBe("changed");
+});
+test("owner media import rejects excessive bytes, unsafe names and linked outboxes", async () => {
+  const { root, workspace } = await setup();
+  for (const extension of ["../jpg", "PNG", "", "x/y"]) await expect(workspace.importAsset(Buffer.from("x"), extension)).rejects.toThrow();
+  await expect(workspace.importAsset(Buffer.alloc(0))).rejects.toThrow();
+  await expect(workspace.importAsset(Buffer.alloc(16 * 1024 * 1024 + 1))).rejects.toThrow();
+  await rm(join(workspace.root, "outbox"), { recursive: true });
+  await symlink(root, join(workspace.root, "outbox"));
+  await expect(workspace.importAsset(Buffer.from("x"))).rejects.toThrow();
 });

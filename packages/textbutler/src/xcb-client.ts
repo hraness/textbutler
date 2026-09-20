@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import type { XcbHostConfig } from "./host-config.ts";
 
-export const XCB_LIMITS = Object.freeze({ request: 1_048_576, response: 2_097_152, output: 262_144, cleanupMs: 15_000 });
+export const XCB_LIMITS = Object.freeze({ request: 1_048_576, response: 2_097_152, output: 262_144, capabilitiesMs: 90_000, cleanupMs: 15_000 });
 export interface XcbModel { key: string; label: string; observedAtMs: number }
 export interface XcbQualification { runtimeVersion: string; runtimeDigest: string; evidenceDigest: string; expiresAt: number }
 export interface XcbAccount {
@@ -114,6 +114,13 @@ export function parseXcbResult(value: unknown, request: XcbGenerateRequest, exit
 /** A pre-spawn failure proves no XCB child exists. Once spawned, only XCB's
  * validated settlement envelope can establish provider-process custody. */
 export class XcbNotStarted extends Error {}
+export type XcbCapabilityFailure = "executable-changed" | "executable-unsafe" | "executable-unavailable" | "not-started"
+  | "timeout" | "io" | "exit" | "output-limit" | "invalid-json" | "invalid-schema";
+/** Fixed capability diagnostics never contain process output, paths or accounts.
+ * These errors are not inference settlement or provider-custody evidence. */
+export class XcbCapabilitiesError extends Error {
+  constructor(readonly code: XcbCapabilityFailure) { super(`XCB_CAPABILITIES_${code.toUpperCase().replaceAll("-", "_")}`); }
+}
 export async function verifyXcbExecutable(config: XcbHostConfig): Promise<void> {
   if (await realpath(config.executable) !== config.executable) throw Error("XCB_EXECUTABLE_CHANGED");
   const file = await open(config.executable, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
@@ -130,41 +137,65 @@ export async function verifyXcbExecutable(config: XcbHostConfig): Promise<void> 
   } finally { await file.close(); }
 }
 
-export function createXcbClient(config: XcbHostConfig): XcbClient {
+export function createXcbClient(config: XcbHostConfig, dependencies: {
+  /** Trusted test scheduler only; never configured by a host file or request. */
+  capabilityTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+} = {}): XcbClient {
   async function invoke(capabilities: boolean, request: XcbGenerateRequest | undefined, signal: AbortSignal): Promise<{ value: unknown; code: number | null }> {
     let input: string;
     try {
       signal.throwIfAborted(); input = request === undefined ? "" : JSON.stringify(request);
       if (Buffer.byteLength(input) > XCB_LIMITS.request) throw Error("XCB_REQUEST_LIMIT");
       await verifyXcbExecutable(config); signal.throwIfAborted();
-    } catch (cause) { throw new XcbNotStarted("XCB_NOT_STARTED", { cause }); }
+    } catch (cause) {
+      if (capabilities && !signal.aborted) throw new XcbCapabilitiesError(cause instanceof Error && cause.message === "XCB_EXECUTABLE_CHANGED" ? "executable-changed"
+        : cause instanceof Error && cause.message === "XCB_EXECUTABLE_UNSAFE" ? "executable-unsafe" : "executable-unavailable");
+      throw new XcbNotStarted("XCB_NOT_STARTED", { cause });
+    }
     return await new Promise((resolve, reject) => {
       const child = spawn(config.executable, ["--state", config.stateHome, "--json", "generate", ...(capabilities ? ["--capabilities"] : [])], {
         cwd: "/", env: { HOME: homedir(), PATH: "/usr/bin:/bin:/usr/sbin:/sbin", LANG: "en_US.UTF-8" }, stdio: ["pipe", "pipe", "pipe"],
       });
       const chunks: Buffer[] = []; let stdout = 0, stderr = 0, overflow = false, started = false, terminated = false;
+      let capabilityFailure: XcbCapabilityFailure | undefined;
+      const diagnose = (code: XcbCapabilityFailure) => { if (capabilities) capabilityFailure ??= code; };
       let killTimer: ReturnType<typeof setTimeout> | undefined;
       const stop = () => { if (terminated) return; terminated = true; child.kill("SIGINT"); killTimer = setTimeout(() => child.kill("SIGKILL"), XCB_LIMITS.cleanupMs); };
-      const timer = setTimeout(stop, capabilities ? 10_000 : request!.timeoutMs + 1000);
+      // Background launchd work can take longer to verify cached account and
+      // runtime evidence. Keep discovery plus cleanup inside the 120s owner job;
+      // generation continues to use its separately bounded request deadline.
+      const timer = capabilities
+        ? (dependencies.capabilityTimer ?? setTimeout)(() => { diagnose("timeout"); stop(); }, XCB_LIMITS.capabilitiesMs)
+        : setTimeout(stop, request!.timeoutMs + 1000);
       signal.addEventListener("abort", stop, { once: true });
       child.on("spawn", () => { started = true; if (signal.aborted) stop(); });
-      child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.length; if (stdout > XCB_LIMITS.response) { overflow = true; stop(); } else chunks.push(chunk); });
-      child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.length; if (stderr > 65_536) { overflow = true; stop(); } });
+      child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.length; if (stdout > XCB_LIMITS.response) { overflow = true; diagnose("output-limit"); stop(); } else chunks.push(chunk); });
+      child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.length; if (stderr > 65_536) { overflow = true; diagnose("output-limit"); stop(); } });
       // Never echo provider stderr or request bodies into diagnostics.
-      child.stdin.on("error", () => { stop(); });
-      child.on("error", cause => { if (!started) reject(new XcbNotStarted("XCB_NOT_STARTED", { cause })); else reject(Error("XCB_PROCESS_UNCERTAIN")); });
+      child.stdin.on("error", () => { diagnose("io"); stop(); });
+      if (capabilities) for (const stream of [child.stdout, child.stderr]) stream.on("error", () => { diagnose("io"); stop(); });
+      child.on("error", cause => {
+        if (capabilities) reject(new XcbCapabilitiesError(started ? "io" : "not-started"));
+        else if (!started) reject(new XcbNotStarted("XCB_NOT_STARTED", { cause })); else reject(Error("XCB_PROCESS_UNCERTAIN"));
+      });
       child.on("close", code => {
         clearTimeout(timer); if (killTimer) clearTimeout(killTimer); signal.removeEventListener("abort", stop);
+        if (capabilityFailure) { reject(new XcbCapabilitiesError(capabilityFailure)); return; }
         if (overflow) { reject(Error("XCB_OUTPUT_LIMIT")); return; }
+        if (capabilities && code !== 0) { reject(new XcbCapabilitiesError("exit")); return; }
         try { resolve({ value: parseXcbJson(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))), code }); }
-        catch { reject(Error("XCB_APPLICATION_RESPONSE_INVALID")); }
+        catch { reject(capabilities ? new XcbCapabilitiesError("invalid-json") : Error("XCB_APPLICATION_RESPONSE_INVALID")); }
       });
       child.stdin.end(input);
       if (signal.aborted) stop();
     });
   }
   return {
-    async capabilities(signal) { const result = await invoke(true, undefined, signal); signal.throwIfAborted(); if (result.code !== 0) throw Error("XCB_APPLICATION_UNAVAILABLE"); return parseXcbCapabilities(result.value); },
+    async capabilities(signal) {
+      const result = await invoke(true, undefined, signal); signal.throwIfAborted();
+      if (result.code !== 0) throw new XcbCapabilitiesError("exit");
+      try { return parseXcbCapabilities(result.value); } catch { throw new XcbCapabilitiesError("invalid-schema"); }
+    },
     async generate(request, signal) { const result = await invoke(false, request, signal); return parseXcbResult(result.value, request, result.code); },
   };
 }

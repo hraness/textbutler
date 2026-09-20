@@ -11,6 +11,7 @@ import { awaitOwnerJob, handleOwnerCommand, OWNER_COMMAND_HELP, OwnerCliError, p
 import { runDoctor, runSetup } from "./onboarding.ts";
 import { runTextbutlerTui } from "./tui.ts";
 import { runIMessageSetup } from "./imessage-setup.ts";
+import { handleMessagesCommand, MESSAGES_COMMAND_HELP } from "./messages-cli.ts";
 
 export const CLI_USAGE = `Textbutler — your local messaging assistant
 
@@ -30,6 +31,8 @@ Setup options:
   init                               Initialize private settings, paused
 
 ${OWNER_COMMAND_HELP}
+
+${MESSAGES_COMMAND_HELP}
 
 Agents:
   providers list                     Show configured agent accounts
@@ -78,6 +81,13 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
   if (command === "app imessage-setup") { if (option === -1) throw new Error(CLI_USAGE); const result = await runIMessageSetup(dataDir); print(result); return result.ok ? 0 : 1; }
   if (command === "tui") return await runTextbutlerTui(dataDir, output, { ...(options.entrypoint ? { entrypoint: options.entrypoint } : {}) });
   if (command === "doctor") return await runDoctor(dataDir, output);
+  if (args[0] === "messages") {
+    try { return (await handleMessagesCommand(args, { request, print, dataDir }))!; }
+    catch (error) {
+      if (error instanceof OwnerCliError) { print({ ok: false, code: "invalid-request", message: error.message }); return 1; }
+      print({ ok: false, code: "unconfirmed", message: "The messaging operation could not be confirmed. Check its job or current state before repeating a send." }); return 1;
+    }
+  }
   try {
     const handled = await handleOwnerCommand(args, { request, print });
     if (handled !== undefined) return handled;

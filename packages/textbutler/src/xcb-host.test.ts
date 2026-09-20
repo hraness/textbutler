@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createToolBroker, type AgentTaskRequest } from "@hraness/agentmixer";
 import { createXcbSubscriptionHost } from "./xcb-host.ts";
-import { parseXcbCapabilities, parseXcbResult, XcbNotStarted, type XcbCapabilities, type XcbClient, type XcbGenerateRequest, type XcbResult } from "./xcb-client.ts";
+import { parseXcbCapabilities, parseXcbResult, XcbCapabilitiesError, XcbNotStarted, type XcbCapabilities, type XcbCapabilityFailure, type XcbClient, type XcbGenerateRequest, type XcbResult } from "./xcb-client.ts";
 import { contactCapabilityIdentity, createContactCapabilityBroker } from "./contact-capabilities.ts";
 import { RunJournal } from "./journal.ts";
 import type { XcbHostConfig } from "./host-config.ts";
@@ -170,4 +170,31 @@ test("shutdown cancels an in-flight stale capability refresh before waiting for 
   clock += 30_001;
   const selection = host.selection("native-claude-code", "respond"); void selection.catch(() => {});
   await started; await host.close(); expect(aborted).toBe(true); await expect(selection).rejects.toThrow();
+});
+test("capability failure diagnostics are allowlisted and clear after a successful refresh", async () => {
+  const failures: readonly [XcbCapabilityFailure, string][] = [
+    ["executable-changed", "pinned file"], ["executable-unsafe", "ownership"], ["executable-unavailable", "could not be read"],
+    ["not-started", "could not start"], ["timeout", "90-second deadline"], ["io", "input or output error"],
+    ["exit", "exited unsuccessfully"], ["output-limit", "exceeded TextButler's limits"], ["invalid-json", "UTF-8 JSON"], ["invalid-schema", "API schema"],
+  ];
+  let failure: Error | undefined, generated = 0;
+  const host = await createXcbSubscriptionHost(config, { now: () => NOW, integration, client: {
+    async capabilities() { if (failure) throw failure; return capabilities(); },
+    async generate(r) { generated++; return completed(r); },
+  } });
+  try {
+    for (const [code, detail] of failures) {
+      failure = new XcbCapabilitiesError(code); failure.message = "SYNTHETIC_PRIVATE_PROVIDER_OUTPUT";
+      await host.check("native-claude-code", new AbortController().signal);
+      expect(host.accounts()[0]).toMatchObject({ status: "unavailable", defaultReplyModel: null });
+      expect(host.accounts()[0]?.detail).toContain(detail);
+      expect(host.accounts()[0]?.detail).not.toContain("SYNTHETIC_PRIVATE");
+    }
+    for (const unknown of [Error("SYNTHETIC_PRIVATE_ERROR"), new XcbCapabilitiesError("__proto__" as XcbCapabilityFailure)]) {
+      failure = unknown; await host.check("native-claude-code", new AbortController().signal);
+      expect(host.accounts()[0]?.detail).toBe("XCB could not be verified. Check its pinned executable and application API, then check this account again.");
+    }
+    failure = undefined; await host.check("native-claude-code", new AbortController().signal);
+    expect(host.accounts()[0]?.status).toBe("ready"); expect(generated).toBe(0);
+  } finally { await host.close(); }
 });

@@ -25,6 +25,33 @@ test("resolver admission preserves temporary, sibling and suffix path detection"
   ]) expect(PRIVATE_TEMPORARY_PATH.test(source)).toBe(true);
 });
 
+test("privacy scanning admits only the exact OS-redacted imsg crash path", () => {
+  for (const source of [
+    '"procPath": "/private/tmp/*/imsg"',
+    "'/private/tmp/*/imsg'",
+    "`/private/tmp/*/imsg`",
+    "/private/tmp/*/imsg",
+  ]) expect(PRIVATE_TEMPORARY_PATH.test(source)).toBe(false);
+});
+
+test("redacted crash admission preserves real private, sibling and suffix path detection", () => {
+  for (const source of [
+    '"/private/tmp/wrench-imessage-private-fixture/imsg"',
+    '"/private/tmp/private-fixture/imsg"',
+    '"/private/tmp/*/other"',
+    '"/private/tmp/**/imsg"',
+    '"/private/tmp/*/imsg/child"',
+    '"/private/tmp/*/imsg.log"',
+    '"/private/tmp/*/imsg-private-fixture"',
+    '"/private/tmp/*/imsg private-fixture"',
+    '"/private/tmp/*/imsg\\private-fixture"',
+    '"/private/tmp/*/"',
+    '"/private/tmp/"',
+    '"/private/var/tmp/*/imsg"',
+    '"/private/tmp/*/imsg"; "/private/tmp/private-fixture"',
+  ]) expect(PRIVATE_TEMPORARY_PATH.test(source)).toBe(true);
+});
+
 const protocol = (source: string) =>
   standaloneSourceProblems("fixture/package.json", source)
     .filter((problem) => problem.includes("private workspace dependency protocol"));

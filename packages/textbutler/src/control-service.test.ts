@@ -14,6 +14,8 @@ import { RunJournal } from "./journal.ts";
 import { createProviderHost } from "./provider-host.ts";
 import { parseHostConfig } from "./host-config.ts";
 import { parseControlResponse } from "../../control/src/index.ts";
+import { createXcbSubscriptionHost } from "./xcb-host.ts";
+import { contactCapabilityIdentity } from "./contact-capabilities.ts";
 
 const roots: string[] = [], services: TextbutlerControlService[] = [];
 afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -36,6 +38,51 @@ describe("persistent owner control service", () => {
     const { service } = await setup(false); const snapshot = await service.snapshot();
     expect(snapshot.connection).toBe("connected"); expect(snapshot.contacts).toEqual([]);
     expect(snapshot.settings.paused).toBe(true); expect(snapshot.capabilities.every(capability => capability.status !== "available")).toBe(true);
+  });
+  test("qualified XCB accounts survive the provider host and serialized control snapshot", async () => {
+    const now = Date.now(), sha256 = "a".repeat(64);
+    const accounts = (["claude", "codex"] as const).map(provider => ({ provider, accountId: `synthetic-${provider}`, model: `${provider}/observed` }));
+    let generated = 0;
+    const native = await createXcbSubscriptionHost({ executable: "/synthetic/xcb", stateHome: "/synthetic/state", sha256, accounts }, {
+      now: () => now,
+      integration: { version: 1, evidenceDigest: "d".repeat(64), sourceDigest: "e".repeat(64),
+        profiles: { classify: contactCapabilityIdentity("classify"), respond: contactCapabilityIdentity("respond") } },
+      client: {
+        async capabilities() { return { version: 1, supported: true, zeroTools: true, zeroHooks: true, ephemeral: true,
+          accounts: accounts.map(account => ({ id: account.accountId, label: "Synthetic", provider: account.provider,
+            enabled: true, busy: false, connected: true, runtimeAdmitted: true, available: true, reason: null,
+            models: [{ key: account.model, label: "Observed", observedAtMs: now }],
+            qualification: { runtimeVersion: "synthetic-v1", runtimeDigest: sha256, evidenceDigest: "b".repeat(64), expiresAt: now + 600_000 } })) }; },
+        async generate() { generated++; throw Error("Snapshot must not invoke a model"); },
+      },
+    });
+    const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-control-xcb-")); roots.push(dataDir);
+    const service = await TextbutlerControlService.open({ dataDir, providers: leases => createProviderHost({
+      dataDir, config: { schemaVersion: 1 }, leases, nativeSubscriptions: native, now: () => now,
+    }) }); services.push(service);
+    const raw = await service.request({ protocol, command: "snapshot" });
+    const response = parseControlResponse(JSON.parse(JSON.stringify(raw)));
+    expect(response).toMatchObject({ ok: true, kind: "snapshot", snapshot: { settings: { paused: true }, contacts: [], providerAccounts: [
+      { id: "native-codex", provider: "codex", route: "codex", status: "ready", defaultReplyModel: "codex/observed", classifierModel: "codex/observed" },
+      { id: "native-claude-code", provider: "claude", route: "claude-code", status: "ready", defaultReplyModel: "claude/observed", classifierModel: "claude/observed" },
+    ] } });
+    expect(response).toEqual(raw); expect(generated).toBe(0);
+  });
+  test("ready account snapshots still require models, route identity and qualified account state", async () => {
+    const { service } = await setup(false), snapshot = await service.snapshot();
+    const parse = (account: unknown) => parseControlResponse({ protocol, ok: true, kind: "snapshot", snapshot: { ...snapshot, providerAccounts: [account] } });
+    for (const route of ["claude-api", "claude-code", "codex"] as const) {
+      const account = { id: "synthetic-account", label: "Synthetic", provider: route === "codex" ? "codex" : "claude", route,
+        status: "ready", detail: "Synthetic qualification", defaultReplyModel: "reply-model", classifierModel: "classifier-model" };
+      expect(parse(account)).toMatchObject({ ok: true, kind: "snapshot" });
+      for (const field of ["defaultReplyModel", "classifierModel"] as const) {
+        for (const value of [null, "", undefined]) expect(() => parse({ ...account, [field]: value })).toThrow();
+      }
+      for (const patch of [{ provider: account.provider === "codex" ? "claude" : "codex" }, { route: "unknown" }, { id: "../other" }]) expect(() => parse({ ...account, ...patch })).toThrow();
+      const managedAccount = { state: "signed-in", generation: 1, modelCount: 1, pendingLoginId: null };
+      expect(() => parse({ ...account, managedAccount })).toThrow("Invalid managed account readiness");
+      if (route === "codex") expect(parse({ ...account, status: "unavailable", defaultReplyModel: null, classifierModel: null, managedAccount })).toMatchObject({ ok: true });
+    }
   });
   test("settings writes are conditional, persist to disk, and remain outside contact memory", async () => {
     const { service, dataDir } = await setup();
@@ -183,6 +230,30 @@ describe("owner reply triage through the control surface", () => {
     };
     return { service, sent, db, run, dataDir, grantStore };
   }
+  test("history, capabilities and explicit rich drafts use bounded owner jobs without dispatch", async () => {
+    const { run, sent } = await replySetup();
+    const history = await run({ command: "messages.history", contactId: "synthetic-a", limit: 20 });
+    expect(history).toMatchObject({ ok: true, kind: "message-history", contactId: "synthetic-a", messages: [{ id: "inbound-1", author: "contact", text: "Can you pick up dinner?" }] });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(history)))).toEqual(history);
+    const capabilities = await run({ command: "messages.capabilities", contactId: "synthetic-a" });
+    expect(capabilities).toMatchObject({ ok: true, kind: "message-capabilities", ready: true, threadedReplies: { available: false } });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(capabilities)))).toEqual(capabilities);
+    const composed = await run({ command: "replies.compose", contactId: "synthetic-a", summary: "Acknowledge dinner", actions: [{ kind: "reaction", messageId: "inbound-1", emoji: "👍", action: "add" }] });
+    expect(composed).toMatchObject({ ok: true, kind: "reply-draft", draft: { actions: [{ kind: "text", text: "🤖{ Acknowledge dinner }" }, { kind: "reaction", messageId: "inbound-1", emoji: "👍", action: "add" }] } });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(composed)))).toEqual(composed);
+    expect(sent).toEqual([]);
+    expect(await run({ command: "messages.summarize", contactId: "synthetic-a", limit: 20 })).toMatchObject({ ok: false, code: "unavailable" });
+  });
+  test("message command parsing rejects unbounded history and arbitrary actions or paths", () => {
+    for (const limit of [0, 201, 1.5, "20", undefined]) expect(() => parseControlRequest({ protocol, command: "messages.history", contactId: "synthetic-a", limit })).toThrow();
+    for (const command of ["messages.history", "messages.summarize"]) expect(parseControlRequest({ protocol, command, contactId: "synthetic-a", limit: 200 })).toMatchObject({ command, limit: 200 });
+    for (const command of ["messages.history", "messages.summarize", "messages.capabilities"]) expect(() => parseControlRequest({ protocol, command, contactId: "../other", limit: 20 })).toThrow();
+    for (const actions of [[], Array.from({ length: 8 }, () => ({ kind: "text", text: "Hi" })), [{ kind: "shell", command: "whoami" }],
+      [{ kind: "text", text: "Hi", replyTo: "inbound-1" }], [{ kind: "attachment", file: "/private/owner-file", mimeType: "text/plain", name: "file" }]])
+      expect(() => parseControlRequest({ protocol, command: "replies.compose", contactId: "synthetic-a", summary: "Review", actions })).toThrow();
+    expect(parseControlRequest({ protocol, command: "replies.compose", contactId: "synthetic-a", summary: "Review", actions: [{ kind: "text", text: "Hi" }] })).toMatchObject({ command: "replies.compose" });
+    expect(() => parseControlRequest({ protocol, command: "messages.capabilities", contactId: "synthetic-a", force: true })).toThrow();
+  });
   test("scan, suggest, send and discard stay behind owner commands", async () => {
     const { service, sent, run } = await replySetup();
     const scan = await run({ command: "replies.scan" });

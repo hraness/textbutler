@@ -103,9 +103,10 @@ const LEGACY_NON_BUN_REFERENCE = new RegExp([
   "y",
 ].join(""), "u");
 
-// The exact quoted macOS resolver socket is a public OS interface. Its parent,
-// sibling paths, suffixes and every temporary directory remain private paths.
-export const PRIVATE_TEMPORARY_PATH = /\/private\/(?:tmp\/|var\/(?!run\/mDNSResponder(?:["'`]|$)))/u;
+// The exact macOS resolver socket and OS-redacted imsg crash path are public
+// OS forms. Quote/end boundaries keep parents, siblings, suffixes and every
+// actual temporary directory subject to private-path detection.
+export const PRIVATE_TEMPORARY_PATH = /\/private\/(?:tmp\/(?!\*\/imsg(?:["'`]|$))|var\/(?!run\/mDNSResponder(?:["'`]|$)))/u;
 
 const OPACITY_RULES = [
   { label: "private package name", pattern: /@jungle\//u },

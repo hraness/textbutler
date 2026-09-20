@@ -4,20 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configureIMessage, IMESSAGE_SETUP_BINDING, IMESSAGE_SETUP_CUSTODY, IMESSAGE_SETUP_RESULT, runIMessageSetup, type IMessageSetupPort } from "./imessage-setup.ts";
 import { runTextbutlerCli, CLI_USAGE } from "./cli.ts";
-const ID = "synthetic-imessage", SUBJECT = "imessage:synthetic", READ = "messaging.automation.read", SEND = "messaging.automation.send.text";
+const ID = "synthetic-imessage", SUBJECT = "imessage:synthetic", READ = "messaging.automation.read", SEND = "messaging.automation.send.text", ATTACHMENT = "messaging.automation.send.attachment";
+const OPERATIONS = [READ, SEND, ATTACHMENT];
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 function capability(operationId: string, revision: number, permission: string) {
-  return { digest: String(revision + (operationId === READ ? 1 : 2)).padStart(64, "a"), adapterId: "imessage-direct", operationId, pluginId: "imessage", surface: "imessage", transport: "local-cli", risk: operationId === READ ? "R1" : "R3", effect: operationId === READ ? "none" : "synthetic scoped text", state: "available", executorSource: "built-in", interfaceSource: "bundled", permission };
+  return { digest: String(revision + (OPERATIONS.indexOf(operationId) + 1)).padStart(64, "a"), adapterId: "imessage-direct", operationId, pluginId: "imessage", surface: "imessage", transport: "local-cli", risk: operationId === READ ? "R1" : "R3", effect: operationId === READ ? "none" : "synthetic scoped text", state: "available", executorSource: "built-in", interfaceSource: "bundled", permission };
 }
 function view(revision: number, managed: boolean, permissions: Record<string, string>) {
-  return { version: "0.18.16", accountId: ID, accounts: [{ id: ID, provider: "imessage", kind: "linked-device-store", subject: SUBJECT, revision: "c".repeat(64), status: "configured", source: null, tokenStorage: null }],
-    capabilities: [READ, SEND].map(operation => capability(operation, revision, managed ? permissions[operation] ?? "deny" : "unmanaged")), interfaces: [], policy: { managed, revision }, web: { revision: 0, gatewayOnly: false, rules: [] }, approvals: [], connectionProviders: [], vault: { provider: "1password", available: true, purpose: "x-user-token-import" } };
+  return { version: "0.18.20", accountId: ID, accounts: [{ id: ID, provider: "imessage", kind: "linked-device-store", subject: SUBJECT, revision: "c".repeat(64), status: "configured", source: null, tokenStorage: null }],
+    capabilities: OPERATIONS.map(operation => capability(operation, revision, managed ? permissions[operation] ?? "deny" : "unmanaged")), interfaces: [], policy: { managed, revision }, web: { revision: 0, gatewayOnly: false, rules: [] }, approvals: [], connectionProviders: [], vault: { provider: "1password", available: true, purpose: "x-user-token-import" } };
 }
 function fixture(existing = false, alreadyAllowed = false) {
   let auth: { id: string; kind: string; provider: string; subject: string | null; realmFingerprint: string } | null = existing ? { id: ID, kind: "linked-device-store", provider: "imessage", subject: SUBJECT, realmFingerprint: "b".repeat(16) } : null;
-  let revision = alreadyAllowed ? 3 : 0, managed = alreadyAllowed;
-  const permissions: Record<string, string> = alreadyAllowed ? { [READ]: "allow", [SEND]: "allow" } : {};
+  let revision = alreadyAllowed ? 4 : 0, managed = alreadyAllowed;
+  const permissions: Record<string, string> = alreadyAllowed ? { [READ]: "allow", [SEND]: "allow", [ATTACHMENT]: "allow" } : {};
   const calls: Array<{ action: string; [key: string]: unknown }> = [];
   let transform: (value: ReturnType<typeof view>) => unknown = value => value;
   const port: IMessageSetupPort = {
@@ -33,20 +34,26 @@ function fixture(existing = false, alreadyAllowed = false) {
       revision++; return { ok: true, data: { kind: "success", message: "Saved." } };
     },
   };
-  return { port, calls, replaceAuth(value: typeof auth) { auth = value; }, transform(value: typeof transform) { transform = value; } };
+  return { port, calls, permissions, replaceAuth(value: typeof auth) { auth = value; }, transform(value: typeof transform) { transform = value; } };
 }
-test("fresh setup grants only two exact operations from fresh CAS-bound snapshots", async () => {
+test("fresh setup grants only three exact operations from fresh CAS-bound snapshots", async () => {
   const f = fixture();
-  expect(await configureIMessage(f.port, ID)).toMatchObject({ accountCreated: true, accountBound: true, managedEnabled: true, permissionsChanged: 2 });
-  expect(f.calls.filter(call => call.action === "permission.set").map(call => [call.operationId, call.expectedRevision])).toEqual([[READ, 1], [SEND, 2]]);
+  expect(await configureIMessage(f.port, ID)).toMatchObject({ accountCreated: true, accountBound: true, managedEnabled: true, permissionsChanged: 3 });
+  expect(f.calls.filter(call => call.action === "permission.set").map(call => [call.operationId, call.expectedRevision])).toEqual([[READ, 1], [SEND, 2], [ATTACHMENT, 3]]);
   for (const call of f.calls.filter(call => call.action === "permission.set")) expect(call).toMatchObject({ adapterId: "imessage-direct", accountId: ID, decision: "allow", expectedCapabilityDigest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
-  expect(f.calls.filter(call => call.action === "snapshot")).toHaveLength(4);
+  expect(f.calls.filter(call => call.action === "snapshot")).toHaveLength(5);
 });
 test("completed existing account setup is repeatable without account or permission replacement", async () => {
   const f = fixture(true, true);
   f.port.authBind = async () => { throw new Error("Rebinding would rotate the existing account incarnation"); };
   expect(await configureIMessage(f.port, ID)).toMatchObject({ accountCreated: false, managedEnabled: false, permissionsChanged: 0 });
   expect(f.calls.some(call => call.action === "auth.add" || call.action === "auth.bind" || call.action.startsWith("permission."))).toBe(false);
+});
+test("existing read and text permissions gain only the missing attachment grant", async () => {
+  const f = fixture(true, true); f.permissions[ATTACHMENT] = "deny";
+  expect(await configureIMessage(f.port, ID)).toMatchObject({ accountCreated: false, managedEnabled: false, permissionsChanged: 1 });
+  expect(f.calls.filter(call => call.action.startsWith("permission."))).toEqual([{ action: "permission.set", adapterId: "imessage-direct", operationId: ATTACHMENT, accountId: ID, decision: "allow", expectedRevision: 4, expectedCapabilityDigest: capability(ATTACHMENT, 4, "deny").digest }]);
+  expect(f.calls.some(call => call.action === "auth.add" || call.action === "auth.bind")).toBe(false);
 });
 test("binding publication must settle before any permission mutation", async () => {
   const f = fixture();
@@ -72,8 +79,13 @@ test("an existing subject changing during setup is never replaced or authorized"
 test("foreign, duplicate, malformed and unavailable capabilities never receive grants", async () => {
   const transforms = [
     (v: ReturnType<typeof view>) => ({ ...v, accountId: "other" }),
+    (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.16" }),
     (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.17" }),
+    (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.18" }),
+    (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.19" }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: [...v.capabilities, v.capabilities[0]] }),
+    (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.filter(c => c.operationId !== ATTACHMENT) }),
+    (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.map(c => c.operationId === ATTACHMENT ? { ...c, adapterId: "imessage-bridge" } : c) }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.map(c => ({ ...c, digest: "bad" })) }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.map(c => ({ ...c, interfaceSource: "user" })) }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.map(c => ({ ...c, state: "unsupported" })) }),
@@ -86,11 +98,17 @@ test("account revision drift after permission activation is fenced before grant"
   await expect(configureIMessage(f.port, ID)).rejects.toThrow("account-identity-changed");
   expect(f.calls.filter(c => c.action === "permission.set")).toHaveLength(0);
 });
-test("failed grant is not retried and final permissions must both be allowed", async () => {
+test("account drift before attachment authorization stops after the two earlier grants", async () => {
+  const f = fixture(true); let reads = 0;
+  f.transform(v => ++reads < 4 ? v : { ...v, accounts: v.accounts.map(a => ({ ...a, revision: "d".repeat(64) })) });
+  await expect(configureIMessage(f.port, ID)).rejects.toThrow("account-identity-changed");
+  expect(f.calls.filter(c => c.action === "permission.set").map(c => c.operationId)).toEqual([READ, SEND]);
+});
+test("failed grant is not retried and final permissions must all be allowed", async () => {
   const f = fixture(true, true);
   f.transform(v => ({ ...v, capabilities: v.capabilities.map(c => ({ ...c, permission: "deny" })) }));
   await expect(configureIMessage(f.port, ID)).rejects.toThrow("permission-verification-failed");
-  expect(f.calls.filter(c => c.action === "permission.set")).toHaveLength(2);
+  expect(f.calls.filter(c => c.action === "permission.set")).toHaveLength(3);
   const rejected = fixture(true, true); rejected.port.control = async () => ({ ok: false, code: "OPERATION_PERMISSION_CHANGED", message: "Refresh." });
   await expect(configureIMessage(rejected.port, ID)).rejects.toThrow("permission-revision-rejected");
 });
@@ -99,14 +117,14 @@ async function processFixture(mode = "normal") {
   const root = await realpath(await mkdtemp(join(tmpdir(), "textbutler-imessage-setup-"))); roots.push(root);
   const packageRoot = join(root, "ghostget"), home = join(root, "home"), dataDir = join(root, "data"), stateHome = join(root, "connector-state");
   for (const path of [packageRoot, home, dataDir, stateHome, join(dataDir, "state"), join(packageRoot, "src"), join(packageRoot, "src", "control")]) await mkdir(path, { mode: 0o700 });
-  await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: "@hraness/ghostget", version: "0.18.16", type: "module" }), { mode: 0o600 });
+  await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: "@hraness/ghostget", version: "0.18.20", type: "module" }), { mode: 0o600 });
   const common = `import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 const root=process.env.GHOSTGET_STATE_HOME, file=join(root,"fixture.json"), log=join(root,"calls.jsonl");
 const state=JSON.parse(readFileSync(file,"utf8"));
 const save=()=>writeFileSync(file,JSON.stringify(state));
 const record=(call)=>appendFileSync(log,JSON.stringify({call,pid:process.pid,cwd:process.cwd(),runtimeArgs:process.execArgv,env:process.env})+"\\n");
-const id=${JSON.stringify(ID)}, subject=${JSON.stringify(SUBJECT)}, read=${JSON.stringify(READ)}, send=${JSON.stringify(SEND)};
+const id=${JSON.stringify(ID)}, subject=${JSON.stringify(SUBJECT)}, read=${JSON.stringify(READ)}, send=${JSON.stringify(SEND)}, attachment=${JSON.stringify(ATTACHMENT)}, operations=[read,send,attachment];
 `;
   await writeFile(join(packageRoot, "src", "cli.ts"), common + `
 import { spawn } from "node:child_process";
@@ -122,10 +140,10 @@ else process.exit(2);
   await writeFile(join(packageRoot, "src", "control", "helper.ts"), common + `
 let buffer="";process.stdin.on("data",chunk=>{buffer+=chunk;const at=buffer.indexOf("\\n");if(at<0)return;const frame=JSON.parse(buffer.slice(0,at)),request=frame.request;record(request);
 let data;
-if(request.action==="snapshot")data={kind:"snapshot",snapshot:{version:"0.18.16",accountId:id,accounts:[{id,provider:"imessage",kind:"linked-device-store",subject,revision:"c".repeat(64)}],capabilities:[read,send].map(operationId=>({digest:String(state.revision+(operationId===read?1:2)).padStart(64,"a"),adapterId:"imessage-direct",operationId,pluginId:"imessage",surface:"imessage",transport:"local-cli",risk:operationId===read?"R1":"R3",effect:"synthetic",state:"available",executorSource:"built-in",interfaceSource:"bundled",permission:state.managed?state.permissions[operationId]??"deny":"unmanaged"})),interfaces:[],policy:{managed:state.managed,revision:state.revision},web:{},approvals:[],connectionProviders:[],vault:{}}};
+if(request.action==="snapshot")data={kind:"snapshot",snapshot:{version:"0.18.20",accountId:id,accounts:[{id,provider:"imessage",kind:"linked-device-store",subject,revision:"c".repeat(64)}],capabilities:operations.map(operationId=>({digest:String(state.revision+(operations.indexOf(operationId)+1)).padStart(64,"a"),adapterId:"imessage-direct",operationId,pluginId:"imessage",surface:"imessage",transport:"local-cli",risk:operationId===read?"R1":"R3",effect:"synthetic",state:"available",executorSource:"built-in",interfaceSource:"bundled",permission:state.managed?state.permissions[operationId]??"deny":"unmanaged"})),interfaces:[],policy:{managed:state.managed,revision:state.revision},web:{},approvals:[],connectionProviders:[],vault:{}}};
 else if(request.action==="permission.enable"&&request.expectedRevision===state.revision){state.managed=true;state.revision++;save();data={kind:"success",message:"Enabled."};}
 else if(request.action==="permission.set"&&state.mode==="stale"){console.log(JSON.stringify({id:frame.id,protocol:frame.protocol,ok:false,code:"OPERATION_PERMISSION_CHANGED",message:"Refresh."}));return;}
-else if(request.action==="permission.set"&&request.accountId===id&&request.adapterId==="imessage-direct"&&[read,send].includes(request.operationId)&&request.expectedRevision===state.revision&&request.expectedCapabilityDigest===String(state.revision+(request.operationId===read?1:2)).padStart(64,"a")){state.permissions[request.operationId]="allow";state.revision++;save();data={kind:"success",message:"Saved."};}
+else if(request.action==="permission.set"&&request.accountId===id&&request.adapterId==="imessage-direct"&&operations.includes(request.operationId)&&request.expectedRevision===state.revision&&request.expectedCapabilityDigest===String(state.revision+(operations.indexOf(request.operationId)+1)).padStart(64,"a")){state.permissions[request.operationId]="allow";state.revision++;save();data={kind:"success",message:"Saved."};}
 else process.exit(2);
 console.log(JSON.stringify({id:state.mode==="wrong-id"?"wrong-id":frame.id,protocol:frame.protocol,ok:true,data}));
 });
@@ -135,10 +153,18 @@ console.log(JSON.stringify({id:state.mode==="wrong-id"?"wrong-id":frame.id,proto
   await writeFile(join(dataDir, "state", "host.json"), JSON.stringify({ schemaVersion: 1, ghostget: { executable, runtimeExecutable, authId: ID, stateHome, automationAccounts: [{ provider: "imessage", authId: ID }] } }), { mode: 0o600 });
   return { root, packageRoot, home, dataDir, stateHome, executable, options: { home, platform: "darwin", automationPermission: "allowed", launchGeneration: "12345678-1234-1234-1234-123456789abc", processLimits: { commandMs: 2000, cleanupMs: 100 } }, async calls() { try { return (await readFile(join(stateHome, "calls.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line)); } catch { return []; } } };
 }
+test("connector releases without native startup fixes are refused before launch", async () => {
+  for (const version of ["0.18.16", "0.18.17", "0.18.18", "0.18.19"]) {
+    const f = await processFixture();
+    await writeFile(join(f.packageRoot, "package.json"), JSON.stringify({ name: "@hraness/ghostget", version, type: "module" }), { mode: 0o600 });
+    expect(await runIMessageSetup(f.dataDir, f.options)).toMatchObject({ ok: false, status: "blocked", custody: "not-acquired", code: "unsupported-connector-version" });
+    expect(await f.calls()).toHaveLength(0);
+  }
+});
 test("real child setup has closed argv/environment, durable results, and repeatable completed state", async () => {
   const f = await processFixture();
   const result = await runIMessageSetup(f.dataDir, f.options);
-  expect(result).toMatchObject({ ok: true, status: "completed", custody: "released", launchGeneration: f.options.launchGeneration, progress: { accountCreated: true, permissionsChanged: 2 } });
+  expect(result).toMatchObject({ ok: true, status: "completed", custody: "released", launchGeneration: f.options.launchGeneration, progress: { accountCreated: true, permissionsChanged: 3 } });
   expect(JSON.parse(await readFile(join(f.dataDir, "state", IMESSAGE_SETUP_RESULT), "utf8"))).toEqual(result);
   expect((await lstat(join(f.dataDir, "state", IMESSAGE_SETUP_RESULT))).mode & 0o777).toBe(0o600);
   const bindingPath = join(f.dataDir, "state", IMESSAGE_SETUP_BINDING);

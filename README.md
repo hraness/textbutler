@@ -24,6 +24,10 @@ automation adapter. Its linked apps and account permissions determine what is
 available. The [architecture](docs/textbutler/architecture.md) records the
 runtime boundaries and remaining qualification work.
 
+Agents can use the [JSON CLI](docs/textbutler/agent-cli.md) to read and summarize
+one conversation, prepare text or media drafts, and send an explicitly
+authorized message. Each connection reports its available actions.
+
 ## Open the guided terminal
 
 From a Textbutler checkout on your Mac, with Bun 1.3.14:

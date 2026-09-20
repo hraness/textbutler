@@ -1,5 +1,7 @@
 import { parseActionIntent } from "../../transport/src/validation.ts";
 import type { ActionIntent } from "../../transport/src/types.ts";
+import type { AutomationProvider, AutomationStatus } from "../../transport/src/automation-contract.ts";
+const MESSAGE_ACTIONS = ["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"] as const;
 
 /** Owner-only desktop control protocol. Messaging authority remains in the daemon. */
 export const CONTROL_PROTOCOL = "textbutler.control.v1" as const;
@@ -39,6 +41,24 @@ export interface ReplyDraftDetail {
   digest: string; expiresAt: string;
 }
 export interface RepliesView { scannedAt: string | null; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
+export interface OwnerMessage {
+  id: string; at: number; author: "owner" | "contact" | "butler" | "unknown"; text: string | null;
+  kind: "message" | "reaction" | "edit" | "delete"; relatedMessageId: string | null; textTruncated: boolean;
+  attachments: readonly { name: string | null; mimeType: string | null; sizeBytes: number | null }[];
+}
+export interface MessageHistoryResult {
+  contactId: string; provider: AutomationProvider; ready: boolean; messages: readonly OwnerMessage[];
+  bounds: { requested: number; received: number; returned: number; maxTextBytes: 4096; maxJsonBytes: 512000 };
+  omissions: { messages: number; textShortened: number }; limitations: readonly string[];
+}
+export interface MessageSummaryResult {
+  contactId: string; summary: string; citations: readonly string[]; sampledMessages: number;
+  omittedMessages: number; shortenedMessages: number; limitations: readonly string[];
+}
+export interface MessageCapabilitiesResult {
+  contactId: string; provider: AutomationProvider; ready: boolean; actions: AutomationStatus["actions"];
+  threadedReplies: { available: false; reason: string };
+}
 export interface DesktopSnapshot {
   protocol: typeof CONTROL_PROTOCOL;
   revision: number;
@@ -70,6 +90,10 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "global.settings.update"; expectedRevision: number; settings: DesktopSnapshot["settings"] }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.scan" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.suggest"; contactId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "messages.history"; contactId: string; limit: number }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "messages.summarize"; contactId: string; limit: number }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "messages.capabilities"; contactId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.compose"; contactId: string; summary: string; actions: readonly ActionIntent[] }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.draft.read"; draftId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; draftId: string; expectedDigest: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; contactId: string; text: string; expectedRevision?: number }
@@ -85,6 +109,9 @@ export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "replies"; scannedAt: string; checked: number; unreadable: number; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-suggestion"; draft: ReplyDraftView | null; pending: PendingReplyItem }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-draft"; draft: ReplyDraftDetail }
+  | ({ protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "message-history" } & MessageHistoryResult)
+  | ({ protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "message-summary" } & MessageSummaryResult)
+  | ({ protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "message-capabilities" } & MessageCapabilitiesResult)
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-sent"; contactId: string; runId: string; state: "submitted" | "failed" | "partial" | "indeterminate" | "cancelled"; detail: string }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-discarded"; discarded: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: false; code: "disconnected" | "invalid-request" | "conflict" | "capacity" | "unavailable"; message: string };
@@ -186,6 +213,18 @@ function replyDraftDetail(value: unknown): ReplyDraftDetail {
     assets: list(row.assets, 8).map(value => { const asset = record(value); return { path: text(asset.path, 1024), sha256: digest(asset.sha256), bytes: integer(asset.bytes, 1, 16 * 1024 * 1024) }; }),
     digest: digest(row.digest), expiresAt: text(row.expiresAt, 64) };
 }
+function messageText(value: unknown, max: number): string {
+  const result = text(value, max);
+  if (new TextEncoder().encode(result).length > max || result.includes("\0")) throw Error("Message response text exceeds its byte bound.");
+  return result;
+}
+function ownerMessage(value: unknown): OwnerMessage {
+  const row = record(value);
+  const nullable = (value: unknown, max: number) => value === null ? null : messageText(value, max);
+  return { id: messageText(row.id, 512), at: integer(row.at), author: oneOf(row.author, ["owner", "contact", "butler", "unknown"]),
+    text: nullable(row.text, 4096), kind: oneOf(row.kind, ["message", "reaction", "edit", "delete"]), relatedMessageId: nullable(row.relatedMessageId, 512), textTruncated: bool(row.textTruncated),
+    attachments: list(row.attachments, 20).map(value => { const attachment = record(value); return { name: nullable(attachment.name, 512), mimeType: nullable(attachment.mimeType, 256), sizeBytes: attachment.sizeBytes === null ? null : integer(attachment.sizeBytes, 0, 1024 ** 3) }; }) };
+}
 function repliesView(value: unknown): RepliesView {
   const row = record(value);
   return { scannedAt: row.scannedAt === null ? null : text(row.scannedAt, 64),
@@ -241,6 +280,32 @@ export function parseControlResponse(value: unknown): ControlResponse {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-suggestion", draft, pending };
   }
   if (row.kind === "reply-draft") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-draft", draft: replyDraftDetail(row.draft) };
+  if (row.kind === "message-history") {
+    const messages = list(row.messages, 200).map(ownerMessage), bounds = record(row.bounds), omissions = record(row.omissions);
+    const requested = integer(bounds.requested, 1, 200), received = integer(bounds.received, 0, requested), returned = integer(bounds.returned, 0, received);
+    const omitted = integer(omissions.messages, 0, received), textShortened = integer(omissions.textShortened, 0, received);
+    if (new Set(messages.map(message => message.id)).size !== messages.length || messages.some(message => !message.id)
+      || returned !== messages.length || returned + omitted !== received || bounds.maxTextBytes !== 4096 || bounds.maxJsonBytes !== 512000
+      || new TextEncoder().encode(JSON.stringify(messages)).length > 512000) throw Error("Inconsistent bounded message history.");
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "message-history", contactId: messageText(row.contactId, 80), provider: oneOf(row.provider, ["imessage", "whatsapp", "beeper"]), ready: bool(row.ready), messages,
+      bounds: { requested, received, returned, maxTextBytes: 4096, maxJsonBytes: 512000 }, omissions: { messages: omitted, textShortened }, limitations: list(row.limitations, 8).map(value => messageText(value, 512)) };
+  }
+  if (row.kind === "message-summary") {
+    const citations = list(row.citations, 32).map(value => messageText(value, 512));
+    const sampledMessages = integer(row.sampledMessages, 1, 200), omittedMessages = integer(row.omittedMessages, 0, 200), shortenedMessages = integer(row.shortenedMessages, 0, 200), summary = messageText(row.summary, 8192);
+    if (new Set(citations).size !== citations.length || citations.some(id => !id) || citations.length > sampledMessages
+      || sampledMessages + omittedMessages > 200 || shortenedMessages > sampledMessages + omittedMessages || !summary.trim()) throw Error("Invalid summary citations or sample bounds.");
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "message-summary", contactId: messageText(row.contactId, 80), summary, citations,
+      sampledMessages, omittedMessages, shortenedMessages,
+      limitations: list(row.limitations, 8).map(value => messageText(value, 512)) };
+  }
+  if (row.kind === "message-capabilities") {
+    const actions = record(row.actions), threaded = record(row.threadedReplies);
+    if (Object.keys(actions).sort().join(",") !== [...MESSAGE_ACTIONS].sort().join(",") || threaded.available !== false) throw Error("Unsupported message capabilities.");
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "message-capabilities", contactId: messageText(row.contactId, 80), provider: oneOf(row.provider, ["imessage", "whatsapp", "beeper"]), ready: bool(row.ready),
+      actions: Object.fromEntries(MESSAGE_ACTIONS.map(kind => { const action = record(actions[kind]); return [kind, { available: bool(action.available), reason: action.reason === null ? null : messageText(action.reason, 1024) }]; })) as AutomationStatus["actions"],
+      threadedReplies: { available: false, reason: messageText(threaded.reason, 512) } };
+  }
   if (row.kind === "reply-sent") {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-sent", contactId: text(row.contactId, 256), runId: text(row.runId, 120),
       state: oneOf(row.state, ["submitted", "failed", "partial", "indeterminate", "cancelled"]), detail: text(row.detail, 512) };
@@ -277,7 +342,9 @@ export function parseControlResponse(value: unknown): ControlResponse {
     || snapshot.providerAccounts && new Set(snapshot.providerAccounts.map(account => account.id)).size !== snapshot.providerAccounts.length) throw new Error("Duplicate identity in control response.");
   for (const account of snapshot.providerAccounts ?? []) {
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(account.id) || account.provider !== (account.route === "codex" ? "codex" : "claude")) throw new Error("Invalid provider account identity.");
-    if (account.status === "ready" && (account.route !== "claude-api" || !account.classifierModel || !account.defaultReplyModel)) throw new Error("Invalid provider readiness.");
+    // Qualified native subscription hosts use the same diagnostic contract.
+    // Readiness is admitted by the host; the wire still requires both models.
+    if (account.status === "ready" && (!account.classifierModel || !account.defaultReplyModel)) throw new Error("Invalid provider readiness.");
     if (account.managedAccount && (account.route !== "codex" || account.status === "ready" || account.managedAccount.state !== "signed-in" && account.managedAccount.modelCount !== 0)) throw new Error("Invalid managed account readiness.");
     if (account.managedAccount?.pendingLoginId != null && !/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(account.managedAccount.pendingLoginId)) throw new Error("Invalid managed login identity.");
   }
