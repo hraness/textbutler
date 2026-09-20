@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "scope": "Textbutler contact-profile composition only; not native XCB/provider or live messaging qualification",
+  "scope": "Textbutler contact-profile composition and native app startup/setup source only; native XCB/provider and live messaging qualification remain independent",
   "toolchain": "Bun 1.3.14",
   "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts",
   "result": {
@@ -10,15 +10,42 @@
     "assertions": 517,
     "files": 9
   },
-  "sourceDigest": "e8703eb4384b82ff0301df974f3c3186d3b50f4eac2a93a57527dd14489bc03a",
-  "logSha256": "3026f6db8677ac7c1b39ff4c69d67ea4ad3b67b5d6eea6d576efd3703d372568",
+  "additionalChecks": [
+    {
+      "command": "bun test packages/textbutler/src/launch-agent.test.ts packages/textbutler/src/macos-app.test.ts",
+      "exitCode": 0,
+      "passed": 21,
+      "failed": 0,
+      "assertions": 232,
+      "evidence": "retained exact tool completion summary",
+      "retainedEvidenceSha256": "b310dfff88874c03f6b19c0eff029ed8c0a9159e9c801d11d703ff70566a6af3"
+    },
+    {
+      "command": "bun test packages/textbutler/src/imessage-setup.test.ts",
+      "exitCode": 0,
+      "passed": 19,
+      "failed": 0,
+      "assertions": 217,
+      "retainedEvidenceSha256": "30d0966f8655d40884207fd6ccb75f8b615f0e0ba5ea4abd6c17a95c63e47bfe"
+    },
+    {
+      "command": "bun node_modules/typescript/bin/tsc --noEmit -p packages/textbutler/tsconfig.json",
+      "exitCode": 0
+    }
+  ],
+  "sourceDigest": "b63b24c1dbe14ee2e63a68eda88eacd57aaee92d4a59ba89f7844f24d90a828d",
+  "logSha256": "19326383357a38e63d09007f95fa383f59dee8e7cdd138a9106ae47a6e3764b5",
   "review": {
-    "method": "Independent agent review of application client/host and integration-owner review of build admission",
+    "method": "Independent agent review of the application client/host and native app; independent iMessage setup review; integration-owner review of build admission",
     "findingsResolved": [
       "Bind classifier and reply qualification to reviewed Textbutler sources as well as XCB evidence",
       "Reject contradictory custody failures and signal exits",
-      "Prime readiness on restart and refresh stale capability metadata with shutdown cancellation"
+      "Prime readiness on restart and refresh stale capability metadata with shutdown cancellation",
+      "Bind app, daemon and setup results to exact immutable artifacts and launch generation",
+      "Use app-scoped native Messages consent without sending an event",
+      "Preserve already-bound Ghostget auth incarnation on repeat setup",
+      "Preserve first accepted account identity independently of failed attempts and latest results"
     ],
-    "remaining": "XCB exact executable/provider admission and live account/recipient verification remain independent"
+    "remaining": "Native app execution, macOS permissions, XCB exact executable/provider admission and live account/recipient verification are separately verified"
   }
 }

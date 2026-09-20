@@ -83,6 +83,7 @@
     "textbutler": "bun packages/textbutler/src/cli.ts",
     "textbutler:build": "bun scripts/build-textbutler.ts",
     "textbutler:install": "bun scripts/install-textbutler.ts",
+    "textbutler:app": "bun scripts/macos-textbutler-app.ts",
     "prepack": "bun run check",
     "check:effect": "bun scripts/check-effect-architecture.ts",
     "check:public-graphs": "bun scripts/check-public-graphs.ts"

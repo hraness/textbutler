@@ -1,6 +1,45 @@
 {
   "version": 1,
   "surfaces": {
+    "served:textbutler-macos-app": {
+      "kind": "served",
+      "retention": "persistent",
+      "owner": "scripts/macos-textbutler-app.ts",
+      "budget": { "maximumFileBytes": 536870912, "filesPerApp": 3 },
+      "note": "locally reproducible native supervisor, fixed Info.plist and signature resource; exact inventory and bounded artifact hashing; runtime payload remains separately installed"
+    },
+    "local:imessage-setup-binding": {
+      "kind": "authoritative",
+      "retention": "persistent",
+      "owner": "packages/textbutler/src/imessage-setup.ts",
+      "deletion": "docs/textbutler/local-data.md",
+      "budget": { "bytesPerBinding": 1024, "bindingsPerInstallation": 1 },
+      "note": "private write-once account and subject digests preserve first accepted identity across failed attempts; removed only with explicit settled installation data erasure"
+    },
+    "local:imessage-setup-launch": {
+      "kind": "derived",
+      "retention": "persistent",
+      "source": "explicit owner setup launch and exact installed app identity",
+      "owner": "scripts/macos-textbutler-app.ts",
+      "budget": { "bytesPerArtifact": 65536, "artifactsPerInstallation": 2 },
+      "note": "private launchd plist and custody record; exact completed launches remove their artifacts, uncertain launches remain for reconciliation"
+    },
+    "local:macos-app-installation": {
+      "kind": "derived",
+      "retention": "persistent",
+      "source": "verified installed runtime and native app artifacts",
+      "owner": "packages/textbutler/src/macos-app.ts",
+      "budget": { "receiptBytes": 65536, "receiptsPerInstallation": 1 },
+      "note": "private app identity and artifact pins; no message content or credentials; preserve mismatched identities for reviewed recovery"
+    },
+    "local:imessage-setup-results": {
+      "kind": "derived",
+      "retention": "persistent",
+      "source": "explicit owner iMessage setup attempts and connector settlement",
+      "owner": "packages/textbutler/src/imessage-setup.ts",
+      "budget": { "bytesPerResult": 8192, "archivedResults": 256, "latestResults": 1, "custodyMarkers": 1 },
+      "note": "private body-free progress and configuration digests; bounded archive stops new setup when full; uncertain custody is retained for reconciliation"
+    },
     "local:xcb-application-exchange": {
       "kind": "derived",
       "retention": "ephemeral",

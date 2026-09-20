@@ -16,8 +16,9 @@ proposals through its contact broker. This MIT-licensed package is a reference
 application for that API. Claude API is a separate billed choice; source-mode
 startup and the local installer do not supply its trusted runtime attestation.
 See [provider setup](PROVIDERS.md) before enabling a contact. Source and synthetic
-tests do not attest live delivery on a particular account. CLI and menu-bar use
-do not require a signed Mac release; windowed desktop app packaging has been removed.
+tests do not attest live delivery on a particular account. A minimal native
+TextButler.app hosts the verified runtime for app-specific macOS permissions.
+Local builds use an ad-hoc signature; they are not notarized public releases.
 
 ## First use
 
@@ -68,6 +69,8 @@ The menu companion uses the shared Rust runner; no local Rust build is needed.
   control and foreground daemon service, including bounded asynchronous read jobs.
 - `launch-agent.ts`: explicit per-user background-service install, status and
   uninstall, with exact artifact and loaded-service identity checks.
+- `macos-app.ts` and `native/textbutler-launcher.c`: a fixed-role native app
+  supervisor and verified installation identity for macOS permission ownership.
 
 The external xcb connection supplies the subscription execution path. The
 builder checks a reviewed composition receipt against its source inventory and

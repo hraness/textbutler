@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 import { initializeOwnerState } from "./control-service.ts";
 import { daemonSocketPath } from "./daemon.ts";
 import { acquireOwnerDatabase } from "./daemon-custody.ts";
+import { macosAppExecutable, macosLaunchGeneration, parseMacosAppIdentity, readInstalledMacosApp, type MacosAppIdentity } from "./macos-app.ts";
 
 export const LAUNCH_AGENT_LABEL = "app.textbutler.daemon";
 type LaunchAgentLabel = typeof LAUNCH_AGENT_LABEL;
 const MAX_BYTES = 65_536;
 type Phase = "prepared" | "installing" | "installed" | "removing" | "uncertain-install" | "uncertain-remove";
-type Receipt = { schemaVersion: 1 | 2; label: LaunchAgentLabel; uid: number; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string; phase: Phase; servicePid: number | null };
+type Receipt = { label: LaunchAgentLabel; uid: number; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string; phase: Phase; servicePid: number | null } & ({ schemaVersion: 1 | 2 } | { schemaVersion: 3; application: MacosAppIdentity });
 type FileSnapshot = { text: string; dev: number; ino: number };
 export type LaunchctlResult = { outcome: "completed" | "indeterminate"; exitCode: number | null; stdout: string; stderr: string };
 export interface LaunchAgentHost {
@@ -21,6 +22,8 @@ export interface LaunchAgentHost {
   readonly home: string;
   readonly runtime: string;
   readonly entrypoint: string;
+  /** Trusted installation reader: invalid app receipts must throw, never fall back. */
+  application?(dataDir: string): Promise<MacosAppIdentity | null>;
   /** Trusted host port. The lifecycle supplies only closed launchctl commands. */
   run(args: readonly string[]): Promise<LaunchctlResult>;
   processState(pid: number): "alive" | "dead" | "unknown";
@@ -56,6 +59,7 @@ export function isolatedBunInvocation(options: { home: string; runtime: string; 
     options.runtime, "--config=/dev/null", "--cwd=/", "--no-env-file", options.entrypoint, ...options.args] };
 }
 function argsFor(receipt: Receipt): readonly string[] {
+  if (receipt.schemaVersion === 3) return [macosAppExecutable(receipt.application), "--daemon"];
   // Keep the old bytes recognizable so an existing service can be removed
   // safely before replacing its startup contract.
   if (receipt.schemaVersion === 1) return ["/usr/bin/env", "-i", `HOME=${receipt.home}`, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", `TEXTBUTLER_LAUNCH_AGENT_GENERATION=${receipt.generation}`, receipt.runtime, "--no-env-file", receipt.entrypoint, "daemon", "run", "--data-dir", receipt.dataDir];
@@ -64,7 +68,8 @@ function argsFor(receipt: Receipt): readonly string[] {
 }
 function plistPath(home: string, label: LaunchAgentLabel = LAUNCH_AGENT_LABEL): string { return join(home, "Library", "LaunchAgents", `${label}.plist`); }
 function render(receipt: Receipt): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n<key>WorkingDirectory</key><string>${xml(receipt.schemaVersion === 1 ? receipt.dataDir : "/")}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>15</integer>\n<key>ProcessType</key><string>Background</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
+  const application = receipt.schemaVersion === 3 ? `<key>AssociatedBundleIdentifiers</key><array><string>${xml(receipt.application.bundleId)}</string></array>\n<key>EnvironmentVariables</key><dict><key>TEXTBUTLER_LAUNCH_AGENT_GENERATION</key><string>${receipt.generation}</string></dict>\n` : "";
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n${application}<key>WorkingDirectory</key><string>${xml(receipt.schemaVersion === 1 ? receipt.dataDir : "/")}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>${receipt.schemaVersion === 3 ? 60 : 15}</integer>\n<key>ProcessType</key><string>Background</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
 }
 
 function parseReceipt(text: string, host: LaunchAgentHost, dataDir: string): Receipt {
@@ -72,8 +77,13 @@ function parseReceipt(text: string, host: LaunchAgentHost, dataDir: string): Rec
   if (!item || typeof item !== "object" || Array.isArray(item)) fail("Invalid LaunchAgent receipt.");
   const r = item as Record<string, unknown>;
   const label = LAUNCH_AGENT_LABEL;
-  if (Object.keys(r).sort().join(",") !== "dataDir,entrypoint,generation,home,label,phase,runtime,schemaVersion,servicePid,uid" || r.schemaVersion !== 1 && r.schemaVersion !== 2 || r.label !== label || r.uid !== host.uid || r.home !== host.home || r.dataDir !== dataDir || typeof r.generation !== "string" || !/^[0-9a-f-]{36}$/u.test(r.generation) || !["prepared", "installing", "installed", "removing", "uncertain-install", "uncertain-remove"].includes(String(r.phase)) || r.servicePid !== null && (!Number.isSafeInteger(r.servicePid) || Number(r.servicePid) < 1 || Number(r.servicePid) > 2 ** 31 - 1)) fail("The LaunchAgent receipt does not match this owner and data directory.");
+  const keys = `${r.schemaVersion === 3 ? "application," : ""}dataDir,entrypoint,generation,home,label,phase,runtime,schemaVersion,servicePid,uid`;
+  if (Object.keys(r).sort().join(",") !== keys || r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 || r.label !== label || r.uid !== host.uid || r.home !== host.home || r.dataDir !== dataDir || typeof r.generation !== "string" || !/^[0-9a-f-]{36}$/u.test(r.generation) || !["prepared", "installing", "installed", "removing", "uncertain-install", "uncertain-remove"].includes(String(r.phase)) || r.servicePid !== null && (!Number.isSafeInteger(r.servicePid) || Number(r.servicePid) < 1 || Number(r.servicePid) > 2 ** 31 - 1)) fail("The LaunchAgent receipt does not match this owner and data directory.");
   path(r.home); path(r.dataDir); path(r.runtime); path(r.entrypoint);
+  if (r.schemaVersion === 3) {
+    const app = parseMacosAppIdentity(r.application);
+    for (const key of ["home", "dataDir", "runtime", "entrypoint"] as const) if (app[key] !== r[key]) fail("The recorded TextButler app does not match its service.");
+  }
   return r as unknown as Receipt;
 }
 async function readOwned(target: string, uid: number): Promise<FileSnapshot | null> {
@@ -131,7 +141,8 @@ function parseJob(result: LaunchctlResult, receipt: Receipt | null, host: Launch
   const lines = result.stdout.split("\n").map(line => line.trim());
   const field = (key: string): string | null => { const values = lines.filter(line => line.startsWith(`${key} = `)); return values.length === 1 ? values[0]!.slice(key.length + 3) : null; };
   const start = lines.indexOf("arguments = {"); const end = lines.indexOf("}", start + 1);
-  if (field("path") !== plistPath(host.home, label) || field("program") !== "/usr/bin/env" || start === -1 || end === -1 || JSON.stringify(lines.slice(start + 1, end)) !== JSON.stringify(argsFor(receipt))) return unknown;
+  if (field("path") !== plistPath(host.home, label) || field("program") !== argsFor(receipt)[0] || start === -1 || end === -1 || JSON.stringify(lines.slice(start + 1, end)) !== JSON.stringify(argsFor(receipt))) return unknown;
+  if (receipt.schemaVersion === 3 && macosLaunchGeneration(result.stdout) !== receipt.generation) return unknown;
   const pidText = field("pid"); const pid = pidText !== null && /^[1-9][0-9]*$/u.test(pidText) ? Number(pidText) : null;
   if (pid !== null && (!Number.isSafeInteger(pid) || pid > 2 ** 31 - 1)) return unknown;
   return { state: "owned", running: field("state") === "running" && pid !== null, pid };
@@ -152,7 +163,9 @@ async function runLaunchctl(args: readonly string[]): Promise<LaunchctlResult> {
   } catch { child.kill("SIGKILL"); await child.exited; return { outcome: "indeterminate", exitCode: null, stdout: "", stderr: "" }; }
 }
 export function defaultLaunchAgentHost(entrypoint?: string): LaunchAgentHost {
-  return { platform: process.platform, uid: process.getuid?.() ?? -1, home: homedir(), runtime: process.execPath, entrypoint: entrypoint ?? fileURLToPath(new URL("cli.ts", import.meta.url)), run: runLaunchctl,
+  const identity = { home: homedir(), runtime: process.execPath, entrypoint: entrypoint ?? fileURLToPath(new URL("cli.ts", import.meta.url)) };
+  return { platform: process.platform, uid: process.getuid?.() ?? -1, ...identity, run: runLaunchctl,
+    application(dataDir) { return readInstalledMacosApp({ ...identity, dataDir }); },
     processState(pid) { try { process.kill(pid, 0); return "alive"; } catch (error) { return (error as NodeJS.ErrnoException).code === "ESRCH" ? "dead" : "unknown"; } } };
 }
 
@@ -204,13 +217,16 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
       supported(); path(host.home); path(dataDir); path(host.runtime); path(host.entrypoint); daemonSocketPath(dataDir);
       await directory(host.home, host.uid, false); await directory(join(host.home, "Library"), host.uid, true); await directory(dirname(plist), host.uid, true);
       await executable(host.runtime, host.uid, true); await executable(host.entrypoint, host.uid, false);
+      const application = await host.application?.(dataDir) ?? null;
+      if (application) { parseMacosAppIdentity(application); if (application.automationConsent !== "native-api") fail("Synthetic app consent cannot authorize an installed service."); for (const key of ["home", "runtime", "entrypoint"] as const) if (application[key] !== host[key]) fail("The installed app belongs to another runtime or entrypoint."); if (application.dataDir !== dataDir) fail("The installed app belongs to another data directory."); }
       await initializeOwnerState(dataDir);
       return await locked(dataDir, async () => {
         const state = await inspect(dataDir);
         if (state.job.state === "unknown") fail("Existing LaunchAgent service ownership cannot be verified.");
-        let receipt = state.receipt ?? { schemaVersion: 2, label, uid: host.uid, home: host.home, dataDir, runtime: host.runtime, entrypoint: host.entrypoint, generation: randomUUID(), phase: "prepared", servicePid: null } satisfies Receipt;
+        let receipt: Receipt = state.receipt ?? { ...(application ? { schemaVersion: 3 as const, application } : { schemaVersion: 2 as const }), label, uid: host.uid, home: host.home, dataDir, runtime: host.runtime, entrypoint: host.entrypoint, generation: randomUUID(), phase: "prepared", servicePid: null };
         if (receipt.schemaVersion === 1) fail("The recorded service uses the previous startup contract. Uninstall it, then install again to apply startup isolation; owner settings are retained.");
         if (receipt.runtime !== host.runtime || receipt.entrypoint !== host.entrypoint) fail("The installed LaunchAgent uses another runtime or entrypoint. Uninstall it before changing its launch identity.");
+        if (JSON.stringify(receipt.schemaVersion === 3 ? receipt.application : null) !== JSON.stringify(application)) fail("The installed LaunchAgent uses another app identity. Uninstall it before changing its launch identity; owner settings are retained.");
         if (state.job.state === "owned") {
           if (!state.installed || !state.stored) fail("The loaded service is missing its exact installation artifacts.");
           if (["removing", "uncertain-remove"].includes(receipt.phase)) fail("A previous removal is still uncertain; do not race it with another operation.");

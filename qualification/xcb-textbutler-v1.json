@@ -14,10 +14,14 @@
   },
   "sources": {
     "bun.lock": "2e6c9ea2aea734cb83423858a2118893a4561bac0030b365a1740411ace37c55",
-    "package.json": "64af9f5be9c4792513be2dbcdcb3c867fe7b9f5172973233d4d1239057fdead2",
+    "package.json": "0a169d2cbdc675ee5cb12347eb6d22aed17d5d1fa0639873c167f1f045d921d0",
+    "packages/textbutler/src/cli.ts": "98c6e39b3b354fa59b36393bf70c15dc58bbf32cb23e08ecb1da222f20318dec",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
     "packages/textbutler/src/daemon.ts": "912b55671579faa7f62fe5acc3b08fac97df0c1ea3292ccafdac815896336eb5",
     "packages/textbutler/src/host-config.ts": "ca3215291f3e50383057a3218fe8f5bc8cb477956d28fffcdf2d78c53e3d05ad",
+    "packages/textbutler/src/imessage-setup.ts": "137fa641ad8a7058912c82d2faf067c73a9366492a3b1ef28c16b587ce676822",
+    "packages/textbutler/src/launch-agent.ts": "16d63e713691a236071da04a77b348106ee2d822a586d0519d07a988bb59b589",
+    "packages/textbutler/src/macos-app.ts": "7b6635763f7f3ca70609d5a2398e3a6f17d33f70a12664f1e8b4507f5a2004b9",
     "packages/textbutler/src/native-subscription.ts": "fcda298612c835dd673086de977a21e10a7e14ea1a409c881906460f245e5cab",
     "packages/textbutler/src/native-task.ts": "e2a3f5ebb1586700af67f540273b5c4c6c0a33c4415a139693d6ca6d0f6dcaf6",
     "packages/textbutler/src/provider-host.ts": "ae0ad4f052aa6cd065772c2dcfecff355296b20519b03ba38cb9a2c7978a5813",
@@ -29,10 +33,10 @@
     "packages/textbutler/src/xcb-host.ts": "b13fcc1ee830da5b96cc05f39741c01aac12e3284fe3098a9b6bdac3bd3583c8",
     "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
     "scripts/build-textbutler.ts": "22a207a92da457eb5a09badbd57ea98298657d89bfb447cffa079de7ab6f2271",
-    "scripts/xcb-integration-admission.ts": "8dde667b6c63837c1189ca120ba37737a91f58eb0e4d323d866e5114bf7241e3"
+    "scripts/xcb-integration-admission.ts": "d043330b00e17f9a91b48078db49fcb156aa0fec5e44f014a0c1ab2ca9226836"
   },
   "validation": {
     "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts",
-    "receiptSha256": "5385945f1d6efa287601578200822761598884de83cb5873fc881d52a251f7c4"
+    "receiptSha256": "24c2109e81107fb0dbd481990469312b7a0536f77c43a7236b935c398b64f9c7"
   }
 }

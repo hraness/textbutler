@@ -6,8 +6,12 @@ Textbutler, a macOS message-butler daemon and menu companion at `textbutler.app`
 The historical constraints below continue to govern the legacy `src/`, `dist/`,
 published message contracts, and their existing release machinery. They do not
 prohibit the explicitly requested new runtime in `packages/` and the menu
-companion adapter that drives the shared desktop-foundation runner. Desktop
-apps, signing, and notarization are outside the current product scope.
+companion adapter that drives the shared desktop-foundation runner. The owner
+also authorized a minimal native TextButler.app supervisor so macOS can grant
+Messages access to TextButler itself. Its fixed roles launch only the verified
+runtime, daemon, menu companion, or owner-invoked iMessage setup. Preserve exact
+payload and lifecycle identity checks. Public Developer ID signing and
+notarization remain outside this local installation scope.
 
 - New agents receive only one contact's brokered files, bounded public web
   requests, and recipient-bound proposed messaging actions. Never enable shell,
