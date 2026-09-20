@@ -342,7 +342,9 @@ export function parseControlResponse(value: unknown): ControlResponse {
     || snapshot.providerAccounts && new Set(snapshot.providerAccounts.map(account => account.id)).size !== snapshot.providerAccounts.length) throw new Error("Duplicate identity in control response.");
   for (const account of snapshot.providerAccounts ?? []) {
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(account.id) || account.provider !== (account.route === "codex" ? "codex" : "claude")) throw new Error("Invalid provider account identity.");
-    if (account.status === "ready" && (account.route !== "claude-api" || !account.classifierModel || !account.defaultReplyModel)) throw new Error("Invalid provider readiness.");
+    // Qualified native subscription hosts use the same diagnostic contract.
+    // Readiness is admitted by the host; the wire still requires both models.
+    if (account.status === "ready" && (!account.classifierModel || !account.defaultReplyModel)) throw new Error("Invalid provider readiness.");
     if (account.managedAccount && (account.route !== "codex" || account.status === "ready" || account.managedAccount.state !== "signed-in" && account.managedAccount.modelCount !== 0)) throw new Error("Invalid managed account readiness.");
     if (account.managedAccount?.pendingLoginId != null && !/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(account.managedAccount.pendingLoginId)) throw new Error("Invalid managed login identity.");
   }
