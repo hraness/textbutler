@@ -6,12 +6,25 @@ import type { XcbHostConfig } from "./host-config.ts";
 import { createNativeSubscriptionHost, type NativeSubscriptionAccount, type NativeSubscriptionHost } from "./native-subscription.ts";
 import { createNativeTaskAdapter, type NativeTaskController } from "./native-task.ts";
 import { bundledXcbIntegrationAdmission, validXcbIntegrationAdmission, type XcbIntegrationAdmission } from "./xcb-integration.ts";
-import { createXcbClient, parseXcbJson, XcbNotStarted, type XcbAccount, type XcbCapabilities, type XcbClient, type XcbResult } from "./xcb-client.ts";
+import { createXcbClient, parseXcbJson, XcbCapabilitiesError, XcbNotStarted, type XcbAccount, type XcbCapabilities, type XcbCapabilityFailure, type XcbClient, type XcbResult } from "./xcb-client.ts";
 
 const sha = (input: unknown): string => createHash("sha256").update(JSON.stringify(input)).digest("hex");
 const localId = (provider: "claude" | "codex"): NativeSubscriptionAccount => provider === "claude" ? "native-claude-code" : "native-codex";
 const controls = Object.freeze({ noCommandTools: true, exactToolInventory: true, workspaceReadIsolation: true,
   workspaceWriteIsolation: true, isolatedConfiguration: true, authOutsideWorkspace: true, hostBrokerOnly: true } as const);
+const CAPABILITY_FAILURE_DETAILS: Readonly<Record<XcbCapabilityFailure, string>> = Object.freeze({
+  "executable-changed": "XCB's executable no longer matches its pinned file. Review the configured installation before checking again.",
+  "executable-unsafe": "XCB's executable has unsupported ownership, permissions or file properties. Review the configured installation.",
+  "executable-unavailable": "XCB's configured executable could not be read and verified. Check that the installation is accessible to TextButler.",
+  "not-started": "XCB's capability process could not start. Check that the configured executable can run from TextButler.",
+  "timeout": "XCB's capability check exceeded its 90-second deadline. Check XCB's application API before trying again.",
+  "io": "XCB's capability process had an input or output error. Check XCB's application API before trying again.",
+  "exit": "XCB's capability process exited unsuccessfully. Check XCB's application API before trying again.",
+  "output-limit": "XCB's capability output exceeded TextButler's limits. Check that the installed application API is compatible.",
+  "invalid-json": "XCB's capability response was not valid bounded UTF-8 JSON. Check that the installed application API is compatible.",
+  "invalid-schema": "XCB's capability response did not match the required application API schema. Check that the installed versions are compatible.",
+});
+const UNKNOWN_CAPABILITY_FAILURE = "XCB could not be verified. Check its pinned executable and application API, then check this account again.";
 
 /** Each XCB invocation owns its provider descendants. A signal or wrapper exit
  * never becomes stop evidence: every started invocation must return XCB's
@@ -66,7 +79,7 @@ export async function createXcbSubscriptionHost(config: XcbHostConfig,
   dependencies: { client?: XcbClient; now?: () => number; integration?: XcbIntegrationAdmission } = {}): Promise<NativeSubscriptionHost> {
   const client = dependencies.client ?? createXcbClient(config), now = dependencies.now ?? Date.now;
   const integration = dependencies.integration ?? bundledXcbIntegrationAdmission();
-  let capabilities: XcbCapabilities | undefined, failure = false;
+  let capabilities: XcbCapabilities | undefined, failure: string | undefined;
   let refreshedAt = -Infinity, refreshing: Promise<void> | undefined;
   const shutdown = new AbortController();
   const observed = (account: XcbHostConfig["accounts"][number]): XcbAccount | undefined =>
@@ -79,8 +92,9 @@ export async function createXcbSubscriptionHost(config: XcbHostConfig,
   }
   async function refresh(signal: AbortSignal): Promise<void> {
     const task = refreshing ??= (async () => {
-      try { capabilities = await client.capabilities(AbortSignal.any([signal, shutdown.signal])); failure = false; }
-      catch { capabilities = undefined; failure = true; }
+      try { capabilities = await client.capabilities(AbortSignal.any([signal, shutdown.signal])); failure = undefined; }
+      catch (error) { capabilities = undefined; failure = error instanceof XcbCapabilitiesError && Object.hasOwn(CAPABILITY_FAILURE_DETAILS, error.code)
+        ? CAPABILITY_FAILURE_DETAILS[error.code] : UNKNOWN_CAPABILITY_FAILURE; }
       finally { refreshedAt = now(); }
     })();
     try { await task; } finally { if (refreshing === task) refreshing = undefined; }
@@ -124,7 +138,7 @@ export async function createXcbSubscriptionHost(config: XcbHostConfig,
       status: ready ? "ready" : a && !a.connected ? "setup-required" : "unavailable",
       detail: ready ? "XCB subscription connection is ready. Textbutler controls contact access and reply approval."
         : !validXcbIntegrationAdmission(integration) ? "Install a Textbutler bundle with reviewed XCB contact-profile evidence. Source integrity alone does not admit AI replies."
-          : failure ? "XCB could not be verified. Check its pinned executable and application API, then check this account again."
+          : failure ? failure
           : !a ? "The configured XCB account was not found. Check the account binding in setup."
             : a.busy ? "This XCB account is busy or needs custody recovery."
               : !a.connected ? "Sign in to this account in XCB, then check it here again."

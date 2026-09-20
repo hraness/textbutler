@@ -5,20 +5,20 @@
   "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts",
   "result": {
     "exitCode": 0,
-    "passed": 190,
+    "passed": 197,
     "failed": 0,
-    "assertions": 1223,
+    "assertions": 1298,
     "files": 15
   },
   "additionalChecks": [
     {
       "command": "bun node_modules/typescript/bin/tsc --noEmit -p packages/textbutler/tsconfig.json",
       "exitCode": 0,
-      "evidence": "Observed HRA-scheduled tool completion with exit 0 and no compiler diagnostics; the retained log below covers the focused test command."
+      "evidence": "Observed HRA-scheduled tool completion for the exact current 50-input snapshot with exit 0 and no compiler diagnostics; the retained log below covers the focused test command."
     }
   ],
   "sourceInventoryCount": 28,
-  "sourceDigest": "cab2096a4f40a286c582424b341b13ebf74ef99320127afa8d8ee6aff5e85e4d",
+  "sourceDigest": "f0adf466ff0ba960bc87c1f483f178627239090b5b976e8018bdabd29be754d9",
   "testSources": {
     "packages/textbutler/src/control-service.test.ts": "716e3a188f395a5866e05bfbd5ae236ff619aad5de6dc3d4e8c6bc7cc1a61e2b",
     "packages/textbutler/src/imessage-setup.test.ts": "137fac2aa7ce9933d64f487c67c2d8843ce89757d83970aabad5193622586bfd",
@@ -32,8 +32,8 @@
     "packages/textbutler/src/routed-agent.test.ts": "0232fbfab4b1f7eafc3e928fbc4ad7443d45073677b21f2e33a76806ed78a2be",
     "packages/textbutler/src/runtime.test.ts": "c45d9edb6a7b7cb2315ad808bf4b534a5f0e135267a559cf7589f1cc05c05e09",
     "packages/textbutler/src/workspace.test.ts": "dd7782f94a0d2c91cea80bd374c10ee95c41373203af290c6154a61d568dfd13",
-    "packages/textbutler/src/xcb-client.test.ts": "81e42eefb23e3c6e14060f8273604e7cc4d061dc1585129659d445d29e965531",
-    "packages/textbutler/src/xcb-host.test.ts": "a2de90658af6b69c15fbe99120ecf0dfe89ba82ad8ba3d5bd16cbc6838ee21b0",
+    "packages/textbutler/src/xcb-client.test.ts": "46aa882ce616e84e823514f9fbc5a4a9c924b8ac29ec4d804dd4ba8bb7e29418",
+    "packages/textbutler/src/xcb-host.test.ts": "2b0a5a41236edf44b4a1ee049c5245bd53df1f708d966113726daee9175969c6",
     "scripts/xcb-integration-admission.test.ts": "e567b1e06d2900b15e37cc8ba634cdb14dc35948dee8d01c63992626f87234ee"
   },
   "typeInputs": {
@@ -41,10 +41,10 @@
     "packages/textbutler/tsconfig.json": "639cd9738fe64eb0f069f295a3ca5d6a9ec123aff8d8e1c63d288d128865c87b",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "086e90e9064daaf652147734634f8db8a7b6de477da3f66d025c227709490390",
+  "logSha256": "d394ae67f7203bc648e01cc59b74f0786d06bca255aa1757f80b64e5332d6018",
   "logScope": "Actual stdout and stderr retained by the compact-output runner for the expanded 15-file synthetic composition test invocation; host scheduler output is outside this log.",
   "review": {
-    "method": "Independent client/host and setup reviews; independent integration-owner review of owner history, summary dispatch, rich composition and build admission; independent CLI, no-tool summary and media-import boundary review. Independent exact-version setup admission and documentation review for the Ghostget 0.18.19 pin.",
+    "method": "Independent client/host and setup reviews; independent integration-owner review of owner history, summary dispatch, rich composition and build admission; independent CLI, no-tool summary and media-import boundary review. Independent exact-version setup admission and documentation review for the Ghostget 0.18.19 pin. Independent review of the capability-only XCB diagnostic codes and 90-second discovery deadline, followed by the complete 15-file composition suite and TextButler typecheck.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -77,6 +77,16 @@
           "docs/textbutler/ghostget-contract.md"
         ],
         "result": "Exact Ghostget 0.18.19 package admission remains before child launch and setup custody; snapshots require the same version. Synthetic cases reject 0.18.16, 0.18.17 and 0.18.18 before launch and reject older snapshots before permission grants. Documentation preserves separate live-verification requirements. All 50 source, test, type and reviewed documentation inputs were unchanged across this validation."
+      },
+      {
+        "reviewerRole": "Independent XCB client/host composition reviewer, separate from diagnostics implementation",
+        "files": [
+          "packages/textbutler/src/xcb-client.ts",
+          "packages/textbutler/src/xcb-client.test.ts",
+          "packages/textbutler/src/xcb-host.ts",
+          "packages/textbutler/src/xcb-host.test.ts"
+        ],
+        "result": "Reviewed fixed allowlisted diagnostics without process output, account data or error causes; first stop cause retention rejects late valid JSON after timeout; output limits and unknown-reason fallback remain bounded; generation deadlines and custody remain unchanged. Synthetic timer injection proves the configured 90-second discovery policy without waiting 90 seconds or claiming live performance. Current qualification, exact executable, account and model gates remain mandatory. All 50 retained source, test, type and documentation inputs were unchanged across 197 tests, 1298 assertions and a successful package typecheck."
       }
     ],
     "findingsResolved": [
@@ -91,7 +101,9 @@
       "Keep owner history and summary samples bounded with explicit omissions and exact recipient revalidation",
       "Share current capability, target, asset and review-digest checks across suggested and explicitly composed rich drafts",
       "Reject NUL summary output before it can become an unreadable completed control job",
-      "Reject Ghostget 0.18.18 before native setup launch and require an exact 0.18.19 capability snapshot before permission grants"
+      "Reject Ghostget 0.18.18 before native setup launch and require an exact 0.18.19 capability snapshot before permission grants",
+      "Expose bounded allowlisted XCB capability failures without raw child output or untrusted error messages",
+      "Keep capability discovery within a fixed 90-second deadline plus 15-second cleanup while preserving generation settlement and first timeout or output-limit failure"
     ],
     "remaining": "The synthetic 0.18.19 fixture proves exact version admission and rejection behavior, not the actual Ghostget release or its protected-folder startup fix. Native app execution, macOS permissions, exact XCB executable/provider admission, account/recipient verification and live messaging behavior are separate evidence; this receipt makes no live-provider or delivery claim."
   }
