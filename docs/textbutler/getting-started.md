@@ -4,11 +4,12 @@ Textbutler is a local Mac assistant for selected conversations. Start with its
 inbox and replies you write yourself. Automatic replies stay paused until you
 choose a ready agent and explicitly enable a contact.
 
-**Current limit:** the source CLI supports messaging setup, conversation
-selection, inbox review and explicit typed replies. It does not include a
-qualified AI reply engine. Codex and Claude Code are unavailable; Claude API
-requires a reviewed compiled runtime supplied by a trusted host. A signed-in
-coding agent alone does not make suggestions or automatic replies available.
+AI replies require a verified Textbutler bundle with reviewed composition
+admission and use a separately installed [xcb](https://github.com/hraness/xcb)
+native runtime and an explicitly connected subscription account. This local
+pilot requires current xcb admission and a successful account check. Installation
+does not enable replies, and live messaging still needs verification with your
+chosen recipient. Claude API retains a separate trusted runtime admission gate.
 
 ## Open the guided terminal
 
@@ -26,18 +27,25 @@ bun run textbutler:install
 ~/.local/bin/textbutler
 ```
 
-The installer builds a self-contained local pilot and verifies its contents
-and exact Bun runtime before use. It starts no services and connects no accounts.
+The installer builds a self-contained local pilot, checks the reviewed
+composition receipt against current source and contact profiles, and verifies
+its contents and exact Bun runtime before use. Missing or stale composition
+evidence blocks the build. Source daemon startup carries no such admission and
+keeps subscription inference unavailable. It starts no services and connects no accounts.
 An existing, different `textbutler` command is preserved. This is a local build,
-not a signed public release; its AI engine remains unavailable. Keep the same
-Bun runtime installed. For a later build, use a separate `--prefix` and stop the
-old services before switching; automatic upgrades are not supported yet.
+not a signed public release. Connect xcb separately for AI replies. Keep the same
+Bun runtime installed. To upgrade a verified existing installation, stop its
+services and run `bun run textbutler:install --upgrade`. The installer checks
+the existing launcher and complete installed version, preserves them for
+rollback, and atomically switches the command. It never replaces an unrelated
+command or changes your settings. Restart the installed daemon afterward.
 
 The terminal has numbered actions for setup, app connections, conversations,
 replies, contacts, pause and the menu bar. Enter goes back from a selection;
 `q` or Ctrl-C closes the terminal. It does not stop an installed background
 service. Commands below use `bun run textbutler`; the help abbreviates that
-prefix to `textbutler`.
+prefix to `textbutler`. You can use `~/.local/bin/textbutler` for these commands.
+Use the installed terminal when setting up daemon startup for AI replies.
 
 Choose **Setup & readiness** first. It creates private settings and points you
 to messaging setup. After saving your connections, return to **Setup & readiness**
@@ -82,12 +90,52 @@ foreground service or uninstall its login entry, review private
 `state/host.json`, then restart or reinstall the service. Uninstall retains your
 settings, contact memory and activity.
 
-For foreground use, run `bun run textbutler daemon run` in another terminal.
-For login startup, use `bun run textbutler daemon install`. Keep the checkout at
-its current path while the source service is installed.
+For foreground use with AI, run `~/.local/bin/textbutler daemon run` in another
+terminal. For login startup, use `~/.local/bin/textbutler daemon install`. Use
+your chosen installation prefix if different. Source daemon commands remain
+available for the manual pilot; keep that checkout at its current path while a
+source service is installed.
 
 See [messaging app support](messaging-apps.md) for Beeper limitations and native
 alternatives, including requirements that affect Telegram AI processing.
+
+## Connect your AI subscription
+
+Install an xcb native build with `generate` support and follow its
+[account setup](https://github.com/hraness/xcb#native-xcb). Sign in through xcb,
+then use `xcb accounts` and `xcb models` to obtain the exact account ID and full
+model key. Credentials remain in xcb's private state.
+
+With the Textbutler daemon stopped, connect that installation:
+
+```sh
+bun run textbutler setup \
+  --xcb /absolute/path/to/xcb \
+  --xcb-state /absolute/path/to/xcb-state \
+  --xcb-account claude:ACCOUNT_ID \
+  --xcb-model FULL_MODEL_KEY
+```
+
+For Codex, use `--xcb-account codex:ACCOUNT_ID` and a matching observed model.
+Repeat setup to add a second account. The command pins the executable bytes and
+explicit routing; it does not activate a contact. Setup refuses changes to an
+existing binary or account/model binding. After an xcb upgrade, stop the daemon
+and review its private `state/host.json` binding before updating the executable
+digest. Retain account and custody state.
+
+Start or restart the installed daemon, then check the account:
+
+```sh
+bun run textbutler providers list
+bun run textbutler providers check TEXTBUTLER_ACCOUNT_ID
+bun run textbutler doctor
+```
+
+Use the account ID returned by `providers list`. This checks xcb's current
+capabilities and admission without making a model turn. Resolve any unavailable
+or recovery status before asking for an unsent suggestion. See the
+[subscription connection](native-subscription.md) for the execution and custody
+contract. Source and bundle integrity checks alone do not qualify an AI provider.
 
 ## Add one conversation and try the inbox
 
@@ -100,7 +148,7 @@ selected conversations. Choose **Type a reply**, review the recipient and the
 complete disclosed text, then type `send` if you want to send it. This path does
 not require an AI account. Leaving the review sends nothing.
 
-If a qualified agent becomes available, choose it under **Manage a contact**.
+After the connected agent passes its readiness check, choose it under **Manage a contact**.
 A suggestion is an unsent draft. Review every action before sending. The CLI
 supports the same review:
 

@@ -64,6 +64,9 @@ describe("owner CLI entrypoint", () => {
     expect(help.lines.join("")).toContain("replies show DRAFT");
     expect(help.lines.join("")).toContain("replies send DRAFT DIGEST");
     expect(help.lines.join("")).toContain("contacts add CANDIDATE [--history]");
+    expect(help.lines.join("")).toContain("--xcb-account PROVIDER:ACCOUNT");
+    expect(help.lines.join("")).toContain("--xcb-model PROVIDER/MODEL[/EFFORT]");
+    expect(help.lines.join("")).toContain("providers check native-codex");
   });
   test("contact controls and pause use the running owner daemon", async () => {
     const dataDir = await root();

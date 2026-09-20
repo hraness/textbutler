@@ -37,10 +37,12 @@ test('renders Textbutler with the shared grammar and honest development status',
   expect(html).toContain('See what’s ready');
   expect(html).toContain('New installations start paused');
   expect(html).toContain('iMessage and WhatsApp');
-  expect(html).toContain('Claude Code and Codex remain unavailable');
+  expect(html).toContain('can connect Claude Code or Codex subscriptions through xcb');
   expect(html).toContain('It is billed separately from a Claude Code subscription');
   expect(html).toContain('no AI account');
-  expect(html).toContain('The source CLI has no qualified AI reply engine');
+  expect(html).toContain('The source daemon has no composition admission and keeps AI replies unavailable');
+  expect(html).toContain('no provider tools');
+  expect(html).toContain('MIT-licensed reference application');
   expect(html).toContain('Live delivery and rich actions still need verification on your account.');
   expect(html).toContain('No windowed app download is provided');
   expect(html).toContain(`Message Like Me v${SOFTWARE_VERSION}`);
@@ -128,10 +130,12 @@ test('admits the released finite marketing snapshot and scopes it to the landing
   expect(html).toContain('hraness-material-pane');
 });
 
-test('keeps machine-readable setup and unavailable choices consistent with the landing', async () => {
+test('keeps machine-readable setup and conditional subscription admission consistent with the landing', async () => {
   const discovery = await getDiscoveryText().text();
   expect(discovery).toContain('New installations start paused and new contacts start disabled.');
-  expect(discovery).toContain('native Claude Code and Codex remain unavailable');
+  expect(discovery).toContain('can connect Claude Code or Codex through xcb only from a verified installed Textbutler bundle');
+  expect(discovery).toContain('independent Textbutler contact-profile evidence must be current');
+  expect(discovery).toContain('The source daemon remains unadmitted');
   expect(discovery).toContain('Textbutler CLI and menu companion source is available; there is no published Textbutler package or windowed app download.');
   expect(discovery).toContain('App Clips, mini apps, and Linq integration remain unavailable.');
   expect(discovery).toContain('Live delivery still needs verification on the selected account.');
@@ -144,12 +148,15 @@ test('offers guided source setup without implying a released AI engine or menu s
   for (const content of [home, about, discovery]) {
     expect(content).toContain(GETTING_STARTED_URL);
     expect(content).toContain('compiled runtime');
+    expect(content).toContain('reviewed composition evidence');
+    expect(content).toContain('source daemon');
+    expect(content).toContain('https://github.com/hraness/xcb');
     expect(content).toContain('prebuilt');
     expect(content).not.toContain('Claude API is available after setup');
     expect(content).not.toContain(`${GITHUB_URL}/tree/main/apps/macos`);
   }
   expect(home).toContain('Start guided setup');
-  expect(home).toContain(`${GITHUB_URL}/blob/main/packages/textbutler/src/menubar.ts`);
+  expect(home).toContain(`${GITHUB_URL}/blob/main/docs/textbutler/native-subscription.md`);
   expect(home).toContain('Clearing all three sends plain text');
   expect(discovery).toContain('replies show DRAFT');
   expect(discovery).toContain('replies send DRAFT DIGEST');

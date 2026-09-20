@@ -11,7 +11,8 @@ export interface DistributionManifest {
   runtime: { version: "1.3.14"; sha256: string; platform: string; arch: string };
   lockfileSha256: string; inputsDigest: string;
   files: Record<DistributionFile, { sha256: string; bytes: number }>;
-  providerAdmission: "unavailable";
+  /** Distribution capability only; an external host must admit each provider. */
+  providerAdmission: "unavailable" | "external-xcb";
 }
 export const sha256 = (bytes: string | Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 const digest = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
@@ -19,7 +20,7 @@ export function parseDistributionManifest(input: unknown): DistributionManifest 
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Invalid Textbutler distribution manifest.");
   const m = input as DistributionManifest;
   if (Object.keys(m).sort().join(",") !== "files,inputsDigest,kind,lockfileSha256,product,providerAdmission,runtime,schemaVersion,version"
-    || m.schemaVersion !== 1 || m.product !== "textbutler" || m.kind !== "local-pilot" || m.providerAdmission !== "unavailable"
+    || m.schemaVersion !== 1 || m.product !== "textbutler" || m.kind !== "local-pilot" || !["unavailable", "external-xcb"].includes(m.providerAdmission)
     || !digest(m.version) || !digest(m.lockfileSha256) || !digest(m.inputsDigest)
     || !m.runtime || Object.keys(m.runtime).sort().join(",") !== "arch,platform,sha256,version"
     || m.runtime.version !== "1.3.14" || !digest(m.runtime.sha256) || !["darwin", "linux"].includes(m.runtime.platform) || !["arm64", "x64"].includes(m.runtime.arch)

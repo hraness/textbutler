@@ -14,12 +14,12 @@ remain visible in setup and must be resolved before that claim is made.
 | First use | Guided terminal, actionable readiness, additive configuration, paused defaults | First-run testing with real owner-selected accounts and permissions |
 | Menu bar | Shared native Rust runner; setup, connections, contact controls, bounded menus and recoverable jobs | Confirm native lifecycle on each supported macOS release |
 | Reply review | Complete ordered action review, recipient/context digest, attachment byte verification; typed preview revision checks | Agreed-recipient live delivery and takeover tests |
-| Agent execution | Source and local pilot expose no qualified default AI engine. The [native subscription route](native-subscription.md) supplies the Codex and Claude Code boundary, protocols and admission checks, with no launcher and no qualification | Reviewed runtime provenance for API execution, or a confined native supervisor with exact installed-runtime evidence and both classifier and reply profile evidence |
+| Agent execution | Verified bundle requires reviewed Textbutler composition admission; [external xcb subscription connection](native-subscription.md), with an explicit executable pin, private state, account and model; no default account or automatic activation | Exact xcb build/provider admission, both classifier and reply checks, and authenticated live inference on the selected account; Claude API still requires separate trusted runtime admission |
 | iMessage | Existing native Ghostget connection | Current account permissions and live transport qualification |
 | WhatsApp | Existing Ghostget linked-device connection and explicit sync | Current linked-device identity, sync and live transport qualification |
 | Beeper | Direct text conversations through Ghostget 0.18.14+; independent connection checks | Current Desktop API/account setup, canonical pending-send reconciliation, and edit/delete observation coverage |
 | Uncertain sends | Journal preserves intent and blocks further sends | Owner reconciliation using durable upstream run/message identity; no blind retry |
-| Distribution | Local integrity-checked bundle and inert installer | Signed/public release provenance, upgrade qualification and provider-specific admission |
+| Distribution | Local integrity-checked bundle and inert installer; `external-xcb` capability keeps provider execution in separately configured xcb | Signed/public release provenance, upgrade qualification and provider-specific admission; artifact hashes do not attest providers |
 
 ## Interface direction
 
@@ -31,24 +31,26 @@ All permission, account, contact, grant and dispatch checks remain in the daemon
 The native menu already uses the shared Rust desktop foundation. A new Rust
 runtime is not required to make these controls usable. If the terminal grows
 into a full-screen workspace, XCB's Ratatui/Crossterm interface is an appropriate
-reference. Reusing its constrained agent execution requires a published adapter
-and qualification contract; launching its CLI with inherited tools or sessions
-would not provide that boundary.
+reference. The subscription connection uses xcb's dedicated zero-tool `generate`
+contract. It does not use the workspace coding command or inherit its tools and
+sessions.
 
 ## Agent execution direction
 
-The selected direction is the Codex and Claude Code applications an owner
-already runs, rather than a separately billed API key. Those applications are
-used as inference components with no tools of their own: they propose one
-operation at a time, and Textbutler's existing contact-scoped broker decides
-whether to perform it. The source now carries that boundary, both provider
-protocols and their admission checks.
+The verified bundle connects to an explicitly selected xcb installation after
+its build checks reviewed composition evidence against current source bytes and
+both contact profiles. A source daemon has no embedded admission and keeps
+subscription inference unavailable. xcb handles
+Claude Code or Codex subscription authentication, confinement and provider
+custody. Textbutler uses zero-tool generation, parses one operation proposal at
+a time and applies its contact-scoped broker policy before any effect.
 
-The route ships disabled. It contains no process launcher and no qualification
-evidence, so native accounts report unavailable and explain why. Neither a
-matching build hash nor a signed-in account is qualification. The
-[native subscription route](native-subscription.md) lists the supervisor,
-runtime-evidence, per-purpose profile and live-account requirements that remain.
+Accounts are unavailable until configured and checked; contacts remain disabled
+until explicitly enabled. No provider qualification is manufactured by setup,
+the installer or a matching hash. The [subscription guide](native-subscription.md)
+explains this reusable application contract and its separate runtime and live
+acceptance requirements. Textbutler's MIT source serves as an xcb reference
+application; publication does not establish unattended operational readiness.
 
 ## Messaging expansion
 

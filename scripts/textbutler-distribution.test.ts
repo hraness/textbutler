@@ -11,7 +11,7 @@ async function chmodTree(root: string): Promise<void> {
   await chmod(root, 0o700);
   for (const entry of await readdir(root, { withFileTypes: true })) if (entry.isDirectory()) await chmodTree(join(root, entry.name));
 }
-async function fixture() {
+async function fixture(providerAdmission: DistributionManifest["providerAdmission"] = "unavailable") {
   const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-distribution-")); roots.push(root);
   const from = join(root, "build"), prefix = join(root, "install with spaces");
   await mkdir(from, { mode: 0o700 });
@@ -19,7 +19,7 @@ async function fixture() {
   const runtime = Buffer.from('process.stdout.write("synthetic-import\\n"); export async function runInstalledCli(args, entrypoint) { process.stdout.write(JSON.stringify({args, entrypoint}) + "\\n"); return 0; }');
   const lockfileSha256 = sha256("synthetic lock"), inputsDigest = sha256("synthetic inputs");
   const files = new Map<DistributionFile, Buffer>([["runtime.mjs", runtime], ["textbutler.mjs", Buffer.from(renderLauncher(sha256(runtime), bun.sha256))], ["LICENSE", Buffer.from("Synthetic license")], ["notices.md", Buffer.from("Synthetic inert pilot")]]);
-  const manifest: DistributionManifest = { schemaVersion: 1, product: "textbutler", kind: "local-pilot", providerAdmission: "unavailable",
+  const manifest: DistributionManifest = { schemaVersion: 1, product: "textbutler", kind: "local-pilot", providerAdmission,
     runtime: { version: "1.3.14", sha256: bun.sha256, platform: process.platform, arch: process.arch }, lockfileSha256, inputsDigest,
     version: sha256(JSON.stringify({ bundle: sha256(runtime), bun: bun.sha256, inputs: inputsDigest, lockfile: lockfileSha256 })),
     files: Object.fromEntries([...files].map(([file, bytes]) => [file, { bytes: bytes.length, sha256: sha256(bytes) }])) as DistributionManifest["files"] };
@@ -37,10 +37,20 @@ describe("inert local Textbutler distribution", () => {
   test("manifest rejects provider attestation, extra files and a mismatched content identity", async () => {
     const f = await fixture();
     expect(parseDistributionManifest(f.manifest).providerAdmission).toBe("unavailable");
-    expect(() => parseDistributionManifest({ ...f.manifest, providerAdmission: "qualified" })).toThrow();
+    for (const providerAdmission of ["qualified", "native", "api", "", null, {}, ["external-xcb"]]) {
+      expect(() => parseDistributionManifest({ ...f.manifest, providerAdmission })).toThrow();
+    }
     expect(() => parseDistributionManifest({ ...f.manifest, version: "a".repeat(64) })).toThrow();
     await writeFile(join(f.from, "extra.js"), "extra");
     await expect(verifyDistribution(f.from)).rejects.toThrow("inventory");
+  });
+  test("external xcb capability survives installation without provider or account activation", async () => {
+    const f = await fixture("external-xcb"), installed = await installTextbutler(f);
+    expect(parseDistributionManifest(f.manifest).providerAdmission).toBe("external-xcb");
+    expect((await verifyDistribution(installed.directory)).manifest.providerAdmission).toBe("external-xcb");
+    expect((await readdir(installed.directory)).sort()).toEqual([...DISTRIBUTION_FILES, "manifest.json"].sort());
+    expect((await readFile(join(installed.directory, "runtime.mjs"))).equals(f.files.get("runtime.mjs")!)).toBe(true);
+    expect(await readdir(f.prefix)).toEqual(["bin", "share"]);
   });
   test("installation is content-addressed, preserves existing application data and is idempotent", async () => {
     const f = await fixture(), state = join(f.root, "state.json");

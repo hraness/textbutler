@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { connect } from "node:net";
-import { lstat, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { daemonSocketPath, MAX_CONTROL_FRAME_BYTES, requestDaemon, startDaemon, type RunningDaemon } from "./daemon.ts";
 import { TEXTBUTLER_CONTROL_PROTOCOL as protocol } from "./control-service.ts";
 import { runTextbutlerCli } from "./cli.ts";
+import { createNativeSubscriptionHost } from "./native-subscription.ts";
 
 const roots: string[] = [], daemons: RunningDaemon[] = [];
 afterEach(async () => { for (const daemon of daemons.splice(0)) await daemon.close(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -71,5 +72,30 @@ describe("foreground owner-only control socket", () => {
     await start(dataDir);
     expect(await runTextbutlerCli(["doctor", "--data-dir", dataDir], output)).toBe(process.platform === "darwin" ? 0 : 1);
     expect(JSON.parse(lines.pop()!)).toMatchObject({ ok: process.platform === "darwin", daemonConnected: true, automaticReplies: "unavailable" });
+  });
+  test("explicit native hosts override XCB configuration and close with daemon custody", async () => {
+    const dataDir = await root(); let closed = 0, checks = 0;
+    await mkdir(join(dataDir, "state"), { mode: 0o700 });
+    await writeFile(join(dataDir, "state/host.json"), JSON.stringify({ schemaVersion: 1, xcb: {
+      executable: join(dataDir, "does-not-exist"), stateHome: join(dataDir, "unused-xcb-state"), sha256: "a".repeat(64),
+      accounts: [{ provider: "codex", accountId: "synthetic", model: "codex/synthetic-model" }],
+    } }), { mode: 0o600 });
+    const nativeSubscriptions = createNativeSubscriptionHost({ adapters: [], accounts: () => [], async check() { checks++; },
+      async selection() { throw Error("No synthetic selection"); }, async close() { closed++; } });
+    const daemon = await startDaemon({ dataDir, nativeSubscriptions }); daemons.push(daemon);
+    expect(checks).toBe(0);
+    expect((await daemon.service.snapshot()).providerAccounts?.every(account => account.status !== "ready")).toBe(true);
+    await daemon.close();
+    expect(closed).toBe(1);
+  });
+  test("native host custody is closed if later daemon startup fails", async () => {
+    const dataDir = await root(); let closed = 0;
+    await mkdir(join(dataDir, "state"), { mode: 0o700 });
+    await writeFile(join(dataDir, "state/settings.json"), "invalid synthetic settings", { mode: 0o600 });
+    const nativeSubscriptions = createNativeSubscriptionHost({ adapters: [], accounts: () => [], async check() {},
+      async selection() { throw Error("No synthetic selection"); }, async close() { closed++; } });
+    await expect(startDaemon({ dataDir, nativeSubscriptions })).rejects.toThrow();
+    expect(closed).toBe(1);
+    await expect(lstat(daemonSocketPath(dataDir))).rejects.toThrow();
   });
 });

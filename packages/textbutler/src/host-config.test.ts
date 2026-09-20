@@ -55,3 +55,25 @@ test("automation accounts explicitly select up to one configured account per mes
     expect(() => parseHostConfig({ schemaVersion: 1, ghostget: { ...ghostget, automationAccounts } })).toThrow("Invalid private");
   }
 });
+
+test("XCB configuration pins one explicit account and full model key per subscription provider", () => {
+  const xcb = { executable: "/opt/bin/xcb", stateHome: "/private/xcb", sha256: "a".repeat(64), accounts: [
+    { provider: "codex", accountId: "account-one[1]", model: "codex/synthetic-model/high" },
+    { provider: "claude", accountId: "account.two", model: "claude/synthetic-model" },
+  ] } as const;
+  const parsed = parseHostConfig({ schemaVersion: 1, xcb });
+  expect(parsed.xcb).toEqual(xcb);
+  expect(Object.isFrozen(parsed.xcb?.accounts[0])).toBe(true);
+  for (const changes of [
+    { executable: "xcb" }, { stateHome: "/private/../other" }, { sha256: "a".repeat(63) },
+    { env: { TOKEN: "not-allowed" } }, { args: ["run"] }, { qualification: { status: "qualified" } },
+    { accounts: [] }, { accounts: [xcb.accounts[0], xcb.accounts[0]] },
+    { accounts: [{ ...xcb.accounts[0], accountId: "../credentials" }] },
+    { accounts: [{ ...xcb.accounts[0], accountId: "x".repeat(161) }] },
+    { accounts: [{ ...xcb.accounts[0], provider: "api" }] },
+    { accounts: [{ ...xcb.accounts[0], model: "synthetic-model" }] },
+    { accounts: [{ ...xcb.accounts[0], model: "claude/synthetic-model" }] },
+    { accounts: [{ ...xcb.accounts[0], model: "codex/model/high/extra" }] },
+    { accounts: [{ ...xcb.accounts[0], credential: "not-allowed" }] },
+  ]) expect(() => parseHostConfig({ schemaVersion: 1, xcb: { ...xcb, ...changes } })).toThrow("Invalid private");
+});

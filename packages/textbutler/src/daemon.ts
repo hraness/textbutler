@@ -13,6 +13,7 @@ import type { OwnerConversationReadPort } from "./enrollment.ts";
 import { DaemonCustody } from "./daemon-custody.ts";
 import { createProviderHost, type ManagedCodexAccountFactory } from "./provider-host.ts";
 import type { NativeSubscriptionHost } from "./native-subscription.ts";
+import { createXcbSubscriptionHost } from "./xcb-host.ts";
 import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
 import { createGhostgetAutomationProcess } from "./ghostget-automation-process.ts";
 import { createAutomationOwnerPort } from "./automation-owner.ts";
@@ -45,6 +46,7 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
   let extensions: LoadedExtensions | undefined;
   let messaging: Awaited<ReturnType<typeof createGhostgetAutomationProcess>> | undefined;
   let replyLoop: Awaited<ReturnType<typeof createDaemonReplyLoop>> | undefined;
+  let nativeSubscriptions: NativeSubscriptionHost | undefined;
   const server = createServer();
   const transport = attachControlSocket(server, {
     maximumFrameBytes: MAX_CONTROL_FRAME_BYTES,
@@ -67,6 +69,9 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
     await custody.publish(server);
     await assertOwnedPath(path, { kind: "socket", exactMode: 0o600 });
     const host = await loadHostConfig(dataDir);
+    // Explicit trusted injection wins. Configured XCB never discovers another
+    // account or falls back to a provider API.
+    nativeSubscriptions = options.nativeSubscriptions ?? (host.xcb === undefined ? undefined : await createXcbSubscriptionHost(host.xcb));
     let messagingUnavailable = false;
     if (host.ghostget?.automationAccounts) {
       try { messaging = await createGhostgetAutomationProcess({ executable: host.ghostget.executable, providers: host.ghostget.automationAccounts, custodyDirectory: join(dataDir, "state"),
@@ -80,7 +85,7 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
       ...(messaging === undefined ? {} : { client: messaging.client }), hooks: extensions.hooks,
       providers: leases => createProviderHost({ dataDir, config: host, leases, ...(options.providerArtifact === undefined ? {} : { runtimeArtifact: options.providerArtifact }),
         ...(options.managedCodex === undefined ? {} : { managedCodex: options.managedCodex }),
-        ...(options.nativeSubscriptions === undefined ? {} : { nativeSubscriptions: options.nativeSubscriptions }) }) });
+        ...(nativeSubscriptions === undefined ? {} : { nativeSubscriptions }) }) });
     await service.recoverInactiveGrants();
     if (messaging) replyLoop = await createDaemonReplyLoop({ service, client: messaging.client, hooks: extensions.hooks, onStatus: value => service!.setRuntimeStatus(value) });
     else if (messagingUnavailable) service.setRuntimeStatus({ state: "unavailable", detail: "Ghostget automation setup or previous process custody needs owner attention. No automatic replies are running." });
@@ -88,7 +93,8 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
     const failures: unknown[] = [error];
     for (const cleanup of [
       async () => { await transport.close(); },
-      async () => replyLoop?.close(), async () => messaging?.close(), async () => service?.close(), async () => custody.close(),
+      async () => replyLoop?.close(), async () => messaging?.close(), async () => service?.close(),
+      async () => { if (service === undefined) await nativeSubscriptions?.close(); }, async () => custody.close(),
     ]) { try { await cleanup(); } catch (failure) { failures.push(failure); } }
     if (failures.length > 1) throw new AggregateError(failures, "Daemon startup and cleanup require attention");
     throw error;

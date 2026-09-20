@@ -1,6 +1,6 @@
 # Textbutler architecture
 
-Textbutler is a personal message butler for macOS. An owner activates a bounded set of contacts. Each contact gets a private workspace that a coding agent can read and evolve. A separate daemon decides when to invoke that agent and controls every outward action.
+Textbutler is a personal message butler for macOS. An owner activates a bounded set of contacts. Each contact gets a private workspace that a model can read and evolve through Textbutler's broker. A separate daemon decides when to invoke that agent and controls every outward action.
 
 The source includes the owner daemon, contact reply loop, versioned Ghostget automation protocol and macOS menu companion. Synthetic tests establish their control and recovery behavior. Live provider delivery has separate acceptance requirements below; the companion is a CLI artifact and has no signing or notarization gate.
 
@@ -10,9 +10,11 @@ The source includes the owner daemon, contact reply loop, versioned Ghostget aut
 flowchart LR
   Menu[Menu companion] --> Control[Owner-only control socket]
   Control --> Butler[Textbutler daemon]
-  Butler --> Router[AgentMixer]
-  Router --> Provider[Admitted agent provider]
-  Provider --> Tools[Contact-bound tool broker]
+  Butler --> Xcb[xcb zero-tool generate]
+  Xcb --> Provider[Admitted subscription provider]
+  Provider --> Proposal[Structured result or proposal]
+  Proposal --> Butler
+  Butler --> Tools[Contact-bound tool broker]
   Tools --> Memory[One contact workspace]
   Tools --> Web[Public web broker]
   Tools --> Intents[Proposed actions]
@@ -22,7 +24,7 @@ flowchart LR
   Ghostget --> Messages[iMessage and WhatsApp]
 ```
 
-Ghostget owns native permissions, message and contact acquisition, provider actions, and receipts. Textbutler does not open chat.db or automate Messages directly. AgentMixer owns provider selection, shared-account leases, cancellation, model catalogs, qualification evidence, and a bounded tool interface. Textbutler owns conversation policy and the durable send transaction. The menu companion changes owner settings through a small local protocol; it never gives a model arbitrary local commands.
+Ghostget owns native permissions, message and contact acquisition, provider actions, and receipts. Textbutler does not open chat.db or automate Messages directly. xcb owns subscription credentials, provider admission, model catalogs, confinement, cancellation and account custody. Textbutler invokes its native zero-tool generation API and interprets returned operation proposals through its own contact broker. Textbutler owns conversation policy and the durable send transaction. The menu companion changes owner settings through a small local protocol; it never gives a model arbitrary local commands.
 
 The background lifecycle uses a user LaunchAgent: native messaging belongs to the signed-in Mac user, and login persistence is independent of the menu companion. Installation records the exact runtime, entrypoint, data directory and generation; removal verifies its private receipt and loaded service identity. Uninstall preserves contact data. New settings start paused. A private SQLite custody lock prevents duplicate daemon ownership and permits recovery only for a dead recorded process and its exact unserved socket. A temporary live launchd install/start/uninstall test passed while preserving synthetic owner data. The CLI companion is the supported release path; desktop app packaging has been removed; the CLI companion is the only local runtime surface.
 
@@ -37,7 +39,7 @@ Textbutler/
   daemon.sock                  owner-only native control socket
   state/
     settings.json              owner configuration and contact bindings
-    host.json                  optional private installed Ghostget CLI/account binding
+    host.json                  private Ghostget and xcb executable/account bindings
     runs.sqlite                private run and send journal
     daemon-custody.sqlite      exclusive process/socket ownership
     launch-agent-custody.sqlite lifecycle serialization
@@ -74,7 +76,7 @@ The daemon waits eight seconds after an incoming message to collect a burst. New
 
 A whole-word, case-insensitive `butler` invocation permits a response after those deterministic gates. In keyword mode, other messages stay silent. In smart mode, a tool-free cheap model returns a strict structured classification. It should answer useful assistance requests, and stay silent during ordinary conversation, acknowledgments, emotional exchanges, or uncertain intent. Confidence below 0.85 stays silent. Malformed results, exhausted accounts, stale model catalogs, or timeouts never escalate to a more expensive agent automatically.
 
-Classifier choice comes from the selected provider's fresh available-model catalog, with explicit cost metadata and structured-output capability. No permanently hard-coded "cheap" model alias is assumed. An owner can pin a classifier or reply model after availability validation. Classifier and responder share the chosen provider/account policy; one classifier gets no tool authority.
+The xcb subscription route uses the owner-selected full model key for classification and replies; a subscription model is not assigned invented API prices. The separately billed API route selects its classifier from fresh availability and explicit cost metadata. Classifier and responder share the chosen provider/account policy, and classification receives no operation authority.
 
 No typing signal can prove the owner is absent. The current adapters expose no typing signal; the daemon retains its message-based cooldown and final revision checks. The selected provider/account must independently qualify before smart mode can invoke a model.
 
@@ -112,19 +114,50 @@ Executable extensions are application code with the daemon's trust. They are ins
 
 The daemon reads a bounded private `plugins/extensions.json` manifest and preflights its complete inventory before importing listed TypeScript/JavaScript entry modules. Each default export must match the manifest ID/version and known hook names. Source digests appear in the loaded extension metadata. No directory scanning, package installation or hot reload occurs; changes require a full daemon process restart. The routed agent emits `memory.updated` only after a successful conditional write, with its path and committed revision. A notification failure does not undo that write or replay it.
 
-## AgentMixer
+## xcb application contract
 
-AgentMixer begins as an MIT-licensed source package independent of Textbutler's product model. Its account lease coordinates the selected provider account without embedding credentials in a contact workspace. Credential resolvers remain trusted host services. A lease cannot be stolen merely because its time elapsed while a process might still be alive.
+Textbutler is an MIT-licensed reference application for
+[xcb](https://github.com/hraness/xcb). AI execution requires a verified Textbutler
+bundle whose build validates independently reviewed composition evidence against
+current source bytes and both contact capability profiles. The build embeds
+this application admission separately from xcb's provider admission. Source
+daemon startup carries no composition admission and cannot enable this route. The native `generate` process provides a
+bounded application request/result interface over stdin and stdout. The owner
+pins the physical xcb executable and selects an explicit private state root,
+subscription account and full model key. xcb and the provider executables are
+separate installations; contact memory cannot edit their configuration.
 
-Provider adapters declare observed, exact-version qualification. A launch plan is not proof of a sandbox. Codex's shell-disable setting and Claude's exact tool list are useful inputs, but an adapter is not admitted until attempted shell/process calls, host file reads, inherited MCP/plugin configuration, auth-file access, alternate agents, and additional workspaces are demonstrably blocked. No bypass-permissions mode is acceptable.
+xcb generates with zero provider tools and no inherited coding session. It owns
+provider credentials, runtime admission, operating-system confinement and
+process cleanup. Textbutler sends bounded contact context, validates the
+structured response and accepts output only with a settled execution receipt.
+A hash match or a root process exit alone cannot establish this receipt.
+Uncertain cleanup preserves custody and blocks another invocation.
 
-The source implements a pinned Claude Agent SDK adapter with explicit API-key account binding, a private verified executable snapshot, isolated runtime directories, no built-in tools or inherited settings, broker-only MCP, bounded raw output, and joined process-group termination. Its production gate requires independent qualification of the exact executable and SDK identity. Synthetic protocol and native-runtime fixtures do not activate it. The experimental Codex app-server driver verifies each model request's tool inventory through a host relay and keeps contact storage outside native scratch. It has no live account transport or production registration; native confinement and adversarial custody qualification remain incomplete. See the [AgentMixer implementation and evidence](https://github.com/hraness/agentmixer#readme).
+For replies, the model can propose a Textbutler operation. The application
+validates the exact operation and closed input, calls its contact-bound broker,
+and includes a bounded result in the next inference step. Classification
+advertises no operations. The native provider never receives a filesystem or
+messaging tool. The [subscription guide](native-subscription.md) documents setup,
+limits and recovery. Credentials remain in xcb; grant and send authority remain
+in Textbutler and Ghostget.
 
-A separately selected Claude API adapter executes the bounded tool loop in the trusted host. It exposes only the six broker tools and never starts a model-selected process. Account checks bind the actual packaged runtime and private credential generation; replacing a credential invalidates old discovery and running account work. Fresh model availability and price metadata select a cheap classifier. This explicit API choice does not silently replace Claude Code or Codex and does not use their subscription authentication.
+The retained AgentMixer compatibility library supplies shared application types
+and broker helpers. Its historical package identity remains pinned for
+reproducible builds; applications need not import private xcb internals or share
+a source checkout. The native process contract is the subscription boundary.
 
-The model receives a fixed contact/workspace identity and a fixed run ID. File operations are brokered and conditional. Public web requests are separately bounded and must not reach loopback, private networks, local sockets, or cloud metadata through DNS or redirects. Message tools stage recipient-free intents for the one conversation. Unknown tool names and unknown input fields fail. Credential/account services are never model tools.
+A separately selected Claude API adapter executes a bounded tool loop in the
+trusted host. That route still requires independent packaged-runtime admission,
+an explicit API credential and current model/price evidence. Neither source
+startup nor local distribution integrity provides this admission, and an xcb
+subscription failure cannot switch to API billing.
 
-Oompa's existing runtime provider port and account/process-custody patterns are source references. Its ordinary workspace-write execution profile is not the requested contact-only sandbox. AI Charts is a prospective second consumer. Do not migrate either product to AgentMixer until an adapter has equivalent feature and recovery evidence; avoid changing their active work in this redesign.
+The model receives a fixed contact/workspace identity and run ID. File
+operations are brokered and conditional. Public web requests are bounded and
+cannot reach private networks, local sockets or cloud metadata through DNS or
+redirects. Messaging operations stage recipient-bound intents. Credential and
+account controls are never model tools.
 
 ## Ghostget contract and rich features
 
@@ -155,7 +188,7 @@ One narrow native command accepts the versioned control request. It connects to 
 ## Admission still required
 
 1. Use the verified Ghostget 0.18.2 package, which includes the reviewed automation source and native helpers. Real account synchronization, recipient identity, rich actions and revocation still require a bounded owner-authorized live test; artifact admission and synthetic fixtures do not prove delivery.
-2. Independently qualify the native Claude SDK and Codex adapters for the requested no-shell, contact-only profile before enabling those choices. The separate Claude API path requires explicit account setup and packaged-runtime admission.
+2. Use a verified Textbutler bundle with reviewed composition admission and connect an admitted native xcb build through its zero-tool generation contract. Verify the exact provider/account, both classifier and reply behavior, cancellation and uncertain-custody recovery before enabling automatic replies. The separate Claude API path retains explicit account setup and packaged-runtime admission.
 3. Publish the CLI package with its pinned desktop-foundation SDK dependency. Verify the package bytes, the verified pinned runner download, singleton behavior, and the shared autostart install/uninstall lifecycle. A source checkout or missing companion must never trigger a build at launch.
 4. Keep historical repository and published package identities as compatibility and provenance anchors. The Textbutler site is assigned to `textbutler.app`; later identity migrations must preserve immutable artifacts and existing release protections.
 

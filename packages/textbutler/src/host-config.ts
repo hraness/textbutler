@@ -4,11 +4,13 @@ import { parseClaudePriceCatalog, type ClaudePriceCatalog } from "@hraness/agent
 
 export type GhostgetHostConfig = Readonly<{ executable: string; runtimeExecutable?: string; authId: string; stateHome?: string;
   automationAccounts?: readonly Readonly<{ provider: "imessage" | "whatsapp" | "beeper"; authId: string }>[] }>;
+export type XcbHostConfig = Readonly<{ executable: string; stateHome: string; sha256: string;
+  accounts: readonly Readonly<{ provider: "claude" | "codex"; accountId: string; model: string }>[] }>;
 export type ProviderAccountConfig = Readonly<{ id: string; label: string }> & (
   | Readonly<{ route: "claude-api"; credentialFile: string; replyModel: string; prices: ClaudePriceCatalog; maxBudgetUsd: number }>
   | Readonly<{ route: "claude-code" | "codex" }>
 );
-export type HostConfig = Readonly<{ schemaVersion: 1; ghostget?: GhostgetHostConfig; providerAccounts?: readonly ProviderAccountConfig[] }>;
+export type HostConfig = Readonly<{ schemaVersion: 1; ghostget?: GhostgetHostConfig; xcb?: XcbHostConfig; providerAccounts?: readonly ProviderAccountConfig[] }>;
 function invalid(): never { throw new Error("Invalid private Textbutler host configuration"); }
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
@@ -20,14 +22,15 @@ function path(value: unknown): string {
 }
 export function parseHostConfig(value: unknown): HostConfig {
   const config = record(value);
-  if (config.schemaVersion !== 1 || Object.keys(config).some(key => !["schemaVersion", "ghostget", "providerAccounts"].includes(key))) return invalid();
+  if (config.schemaVersion !== 1 || Object.keys(config).some(key => !["schemaVersion", "ghostget", "xcb", "providerAccounts"].includes(key))) return invalid();
   let providerAccounts: readonly ProviderAccountConfig[] | undefined;
   if (config.providerAccounts !== undefined) {
     if (!Array.isArray(config.providerAccounts) || config.providerAccounts.length > 8) return invalid();
     providerAccounts = Object.freeze(config.providerAccounts.map(parseProviderAccount));
     if (new Set(providerAccounts.map(account => account.id)).size !== providerAccounts.length) return invalid();
   }
-  const common = { schemaVersion: 1 as const, ...(providerAccounts === undefined ? {} : { providerAccounts }) };
+  const common = { schemaVersion: 1 as const, ...(providerAccounts === undefined ? {} : { providerAccounts }),
+    ...(config.xcb === undefined ? {} : { xcb: parseXcbConfig(config.xcb) }) };
   if (config.ghostget === undefined) return Object.freeze(common);
   const ghostget = record(config.ghostget);
   if (Object.keys(ghostget).some(key => !["executable", "runtimeExecutable", "authId", "stateHome", "automationAccounts"].includes(key)) || typeof ghostget.authId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(ghostget.authId)) return invalid();
@@ -47,6 +50,23 @@ export function parseHostConfig(value: unknown): HostConfig {
     ...(ghostget.stateHome === undefined ? {} : { stateHome: path(ghostget.stateHome) }),
     ...(automationAccounts === undefined ? {} : { automationAccounts }),
   }) });
+}
+function parseXcbConfig(value: unknown): XcbHostConfig {
+  const xcb = record(value);
+  if (Object.keys(xcb).sort().join(",") !== "accounts,executable,sha256,stateHome"
+    || typeof xcb.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(xcb.sha256)
+    || !Array.isArray(xcb.accounts) || xcb.accounts.length < 1 || xcb.accounts.length > 2) return invalid();
+  const accounts = Object.freeze(xcb.accounts.map(value => {
+    const account = record(value);
+    if (Object.keys(account).sort().join(",") !== "accountId,model,provider"
+      || account.provider !== "claude" && account.provider !== "codex"
+      || typeof account.accountId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159}$/u.test(account.accountId)
+      || typeof account.model !== "string" || !/^(?:claude|codex)\/[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159}(?:\/[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159})?$/u.test(account.model)
+      || !account.model.startsWith(`${account.provider}/`)) return invalid();
+    return Object.freeze({ provider: account.provider, accountId: account.accountId, model: account.model });
+  }));
+  if (new Set(accounts.map(account => account.provider)).size !== accounts.length) return invalid();
+  return Object.freeze({ executable: path(xcb.executable), stateHome: path(xcb.stateHome), sha256: xcb.sha256, accounts });
 }
 function parseProviderAccount(value: unknown): ProviderAccountConfig {
   const account = record(value);

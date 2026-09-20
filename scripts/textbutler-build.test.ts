@@ -39,7 +39,14 @@ test("the real bundle runs from an isolated installation without node_modules or
     const status = await run(["daemon", "status", "--data-dir", data]);
     expect(status.code).toBe(1); expect(status.stderr).toBe("");
     expect(JSON.parse(status.stdout)).toMatchObject({ daemon: { ok: false, status: "disconnected" }, automaticReplies: "unavailable" });
-    expect(result.manifest.providerAdmission).toBe("unavailable");
+    expect(result.manifest.providerAdmission).toBe("external-xcb");
+    const notices = await readFile(join(installed.directory, "notices.md"), "utf8");
+    expect(notices).toContain("xcb and provider executables are not bundled");
+    expect(notices).toContain("Credentials and provider custody remain in xcb");
+    expect(notices).toContain("does not qualify a provider or prove live message delivery");
+    expect(notices).toContain("Claude API remains unavailable");
+    expect(notices).toContain("MIT-licensed reference application");
+    expect(help.stdout).toContain("--xcb");
     expect(await readdir(home, { recursive: true })).toEqual([".bunfig.toml"]);
   } finally { await writable(root); await rm(root, { recursive: true, force: true }); }
 }, 30_000);
