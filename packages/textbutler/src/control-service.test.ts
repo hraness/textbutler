@@ -183,6 +183,30 @@ describe("owner reply triage through the control surface", () => {
     };
     return { service, sent, db, run, dataDir, grantStore };
   }
+  test("history, capabilities and explicit rich drafts use bounded owner jobs without dispatch", async () => {
+    const { run, sent } = await replySetup();
+    const history = await run({ command: "messages.history", contactId: "synthetic-a", limit: 20 });
+    expect(history).toMatchObject({ ok: true, kind: "message-history", contactId: "synthetic-a", messages: [{ id: "inbound-1", author: "contact", text: "Can you pick up dinner?" }] });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(history)))).toEqual(history);
+    const capabilities = await run({ command: "messages.capabilities", contactId: "synthetic-a" });
+    expect(capabilities).toMatchObject({ ok: true, kind: "message-capabilities", ready: true, threadedReplies: { available: false } });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(capabilities)))).toEqual(capabilities);
+    const composed = await run({ command: "replies.compose", contactId: "synthetic-a", summary: "Acknowledge dinner", actions: [{ kind: "reaction", messageId: "inbound-1", emoji: "👍", action: "add" }] });
+    expect(composed).toMatchObject({ ok: true, kind: "reply-draft", draft: { actions: [{ kind: "text", text: "🤖{ Acknowledge dinner }" }, { kind: "reaction", messageId: "inbound-1", emoji: "👍", action: "add" }] } });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(composed)))).toEqual(composed);
+    expect(sent).toEqual([]);
+    expect(await run({ command: "messages.summarize", contactId: "synthetic-a", limit: 20 })).toMatchObject({ ok: false, code: "unavailable" });
+  });
+  test("message command parsing rejects unbounded history and arbitrary actions or paths", () => {
+    for (const limit of [0, 201, 1.5, "20", undefined]) expect(() => parseControlRequest({ protocol, command: "messages.history", contactId: "synthetic-a", limit })).toThrow();
+    for (const command of ["messages.history", "messages.summarize"]) expect(parseControlRequest({ protocol, command, contactId: "synthetic-a", limit: 200 })).toMatchObject({ command, limit: 200 });
+    for (const command of ["messages.history", "messages.summarize", "messages.capabilities"]) expect(() => parseControlRequest({ protocol, command, contactId: "../other", limit: 20 })).toThrow();
+    for (const actions of [[], Array.from({ length: 8 }, () => ({ kind: "text", text: "Hi" })), [{ kind: "shell", command: "whoami" }],
+      [{ kind: "text", text: "Hi", replyTo: "inbound-1" }], [{ kind: "attachment", file: "/private/owner-file", mimeType: "text/plain", name: "file" }]])
+      expect(() => parseControlRequest({ protocol, command: "replies.compose", contactId: "synthetic-a", summary: "Review", actions })).toThrow();
+    expect(parseControlRequest({ protocol, command: "replies.compose", contactId: "synthetic-a", summary: "Review", actions: [{ kind: "text", text: "Hi" }] })).toMatchObject({ command: "replies.compose" });
+    expect(() => parseControlRequest({ protocol, command: "messages.capabilities", contactId: "synthetic-a", force: true })).toThrow();
+  });
   test("scan, suggest, send and discard stay behind owner commands", async () => {
     const { service, sent, run } = await replySetup();
     const scan = await run({ command: "replies.scan" });

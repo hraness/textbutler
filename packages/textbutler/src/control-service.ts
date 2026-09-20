@@ -13,6 +13,8 @@ import { selectButlerModel } from "./routed-agent.ts";
 import { parseAutomationBinding, type AutomationBinding, type AutomationCandidate, type OwnerAutomationPort } from "./automation-owner.ts";
 import { automationBindingDigest, parseAutomationGrant, type AutomationGrant, type AutomationProvider, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { OwnerReplies, type PendingObservation } from "./owner-replies.ts";
+import { OwnerMessages } from "./owner-messages.ts";
+import { parseActionIntent } from "../../transport/src/index.ts";
 import { Hooks } from "./hooks.ts";
 
 export const TEXTBUTLER_CONTROL_PROTOCOL = "textbutler.control.v1" as const;
@@ -82,6 +84,22 @@ export function parseControlRequest(value: unknown): ControlRequest {
   if (item.command === "replies.suggest") {
     exact(item, ["protocol", "command", "contactId"]);
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId) };
+  }
+  if (item.command === "messages.history" || item.command === "messages.summarize") {
+    exact(item, ["protocol", "command", "contactId", "limit"]);
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), limit: integer(item.limit, 1, 200) };
+  }
+  if (item.command === "messages.capabilities") {
+    exact(item, ["protocol", "command", "contactId"]);
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId) };
+  }
+  if (item.command === "replies.compose") {
+    exact(item, ["protocol", "command", "contactId", "summary", "actions"]);
+    if (typeof item.summary !== "string" || !item.summary.trim() || item.summary.includes("\0") || Buffer.byteLength(item.summary) > 4096
+      || !Array.isArray(item.actions) || item.actions.length < 1 || item.actions.length > 7 || Object.keys(item.actions).length !== item.actions.length)
+      fail("invalid-request", "Composition needs a bounded summary and 1-7 supported actions.");
+    try { return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), summary: item.summary, actions: item.actions.map(parseActionIntent) }; }
+    catch { fail("invalid-request", "Composition contains an unsupported action or field."); }
   }
   if (item.command === "replies.send") {
     if (Object.hasOwn(item, "draftId")) {
@@ -199,7 +217,10 @@ export class TextbutlerControlService {
   private jobs = new Map<string, { result?: ControlResponse; expires: number }>();
   private activeJob: { controller: AbortController; promise: Promise<void> } | undefined;
   private readonly replies: OwnerReplies | undefined;
+  private readonly messages: OwnerMessages;
   private constructor(readonly dataDir: string, private readonly settingsPath: string, private readonly journal: RunJournal, private readonly enrollment?: OwnerConversationReadPort, readonly providers?: ProviderHost, readonly automation?: OwnerAutomationPort, private readonly client?: GhostgetAutomationClient, hooks?: Hooks) {
+    this.messages = new OwnerMessages({ state: () => this.runtimeState(), journal: this.journal,
+      client: () => this.client, enrollment: () => this.enrollment, providers: () => this.providers, now: () => Date.now() });
     this.replies = automation !== undefined && client !== undefined ? new OwnerReplies({
       state: () => this.runtimeState(), journal: this.journal,
       automation: () => this.automation, client: () => this.client, enrollment: () => this.enrollment, providers: () => this.providers,
@@ -526,6 +547,17 @@ export class TextbutlerControlService {
         signal.throwIfAborted();
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "snapshot", snapshot: await this.snapshot() };
       });
+    }
+    if (request.command === "messages.history") return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true,
+      kind: "message-history", ...await this.messages.history(request.contactId, request.limit, signal) }));
+    if (request.command === "messages.summarize") return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true,
+      kind: "message-summary", ...await this.messages.summarize(request.contactId, request.limit, signal) }));
+    if (request.command === "messages.capabilities") return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true,
+      kind: "message-capabilities", ...await this.messages.capabilities(request.contactId, signal) }));
+    if (request.command === "replies.compose") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-draft",
+        draft: await replies.compose(request.contactId, request.summary, request.actions, signal) }));
     }
     if (request.command === "replies.scan") {
       const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");

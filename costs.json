@@ -1,6 +1,46 @@
 {
   "version": 1,
   "surfaces": {
+    "local:owner-imported-media": {
+      "kind": "authoritative",
+      "retention": "account",
+      "owner": "packages/textbutler/src/workspace.ts",
+      "deletion": "docs/textbutler/local-data.md",
+      "budget": { "bytesPerAsset": 16777216, "sharedFilesPerContact": 500 },
+      "note": "explicit CLI imports into one contact outbox; content-addressed no-clobber publication makes repeated imports idempotent; model text tools cannot import external paths"
+    },
+    "local:owner-message-context": {
+      "kind": "derived",
+      "retention": "ephemeral",
+      "source": "explicit bounded reads from one enrolled messaging conversation",
+      "owner": "packages/textbutler/src/owner-messages.ts",
+      "budget": { "messagesPerRead": 200, "textBytesPerMessage": 4096, "historyJsonBytes": 512000, "summaryInputJsonBytes": 96000, "summaryBytes": 8192, "citationsPerSummary": 32 },
+      "note": "history and summaries are owner control responses; omitted and shortened evidence is reported; attachment content is not retrieved"
+    },
+    "local:owner-reply-drafts": {
+      "kind": "derived",
+      "retention": "ttl:PT15M",
+      "source": "owner-specified or selected-agent actions and current recipient context",
+      "owner": "packages/textbutler/src/owner-replies.ts",
+      "budget": { "drafts": 64, "inputActionsPerDraft": 7, "summaryBytes": 4096 },
+      "note": "in-memory drafts bind full disclosed content, asset digests and exact recipient; explicit send remains a separate journaled operation"
+    },
+    "local:macos-app-upgrades": {
+      "kind": "authoritative",
+      "retention": "persistent",
+      "owner": "scripts/macos-textbutler-app.ts",
+      "deletion": "docs/textbutler/local-data.md",
+      "budget": { "retainedTransitions": 32, "appFilesPerTransition": 3, "maximumAppFileBytes": 536870912, "receiptFilesPerTransition": 3, "bytesPerReceipt": 65536, "activeJournals": 1, "bytesPerActiveJournal": 65536 },
+      "note": "private retained signed app and exact old/new receipts; transition journal is released only after proven completion or rollback; uncertain transitions preserve both versions"
+    },
+    "local:imessage-setup-reconciliation": {
+      "kind": "authoritative",
+      "retention": "persistent",
+      "owner": "scripts/reconcile-imessage-setup.ts",
+      "deletion": "docs/textbutler/local-data.md",
+      "budget": { "bytesPerWitness": 8192, "bytesPerSettlement": 16384, "settlementsPerAttempt": 1, "sharedSetupArchiveFiles": 256 },
+      "note": "explicit legacy crash witness and write-once body-free settlement bind the original attempt, source, app, crash and quiescence; original results remain intact"
+    },
     "served:textbutler-macos-app": {
       "kind": "served",
       "retention": "persistent",

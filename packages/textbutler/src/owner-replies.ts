@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { automationContextId, automationHash, createGhostgetAutomationTransport, type AutomationGrant, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
+import { automationContextId, automationHash, createGhostgetAutomationTransport, type AutomationEnrollment, type AutomationGrant, type AutomationMessage, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { parseActionIntent, type ActionIntent } from "../../transport/src/index.ts";
 import { type ContactSettings, type Disclosure } from "./config.ts";
 import { assertAutomationBinding, type AutomationBinding, type OwnerAutomationPort } from "./automation-owner.ts";
@@ -249,7 +249,42 @@ export class OwnerReplies {
     if (!summary.trim() || Buffer.byteLength(summary) > 4_096 || !Array.isArray(actions) || actions.length < 1 || actions.length > 7) throw new Error("Invalid agent suggestion");
     const intents = actions.map(action => parseActionIntent(action));
     if (intents.some(intent => intent === null)) throw new Error("Invalid agent suggestion");
+    const review = await this.storeDraft(contact, binding, enrollment, messages, intents, summary, latest.id, signal);
+    const draft = this.drafts.get(review.id)!;
+    return { draft: { id: draft.id, contactId: contact.id, name: contact.label, summary: summary.slice(0, 512),
+      preview: draftPreview(draft), actionCount: review.actions.length,
+      expiresAt: new Date(draft.expiresAt).toISOString() }, pending: item };
+  }
+
+  /** Explicit rich composition stores an owner-reviewable draft. It never
+   * acquires a send grant or dispatches until a separate digest-bound send. */
+  async compose(contactId: string, summary: string, actions: readonly ActionIntent[], signal: AbortSignal): Promise<ReplyDraftDetail> {
+    if (typeof summary !== "string" || !summary.trim() || summary.includes("\0") || Buffer.byteLength(summary) > 4096 || !Array.isArray(actions) || actions.length < 1 || actions.length > 7)
+      fail("invalid-request", "Composition needs a bounded summary and 1-7 supported actions.");
+    let intents: ActionIntent[];
+    try { intents = actions.map(action => parseActionIntent(action)); } catch { fail("invalid-request", "Composition contains an unsupported action or field."); }
+    signal.throwIfAborted();
+    const state = await this.ports.state(), contact = state.settings.contacts.find(value => value.id === contactId), binding = state.bindings[contactId];
+    if (!contact) fail("invalid-request", "This contact is not configured by the owner.");
+    if (binding?.version !== 2) fail("unavailable", "Only an exact messaging enrollment can compose replies.");
+    const client = this.ports.client();
+    if (!client || !this.ports.automation()) fail("unavailable", "Messaging automation is not configured.");
+    const { enrollment, messages } = await client.history(binding.enrollmentId, 200, signal); assertAutomationBinding(binding, enrollment);
+    return this.storeDraft(contact, binding, enrollment, messages, intents, summary, `owner:compose:${randomUUID()}`, signal);
+  }
+
+  private async storeDraft(contact: ContactSettings, binding: AutomationBinding, enrollment: AutomationEnrollment, messages: readonly AutomationMessage[],
+    intents: readonly ActionIntent[], summary: string, eventId: string, signal: AbortSignal): Promise<ReplyDraftDetail> {
+    if (!enrollment.ready) fail("unavailable", "Messaging catchup is incomplete. Wait for a current conversation before composing.");
     const disclosed = discloseReplyActions(intents, summary, contact.disclosure);
+    const client = this.ports.client(); if (!client) fail("unavailable", "Messaging automation is not configured.");
+    const status = await client.status(binding.identity.provider, signal);
+    if (automationHash(status.identity) !== automationHash(binding.identity)) fail("conflict", "The messaging account changed during composition.");
+    if (!status.connected || !status.events.available || disclosed.some(action => !status.actions[action.kind].available))
+      fail("unavailable", "The current messaging connection does not support every composed action, including disclosure.");
+    const known = new Set(messages.filter(message => message.kind === "message").map(message => message.id));
+    for (const action of disclosed) if ((action.kind === "reaction" || action.kind === "sticker") && action.messageId !== null && !known.has(action.messageId))
+      fail("invalid-request", "A composed action targets a message outside this conversation's current history.");
     const assets: ReplyDraftDetail["assets"][number][] = [];
     const workspace = await this.ports.workspace(contact.id);
     for (const action of disclosed) {
@@ -260,6 +295,13 @@ export class OwnerReplies {
       }
     }
     signal.throwIfAborted();
+    const current = await this.ports.state(), currentContact = current.settings.contacts.find(value => value.id === contact.id), currentBinding = current.bindings[contact.id];
+    if (!currentContact || currentContact.revision !== contact.revision || currentBinding?.version !== 2
+      || currentBinding.bindingDigest !== binding.bindingDigest || currentBinding.enrollmentId !== binding.enrollmentId)
+      fail("conflict", "The contact or messaging recipient changed during composition.");
+    const fresh = await client.poll(binding.enrollmentId, signal); assertAutomationBinding(binding, fresh);
+    if (!fresh.ready || automationContextId(fresh) !== automationContextId(enrollment)) fail("conflict", "The conversation changed during composition. Read it again.");
+    signal.throwIfAborted();
     this.pruneDrafts();
     for (const [id, existing] of this.drafts) if (existing.contactId === contact.id) this.drafts.delete(id);
     if (this.drafts.size >= DRAFT_LIMIT) fail("capacity", "Too many open reply drafts. Discard one before suggesting again.");
@@ -268,13 +310,11 @@ export class OwnerReplies {
       conversationId: binding.enrollmentId, summary, actions: disclosed, assets, expiresAt: new Date(expiresAt).toISOString() };
     const contextId = automationContextId(enrollment);
     const review: ReplyDraftDetail = { ...detail, digest: automationHash({ draft: detail, bindingDigest: binding.bindingDigest, contextId, contactRevision: contact.revision }) };
-    const draft: ReplyDraft = { id, contactId: contact.id, summary, actions: Object.freeze(intents as ActionIntent[]),
-      disclosure: contact.disclosure, contextId, eventId: latest.id, createdAt, expiresAt,
+    const draft: ReplyDraft = { id, contactId: contact.id, summary, actions: Object.freeze(structuredClone(intents)),
+      disclosure: contact.disclosure, contextId, eventId, createdAt, expiresAt,
       contactRevision: contact.revision, bindingDigest: binding.bindingDigest, review };
     this.drafts.set(draft.id, draft);
-    return { draft: { id: draft.id, contactId: contact.id, name: contact.label, summary: summary.slice(0, 512),
-      preview: draftPreview(draft), actionCount: disclosed.length,
-      expiresAt: new Date(draft.expiresAt).toISOString() }, pending: item };
+    return structuredClone(review);
   }
 
   discard(draftId: string): boolean { return this.drafts.delete(draftId); }

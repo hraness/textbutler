@@ -403,3 +403,63 @@ test("a literal review cannot use an injected state with no revision", async () 
   await expect(fixture.replies.send({ contactId: "contact-1", text: "Reviewed reply", expectedRevision: 1 }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
   expect(fixture.sent).toEqual([]);
 });
+
+test("explicit composition creates a fully disclosed draft for a disabled contact without inference or sending", async () => {
+  const f = await setup({ enabled: false });
+  const providers = f.ports.providers()!; providers.selection = async () => { throw Error("Explicit composition must not run inference"); };
+  const review = await f.replies.compose("contact-1", "React to dinner", [{ kind: "reaction", messageId: "inbound-2", emoji: "👍", action: "add" }], AbortSignal.timeout(5000));
+  expect(review.actions).toEqual([{ kind: "text", text: "🤖{ React to dinner }" }, { kind: "reaction", messageId: "inbound-2", emoji: "👍", action: "add" }]);
+  expect(await f.replies.readDraft(review.id)).toEqual(review);
+  expect(f.sent).toEqual([]); expect(f.grantRequests).toEqual([]);
+  await expect(f.replies.send({ draftId: review.id, expectedDigest: "0".repeat(64) }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+  expect((await f.replies.send({ draftId: review.id, expectedDigest: review.digest }, AbortSignal.timeout(5000))).state).toBe("submitted");
+  expect(f.sent[0]).toEqual([{ kind: "text", text: "🤖{ React to dinner }" }, { kind: "reaction", messageId: "inbound-2", emoji: "👍", remove: false }]);
+});
+
+test("composition validates targets against this conversation and refuses unsupported threading fields", async () => {
+  const f = await setup();
+  for (const action of [{ kind: "reaction", messageId: "other-conversation", emoji: "👍", action: "add" },
+    { kind: "sticker", file: "outbox/sticker.png", messageId: "other-conversation" }, { kind: "text", text: "Hello", replyTo: "inbound-1" }]) {
+    await expect(f.replies.compose("contact-1", "Review", [action as ActionIntent], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  }
+  expect(f.replies.view(f.state).drafts).toEqual([]); expect(f.grantRequests).toEqual([]); expect(f.sent).toEqual([]);
+});
+
+test("composition requires each current capability including the added disclosure text", async () => {
+  for (const unavailable of ["reaction", "text"]) {
+    const f = await setup(), client = f.ports.client()!, original = client.status;
+    client.status = async (...args) => { const status = await original(...args); return { ...status, actions: { ...status.actions, [unavailable]: { available: false, reason: "Synthetic unavailable" } } }; };
+    await expect(f.replies.compose("contact-1", "Review", [{ kind: "reaction", messageId: "inbound-1", emoji: "👍", action: "add" }], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+    expect(f.replies.view(f.state).drafts).toEqual([]); expect(f.sent).toEqual([]);
+  }
+});
+
+test("composition rejects account or context drift before it stores any draft", async () => {
+  for (const kind of ["account", "context"]) {
+    const f = await setup(), client = f.ports.client()!;
+    if (kind === "account") { const original = client.status; client.status = async (...args) => { const status = await original(...args); return { ...status, identity: { ...status.identity, accountSubject: "other" } }; }; }
+    else { const original = client.poll; client.poll = async (...args) => { const enrollment = await original(...args); return { ...enrollment, revision: enrollment.revision + 1 }; }; }
+    await expect(f.replies.compose("contact-1", "Review", [{ kind: "text", text: "Hello" }], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "conflict" });
+    expect(f.replies.view(f.state).drafts).toEqual([]); expect(f.grantRequests).toEqual([]);
+  }
+});
+
+test("composition binds imported contact assets by bytes and digest before owner review", async () => {
+  const f = await setup(); await f.workspace.write("outbox/owner-note.txt", "Synthetic owner media");
+  const review = await f.replies.compose("contact-1", "A note", [{ kind: "attachment", file: "outbox/owner-note.txt", name: "owner-note.txt", mimeType: "text/plain" }], AbortSignal.timeout(5000));
+  expect(review.assets).toEqual([{ path: "outbox/owner-note.txt", bytes: 21, sha256: expect.stringMatching(/^[a-f0-9]{64}$/u) }]);
+  expect(f.grantRequests).toEqual([]); expect(f.sent).toEqual([]);
+  await f.workspace.write("outbox/owner-note.txt", "Different bytes");
+  await expect(f.replies.send({ draftId: review.id, expectedDigest: review.digest }, AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+  expect(f.sent).toEqual([]);
+});
+
+test("composition rejects missing contacts, incomplete catchup, excess actions and invalid summaries", async () => {
+  const f = await setup();
+  await expect(f.replies.compose("other", "Review", [{ kind: "text", text: "Hello" }], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  for (const summary of ["", " ", "x".repeat(4097), "bad\0summary"]) await expect(f.replies.compose("contact-1", summary, [{ kind: "text", text: "Hello" }], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  await expect(f.replies.compose("contact-1", "Review", Array.from({ length: 8 }, () => ({ kind: "text" as const, text: "Hello" })), AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  f.setReady(false);
+  await expect(f.replies.compose("contact-1", "Review", [{ kind: "text", text: "Hello" }], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
+  expect(f.replies.view(f.state).drafts).toEqual([]); expect(f.sent).toEqual([]);
+});

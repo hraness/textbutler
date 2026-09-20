@@ -12,8 +12,10 @@ import { loadHostConfig, type GhostgetHostConfig } from "./host-config.ts";
 export const IMESSAGE_SETUP_RESULT = "imessage-setup-result.json";
 export const IMESSAGE_SETUP_CUSTODY = "imessage-setup-custody.json";
 export const IMESSAGE_SETUP_BINDING = "imessage-setup-binding.json";
-const VERSION = "0.18.16", PROTOCOL = "ghostget.control/1";
-const READ = "messaging.automation.read", SEND = "messaging.automation.send.text";
+// This release preserves imsg's required bundles in each operation directory.
+const VERSION = "0.18.18", PROTOCOL = "ghostget.control/1";
+const READ = "messaging.automation.read", SEND = "messaging.automation.send.text", ATTACHMENT = "messaging.automation.send.attachment";
+const OPERATIONS = [READ, SEND, ATTACHMENT] as const;
 const sha = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
 class SetupError extends Error { constructor(readonly code: string, readonly settledRejection = false) { super(code); } }
 function invalid(): never { throw new SetupError("connector-metadata-invalid"); }
@@ -41,7 +43,7 @@ function accountFrom(value: unknown, id: string) {
 }
 type PermissionRequest = { action: "snapshot"; accountId: string }
   | { action: "permission.enable"; expectedRevision: number }
-  | { action: "permission.set"; adapterId: "imessage-direct"; operationId: typeof READ | typeof SEND; accountId: string; decision: "allow"; expectedRevision: number; expectedCapabilityDigest: string };
+  | { action: "permission.set"; adapterId: "imessage-direct"; operationId: typeof OPERATIONS[number]; accountId: string; decision: "allow"; expectedRevision: number; expectedCapabilityDigest: string };
 /** Narrow test port; no arbitrary command or provider operation is representable. */
 export interface IMessageSetupPort {
   authList(): Promise<unknown>;
@@ -76,14 +78,14 @@ function snapshot(value: unknown, id: string, subject: string, expectedAccountRe
   const policy = record(view.policy, ["managed", "revision"]);
   if (typeof policy.managed !== "boolean" || !Number.isSafeInteger(policy.revision) || Number(policy.revision) < 0) return invalid();
   const capabilities = rows(view.capabilities, 4096).map(value => record(value));
-  const operations = [READ, SEND].map(operationId => {
+  const operations = OPERATIONS.map(operationId => {
     const matches = capabilities.filter(capability => capability.adapterId === "imessage-direct" && capability.operationId === operationId);
     if (matches.length !== 1) return invalid(); const capability = matches[0]!;
     record(capability, ["digest", "adapterId", "operationId", "pluginId", "surface", "transport", "risk", "effect", "state", "executorSource", "interfaceSource", "permission"]);
     if (capability.surface !== "imessage" || capability.transport !== "local-cli" || capability.state !== "available"
       || capability.executorSource !== "built-in" || capability.interfaceSource !== "bundled"
       || capability.risk !== (operationId === READ ? "R1" : "R3") || !["allow", "deny", "ask", "unmanaged"].includes(String(capability.permission))) throw new SetupError("automation-capability-unavailable");
-    return { operationId: operationId as typeof READ | typeof SEND, digest: digest(capability.digest), permission: capability.permission };
+    return { operationId, digest: digest(capability.digest), permission: capability.permission };
   });
   return { managed: policy.managed, revision: policy.revision as number, accountRevision, operations };
 }
@@ -113,7 +115,7 @@ export async function configureIMessage(port: IMessageSetupPort, accountId: stri
   let view = snapshot(await port.control({ action: "snapshot", accountId }), accountId, subject);
   const accountRevision = view.accountRevision;
   if (!view.managed) { permissionSaved(await port.control({ action: "permission.enable", expectedRevision: view.revision })); state.managedEnabled = true; }
-  for (const operationId of [READ, SEND] as const) {
+  for (const operationId of OPERATIONS) {
     view = snapshot(await port.control({ action: "snapshot", accountId }), accountId, subject, accountRevision);
     if (!view.managed) throw new SetupError("permission-policy-changed");
     const capability = view.operations.find(capability => capability.operationId === operationId)!;

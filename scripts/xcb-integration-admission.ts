@@ -7,12 +7,19 @@ export const XCB_INTEGRATION_RECEIPT = "qualification/xcb-textbutler-v1.json";
 /** Reviewed composition boundary, including the build-time admission gate.
  * An additional source requires an explicit change to this inventory. */
 export const XCB_INTEGRATION_SOURCES = Object.freeze([
+  "packages/control/src/index.ts",
   "packages/textbutler/src/xcb-host.ts",
   "packages/textbutler/src/xcb-client.ts",
   "packages/textbutler/src/xcb-integration.ts",
   "packages/textbutler/src/native-subscription.ts",
   "packages/textbutler/src/native-task.ts",
   "packages/textbutler/src/contact-capabilities.ts",
+  "packages/textbutler/src/control-service.ts",
+  "packages/textbutler/src/message-summary.ts",
+  "packages/textbutler/src/messages-cli.ts",
+  "packages/textbutler/src/owner-cli.ts",
+  "packages/textbutler/src/owner-messages.ts",
+  "packages/textbutler/src/owner-replies.ts",
   "packages/textbutler/src/routed-agent.ts",
   "packages/textbutler/src/provider-host.ts",
   "packages/textbutler/src/daemon.ts",
