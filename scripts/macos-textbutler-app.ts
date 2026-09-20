@@ -1,4 +1,4 @@
-import { chmod, cp, link, lstat, mkdir, mkdtemp, open, readdir, realpath, rm, rmdir, unlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, open, readdir, realpath, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir, tmpdir } from "node:os";
@@ -48,8 +48,36 @@ async function removeGeneratedFinderMetadata(app: string): Promise<void> {
   // Finder may annotate a newly created .app while the owner's file picker is
   // open. Remove only these two non-code attributes from this generated app;
   // never clear quarantine, permissions, or attributes on input/user files.
-  const names = (await run(["/usr/bin/xattr", "-r", app])).split("\n");
-  for (const name of ["com.apple.FinderInfo", "com.apple.ResourceFork"]) if (names.some(line => line === name || line.endsWith(`: ${name}`))) await run(["/usr/bin/xattr", "-dr", name, app]);
+  const visit = async (path: string): Promise<void> => {
+    const info = await lstat(path);
+    if (info.uid !== process.getuid?.() || info.isSymbolicLink() || !info.isFile() && !info.isDirectory()) throw new Error("Generated app metadata has an unexpected owner or file type.");
+    if (info.isDirectory()) for (const name of await readdir(path)) await visit(join(path, name));
+    const names = (await run(["/usr/bin/xattr", path])).split("\n");
+    const remove = ["com.apple.FinderInfo", "com.apple.ResourceFork"].filter(name => names.includes(name));
+    if (remove.length) {
+      // The staged copy retains sealed input modes. Temporarily allow this
+      // owner to remove Finder metadata, then restore exactly those modes.
+      const mode = info.mode & 0o7777;
+      try { await chmod(path, mode | 0o200); for (const name of remove) await run(["/usr/bin/xattr", "-d", name, path]); }
+      finally { await chmod(path, mode); }
+    }
+  };
+  await visit(app);
+}
+
+/** Copy verified bytes into a new private staging directory. Preserve security
+ * metadata and normalize only Finder's two signing-incompatible attributes on
+ * the generated copy; neither the source nor an installed app is modified. */
+export async function stageTextbutlerMacosApp(identity: MacosAppIdentity, source: string, destination: string): Promise<void> {
+  await verifyMacosApp(identity, source);
+  await appPhysicalDirectory(dirname(destination), true);
+  if (await exists(destination)) throw new Error("The app staging destination already exists and was preserved.");
+  await run(["/usr/bin/ditto", "--rsrc", "--extattr", "--qtn", "--acl", source, destination]);
+  await verifyMacosApp(identity, destination);
+  await removeGeneratedFinderMetadata(destination);
+  await seal(destination); await verifyMacosApp(identity, destination);
+  await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", destination]);
+  await verifyMacosApp(identity, destination);
 }
 
 /** Native-only builder seam used by synthetic custody tests. Production callers
@@ -80,6 +108,7 @@ export async function compileTextbutlerMacosApp(input: {
     await run(["/usr/bin/xcrun", "clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2", "-framework", "CoreFoundation", "-framework", "ApplicationServices", "-I", scratch, compiledSource, "-o", executable]);
     await removeGeneratedFinderMetadata(app);
     await run(["/usr/bin/codesign", "--force", "--sign", "-", "--timestamp=none", "--identifier", MACOS_APP_BUNDLE_ID, app]);
+    await removeGeneratedFinderMetadata(app);
     await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", app]);
     const identity: MacosAppIdentity = { schemaVersion: 1, bundleId: MACOS_APP_BUNDLE_ID, signing: "ad-hoc", messagesBundleId, automationConsent: input.syntheticAutomationPermission === undefined ? "native-api" : "synthetic", appPath: input.appPath, home: input.home, dataDir: input.dataDir, runtime: input.runtime, entrypoint: input.entrypoint, runtimeSha256: input.runtimeSha256, entrypointSha256: input.entrypointSha256,
       executableSha256: await appFileDigest(executable, { executable: true }), infoPlistSha256: await appFileDigest(join(app, "Contents", "Info.plist")), signatureSha256: await appFileDigest(join(app, "Contents", "_CodeSignature", "CodeResources")), sourceSha256 };
@@ -118,11 +147,11 @@ export async function installTextbutlerMacosApp(options: { from: string }): Prom
   await verifyMacosApp(identity, app);
   const payload = await verifyDistribution(dirname(identity.entrypoint));
   if (payload.manifest.runtime.sha256 !== identity.runtimeSha256) throw new Error("The app's installed payload no longer matches its runtime pin.");
-  await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", app]);
   await physicalDirectory(parent, true); await physicalDirectory(identity.dataDir, true); await physicalDirectory(dirname(receiptPath), true);
   if (await exists(receiptPath)) {
     if (JSON.stringify(await readMacosAppReceipt(receiptPath)) !== JSON.stringify(identity)) throw new Error("Another TextButler app receipt exists and was preserved. A managed upgrade must retain its prior identity and permission evidence.");
     await verifyMacosApp(identity);
+    await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", identity.appPath]);
     return { appPath: identity.appPath, receiptPath, alreadyInstalled: true, signing: "ad-hoc" };
   }
   // A prior complete app with no receipt can be recovered only when every byte
@@ -132,12 +161,12 @@ export async function installTextbutlerMacosApp(options: { from: string }): Prom
     const staged = await mkdtemp(join(parent, ".textbutler-app-stage-"));
     try {
       const copy = join(staged, "TextButler.app");
-      await cp(app, copy, { recursive: true, dereference: false, preserveTimestamps: true, errorOnExist: true, force: false });
-      await verifyMacosApp(identity, copy); await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", copy]);
+      await stageTextbutlerMacosApp(identity, app, copy);
       await chmod(copy, 0o700); await publishApp(copy, identity.appPath); await seal(identity.appPath); await syncDirectory(parent);
     } finally { if ((await readdir(staged)).length === 0) await rmdir(staged); }
   }
   await verifyMacosApp(identity);
+  await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", identity.appPath]);
   await publishPrivateArtifact(dirname(receiptPath), "macos-app.json", Buffer.from(`${JSON.stringify(identity)}\n`)); await syncDirectory(dirname(receiptPath));
   return { appPath: identity.appPath, receiptPath, alreadyInstalled: false, signing: "ad-hoc" };
 }
@@ -151,12 +180,25 @@ export type SetupJob = { state: "absent" } | { state: "owned"; running: boolean;
 export function parseMacosSetupJob(result: SetupCommandResult, expected: { uid: number; plist: string; executable: string; generation?: string }): SetupJob {
   if (result.exitCode === 113 && result.stdout === "" && result.stderr === `Bad request.\nCould not find service "${SETUP_LABEL}" in domain for user gui: ${expected.uid}\n`) return { state: "absent" };
   if (result.exitCode !== 0 || Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) > 131072 || !result.stdout.startsWith(`gui/${expected.uid}/${SETUP_LABEL} = {\n`)) return { state: "unknown" };
-  const lines = result.stdout.split("\n").map(line => line.trim()), fields = (key: string): string | null => { const found = lines.filter(line => line.startsWith(`${key} = `)); return found.length === 1 ? found[0]!.slice(key.length + 3) : null; };
-  const start = lines.indexOf("arguments = {"), end = lines.indexOf("}", start + 1);
-  if (fields("path") !== expected.plist || fields("program") !== expected.executable || start < 0 || end < 0 || JSON.stringify(lines.slice(start + 1, end)) !== JSON.stringify([expected.executable, "--imessage-setup"])) return { state: "unknown" };
-  if (expected.generation === undefined || macosLaunchGeneration(result.stdout) !== expected.generation) return { state: "unknown" };
-  const exit = fields("last exit code"), pid = fields("pid");
-  if (pid !== null && !/^[1-9][0-9]{0,9}$/u.test(pid) || exit !== null && !/^[0-9]{1,3}$/u.test(exit)) return { state: "unknown" };
+  const lines = result.stdout.split("\n").map(line => line.trim()), top: string[] = [], args: string[] = [], environment: string[] = [];
+  let depth = 1, argumentBlocks = 0, environmentBlocks = 0, inArguments = false, inEnvironment = false;
+  for (const line of lines.slice(1)) {
+    if (depth === 0) { if (line !== "") return { state: "unknown" }; continue; }
+    if (depth === 1) {
+      top.push(line);
+      if (line === "arguments = {") { argumentBlocks++; inArguments = true; }
+      if (line === "environment = {") { environmentBlocks++; inEnvironment = true; }
+    } else if (depth === 2 && line !== "}") { if (inArguments) args.push(line); if (inEnvironment) environment.push(line); }
+    if (line === "}") { if (depth === 2) { inArguments = false; inEnvironment = false; } depth--; }
+    else if (line.endsWith(" = {")) depth++;
+  }
+  if (depth !== 0) return { state: "unknown" };
+  if (["path", "program", "state", "pid", "last exit code"].some(key => top.filter(line => line.startsWith(`${key} = `)).length > 1)) return { state: "unknown" };
+  const fields = (key: string): string | null => { const found = top.filter(line => line.startsWith(`${key} = `)); return found.length === 1 ? found[0]!.slice(key.length + 3) : null; };
+  if (fields("path") !== expected.plist || fields("program") !== expected.executable || argumentBlocks !== 1 || JSON.stringify(args) !== JSON.stringify([expected.executable, "--imessage-setup"])) return { state: "unknown" };
+  if (expected.generation === undefined || environmentBlocks !== 1 || macosLaunchGeneration(`environment = {\n${environment.join("\n")}\n}\n`) !== expected.generation) return { state: "unknown" };
+  const observedExit = fields("last exit code"), exit = observedExit === "(never exited)" ? null : observedExit, pid = fields("pid");
+  if (pid !== null && (!/^[1-9][0-9]{0,9}$/u.test(pid) || Number(pid) > 2 ** 31 - 1) || exit !== null && (!/^[0-9]{1,3}$/u.test(exit) || Number(exit) > 255)) return { state: "unknown" };
   const state = fields("state");
   if (state !== "running" && state !== "not running" || state === "running" && pid === null || state === "not running" && pid !== null) return { state: "unknown" };
   return { state: "owned", running: state === "running", exitCode: exit === null ? null : Number(exit) };

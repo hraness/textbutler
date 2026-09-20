@@ -127,6 +127,8 @@ describe("complete workflow-control range", () => {
     });
   });
 
+  // Five independent real Git histories share one integration-test deadline.
+  // Allow fixture latency while preserving every mutation rejection assertion.
   test("rejects workflow add, delete, rename, mode, and content changes", () => {
     const mutations = [
       ["add", (input: Fixture) => {
@@ -150,7 +152,7 @@ describe("complete workflow-control range", () => {
         workingDirectory: input.repository,
       })).toThrow(name === "delete" ? "Workflow tree inventory failed closed" : ".github/workflows");
     }
-  });
+  }, 30_000);
 
   test("rejects a workflow touch-and-revert hidden on a merged side branch", () => {
     const input = fixture();
