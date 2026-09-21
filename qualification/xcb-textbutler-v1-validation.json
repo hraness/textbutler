@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "scope": "TextButler contact-profile composition, owner messaging controls and native startup/setup source; synthetic tests only, including a development Ghostget 0.18.21 fixture, closed discovery diagnostics, literal iMessage/any GUID read and enrollment identity, and route-neutral AI readiness copy. Actual Ghostget artifact admission, native send service enforcement, XCB/provider admission, macOS permissions and live messaging verification remain independent.",
+  "scope": "TextButler contact-profile composition, owner messaging controls and native startup/setup source; synthetic tests only, including a development Ghostget 0.18.21 fixture, closed discovery diagnostics, literal iMessage/any GUID read and enrollment identity, route-neutral AI readiness copy, and pinned native transport provisioning before account linking. Actual Ghostget artifact admission, native send service enforcement, XCB/provider admission, macOS permissions and live messaging verification remain independent.",
   "toolchain": "Bun 1.3.14",
   "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
   "result": {
     "exitCode": 0,
-    "passed": 240,
+    "passed": 241,
     "failed": 0,
-    "assertions": 1952,
+    "assertions": 1966,
     "files": 18
   },
   "additionalChecks": [
@@ -15,22 +15,22 @@
       "command": "bun run node_modules/typescript/bin/tsc --noEmit -p packages/transport/tsconfig.json",
       "exitCode": 0,
       "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "evidence": "Observed current coupled composition completion; compiler output is empty. All 246 retained inputs were unchanged before and after the suite and both typechecks."
+      "evidence": "Observed current coupled composition completion; compiler output is empty. All retained inputs were unchanged before and after the suite and both typechecks."
     },
     {
       "command": "bun run node_modules/typescript/bin/tsc --noEmit -p packages/textbutler/tsconfig.json",
       "exitCode": 0,
       "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "evidence": "Observed current coupled composition completion; compiler output is empty. All 246 retained inputs were unchanged before and after the suite and both typechecks."
+      "evidence": "Observed current coupled composition completion; compiler output is empty. All retained inputs were unchanged before and after the suite and both typechecks."
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "d05fae96dadf5f1bee2d5ee2a8fced19c07245327424e66445028cc596b6a46c",
+  "sourceDigest": "44324d13e2275e628559aa939473706a6142547df8aea795cfbc3eb25f0da4d8",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
     "packages/textbutler/src/ghostget-automation-process.test.ts": "9c2b2303a6deae4d92f5a4c54f3c969799086d45b214f5e4fd2620a499f0b193",
-    "packages/textbutler/src/imessage-setup.test.ts": "8a30658941fc6cdb83b4d2f4350e83f89a36fc93e8483ce035cdfd1597f10db5",
+    "packages/textbutler/src/imessage-setup.test.ts": "2246b341b5bee2714dc58065cd534bc69e4a04a464b3e94f397a50342783dad5",
     "packages/textbutler/src/message-summary.test.ts": "286cd717f0741fd40ac8caa47df14c436e66697834446fdaaa3add283b387419",
     "packages/textbutler/src/messages-cli.test.ts": "c0c2db682378924bbaddfa81db831b652b92e9867dc037c1d4c78099df60a49e",
     "packages/textbutler/src/native-subscription.test.ts": "06b348c961b14bbf234c6626ccfcb2e1d9a24164bec740a2de2fc88ba46df2e4",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "f387020c3751db9440c719588cb8890f1c204577c29c1ef75d0ef019492e12b1",
-  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new literal-GUID tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "56d5e6948fcdf14dfbffbd110d0ca0b6e00be9b960cc3319dc00ef42cb135d27",
+  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new transport-install custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Independent integration-owner review of the literal-coordinate parser and tests plus route-neutral readiness copy atop reviewed draft PR143 head 9d4548ea574d4156e81084dfcdb694d125a0f1d3; independent composition-owner review of the one-line automation-contract source-inventory addition. Current coupled 18-file synthetic suite and both package typechecks passed with all 246 captured inputs unchanged. Earlier review references describe historical baseline work. This review covers TextButler read, enrollment and history identity semantics; native per-send service enforcement is separate.",
+    "method": "Integration-owner review of the pinned native transport provisioning added to native setup and its synthetic custody tests atop PR143 head 94827e8; the live 0.14.1+private-transport.4 install and the completed read-only live check are recorded as deployment evidence, not as substitutes for this synthetic receipt. Earlier review references describe historical baseline work. This review covers TextButler setup provisioning order and failure custody; native per-send service enforcement is separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -139,6 +139,15 @@
           "scripts/xcb-integration-admission.ts"
         ],
         "result": "Approved only the exact iMessage; and any; GUID prefix allowlist while preserving service=iMessage, literal GUID bytes, the existing byte/NUL limits, exact keys, positive safe row identity, and binding equality. Synthetic discovery/enrollment/history cases reject prefix or row changes even when a provider recomputes the enrollment digest. Route-neutral readiness copy avoids implying a Claude API account or an already-selected contact account. The coordinate contract is explicitly bound in the 30-source inventory. All 246 inputs remained unchanged across 240 tests, 1952 assertions and both successful package typechecks. No native send service guard or live messaging result is claimed."
+      },
+      {
+        "reviewerRole": "Integration owner, independent of the transport provisioning implementation",
+        "files": [
+          "packages/textbutler/src/imessage-setup.ts",
+          "packages/textbutler/src/imessage-setup.test.ts",
+          "docs/textbutler/getting-started.md"
+        ],
+        "result": "Approved provisioning the connector-pinned imsg artifact through the connector's own idempotent, hash-admitted install before account linking inside setup custody. The closed install response admits only the exact reviewed tool identity, version and artifact digest shape; missing fields, wrong tool identity, non-boolean markers and nonzero exits retain custody before any account read. The live failure mode this fixes — an admitted connector upgrade leaving an unpinned transport — was reproduced and resolved on the owner installation; this receipt claims only the synthetic evidence."
       }
     ],
     "findingsResolved": [
@@ -162,20 +171,21 @@
       "Reject non-string remote codes before clearing their pending request, retaining failed custody and bounded settlement",
       "Admit exactly Ghostget 0.18.21 in the development setup fixture; prior release or installation is not inferred from synthetic success",
       "Preserve literal any; iMessage coordinates through discovery, enrollment and history while rejecting SMS/unknown prefixes, non-iMessage service and changed exact bindings",
-      "Describe any ready AI route without incorrectly claiming a selected Claude API account"
+      "Describe any ready AI route without incorrectly claiming a selected Claude API account",
+      "Provision the pinned native iMessage transport before account linking; a missing, failed or malformed install retains custody instead of reaching messaging"
     ],
     "remaining": "Synthetic development 0.18.21 fixtures establish TextButler exact-version parsing, diagnostics and literal coordinate identity, not an actual Ghostget release, native send service enforcement, Messages access or delivery. Canonical Ghostget artifact admission and native per-send service checks remain separate gates. Application installation, macOS permissions, exact XCB executable/provider admission, account/recipient verification and live messaging behavior require separate evidence; this receipt makes no live-provider or delivery claim."
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "78386529c18c15adea5e255f399b423c5524da660384f4d00d4509f7c17620a5",
+    "sha256": "2d5eb1de2ea039447bcc29a5f05552b794a0c1b23acb6f8599a96dcc9688ac61",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
       "bun.lock": "2e6c9ea2aea734cb83423858a2118893a4561bac0030b365a1740411ace37c55",
-      "docs/textbutler/agent-cli.md": "3452ea7083fa1750546e1c7dd79375726502a3dc39b0df11dcfdd13d27155900",
+      "docs/textbutler/agent-cli.md": "e803d01f6c5fd30de3169d897c8375c490357d923f84a33876b86231abd5d924",
       "docs/textbutler/architecture.md": "4aa92f18da0682f19250d2c10e7249ca4b041274baf0324e8ea86edb25723361",
-      "docs/textbutler/getting-started.md": "3f9d10938b6c45f6cc68a966b144c7837b4b560b70a6449c4a9a9e0c3b1b910e",
+      "docs/textbutler/getting-started.md": "df359d73e4b42539751972652de881a6fe0a9a34d0f14def299882fc146878a6",
       "docs/textbutler/ghostget-contract.md": "aa029df8643b9c730d037b20bef624193809cda19e597b8589c32fdf53e6deee",
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
@@ -208,8 +218,8 @@
       "packages/textbutler/src/hooks.ts": "87603496f0454d1acd73393b8167bc421eec6e31067398dcfc2f3e28dd08f16f",
       "packages/textbutler/src/host-config.test.ts": "57b8f21951ff12ae19a79f0298984ca73add9cc84c3503e00db6ea514bbee69b",
       "packages/textbutler/src/host-config.ts": "ca3215291f3e50383057a3218fe8f5bc8cb477956d28fffcdf2d78c53e3d05ad",
-      "packages/textbutler/src/imessage-setup.test.ts": "8a30658941fc6cdb83b4d2f4350e83f89a36fc93e8483ce035cdfd1597f10db5",
-      "packages/textbutler/src/imessage-setup.ts": "7d10f96796fc7958e74bf8caf1c89ce89eadfc92ad79bb1c855554240edf718c",
+      "packages/textbutler/src/imessage-setup.test.ts": "2246b341b5bee2714dc58065cd534bc69e4a04a464b3e94f397a50342783dad5",
+      "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
       "packages/textbutler/src/index.ts": "9af45ca0dc8aeef57fc00c414a9c7bf0e1257ed57f93f26bdf1e735205d6b3ce",
       "packages/textbutler/src/journal.ts": "3f967c92def3fd74826b35c5c2a1b2695aff2b14f57f3440e3f30bbe1c9e1f0a",
       "packages/textbutler/src/launch-agent.test.ts": "3120cbdbc362a87cef45059b5d07bff3de6306c323b5c7a7759cfd8eff80b0a3",
@@ -424,9 +434,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "0c0976ab3b8c9842b1b540294d4aaa9de76ced5a540507b5cc383b032ec9d37a",
-    "evidenceSha256": "0365cc7d98aee58629b8c5e9922a605736b83b9b8b54ded4284f57f9f56608bb",
-    "logSha256": "eac1d22364ad8719830c1cad9b23afe0ce4e3ebdea56e09626f27cdbc084ac3e",
+    "validationSha256": "bd292289b1720539937764c01cc271a6f1bf16cb41249f95539cb4d35de5db4a",
+    "evidenceSha256": "12a068eba1628c5adc26af2b28b9e825a3b6397f211082ba463a9d1c300b14f4",
+    "logSha256": "f387020c3751db9440c719588cb8890f1c204577c29c1ef75d0ef019492e12b1",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }
