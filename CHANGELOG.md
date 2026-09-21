@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.12 (2026-09-21)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.12` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Add the native TextButler desktop app with scoped guided setup, a menu bar companion, and per-contact review-first controls. New installations start paused and automatic replies stay off per contact.
+- Connect subscription replies through qualified XCB applications: AI suggestions run against an explicitly admitted native Claude Code or Codex subscription account with exact executable, account, and model checks instead of an API key.
+- Add the agent messaging JSON CLI for agents to read and summarize one selected conversation, prepare text or attachment drafts, and send only an explicitly authorized reviewed message.
+- Restore native iMessage discovery and history through the reviewed Ghostget connector, including literal modern coordinates, and provision the pinned private transport during setup so a reviewed connector upgrade cannot leave a stale helper.
+- Refresh the informational site's identity and keep it informational only; it receives no messages or contact data.
+
 ## 0.8.11 (2026-09-16)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.11` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
