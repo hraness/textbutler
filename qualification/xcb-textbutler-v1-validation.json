@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "a896dd5072c2f98022c3493844dda4c0dbefb841cc6f8971be0b5997d49e1a61",
+  "sourceDigest": "32d8d6dd337357a73ead39af52d7367d7805f3d9ae6ec82be4175ca563858ca7",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "bed0a54f6d55f03ab8f1eb37593453b4e580325b20670639a8b0d96f90375d54",
+  "logSha256": "dd6dcdd212abea40c97f7116fd7bcb311a92eca056274c34bd0eed607ca06696",
   "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new transport-install custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal of the self-chat attribution change on reviewed main head: the changed sealed inputs are the owner control contract gaining an optional selfChat contact flag and a self message author, the control service contact-settings plumbing and stored-state defaulting for it, the owner CLI contacts self command, and the owner message/reply surfaces excluding self echoes from composition evidence. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers the self-conversation flag admission; native per-send service enforcement and live iMessage echo behavior are separate.",
+    "method": "Integration-owner reseal of the 0.8.14 release version bump on reviewed main head: the changed sealed inputs are the root package version carrying the merged self-chat attribution work. Source version, changelog and site version inputs were refreshed with all other sealed bytes unchanged. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers release metadata identity; the self-chat admission was reviewed in the preceding feature merge, and native per-send service enforcement is separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -178,7 +178,7 @@
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "8fb06e229e6b09d1da9733f6d7ddc9d9e711ff997d24c98ea3898aaf7358353c",
+    "sha256": "274c0f64c6d749ab441a4f5cd6ce7b12738066d160f86acd77752018b048a535",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -190,7 +190,7 @@
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
-      "package.json": "30a4761a5ee2bf12436d9831ee6d822b9c8527ba3f375e8c97c8e4c685d83f1c",
+      "package.json": "b5a6b46f4c5f75dca174cc8135fa721e8039bf56a2cd907f028235f96e838710",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
       "packages/control/src/index.ts": "5d9377d4aa913b038f3a0557907137cd17e01fa9595def908416f4729ee4e43d",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
@@ -415,7 +415,7 @@
       "src/test-fixtures.ts": "3ac9802051d38c6d3ef92a842eb35ef1dedf8c9dd6424107b5054e4933d5e6bc",
       "src/test-x-archive-fixture.ts": "3461032a8c8bd2765c1c74c8616f442cbefd356b8f24401bb32241d4a967fa00",
       "src/types.ts": "fb3c0ffecae6900505b1bec8824ff0e24b12c8e12d742cb17250600a29d85aff",
-      "src/version.ts": "ea375cac2010a6a67c038152ada1e599995ecb21f1beaaa8eb16e05ac9a4f15d",
+      "src/version.ts": "dfb24e3d198f6e133dd8e6330e66d0b5b8d959129ac94f3ef0131f3e58ec600e",
       "src/whatsapp-source.test.ts": "c07fdbee0ea8b5b4f1b57f3c7101ff1a5ed62ed8d97f98597d26c1d9999aa1f4",
       "src/whatsapp-source.ts": "fd6daff5185ee81b3585c003eb1d0c07b4b4e788aa55c7b4bef0edca46f732f4",
       "src/x-archive-zip-rust.test.ts": "7fd66cb10f08a2102da3f6ca187b030ecd350580f37224d8c6b4aba7ff3093f7",
@@ -434,9 +434,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "a48ffdc36475a30820dd64b00a16933eda436f8e0b172700f9b77e471f1b4cac",
-    "evidenceSha256": "addb17023c6d020cf8ea32fee9b16d6181777413e64f6bdc5f9ea1b4a3b85d4a",
-    "logSha256": "267ecd9987801db539e5c06a0494cd11adc103913b388cf7b7d4c98fff2117bc",
+    "validationSha256": "675498a0e76949aaa6d9ebe2c9833d178aeebe59a026deeb3b7fc15036dea9d1",
+    "evidenceSha256": "c6219d07cc0485985dd6a4fda88e2b6f2e1ef3994ff5b6b8c6f7963a688c7cf9",
+    "logSha256": "bed0a54f6d55f03ab8f1eb37593453b4e580325b20670639a8b0d96f90375d54",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }

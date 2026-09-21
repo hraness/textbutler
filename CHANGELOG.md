@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.14 (2026-09-21)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.14` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Let the owner mark a conversation as their own address with `contacts self CONTACT on|off`. iMessage self chats deliver each owner text as an inbound copy plus an outgoing echo; the echo is no longer mistaken for the owner's answer, and the butler's own wrapped sends echoing back inbound cannot trigger another reply. Marking requires a visible butler wrap so the echo signal cannot be cleared away, and stored contacts default off.
+
 ## 0.8.13 (2026-09-21)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.13` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
