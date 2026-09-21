@@ -15,10 +15,10 @@
   "sources": {
     "bun.lock": "2e6c9ea2aea734cb83423858a2118893a4561bac0030b365a1740411ace37c55",
     "package.json": "30a4761a5ee2bf12436d9831ee6d822b9c8527ba3f375e8c97c8e4c685d83f1c",
-    "packages/control/src/index.ts": "ef481855a332e720365ff949a2b63cf5c6f507c8bbf93e13cc1e388d5962a5e6",
+    "packages/control/src/index.ts": "5d9377d4aa913b038f3a0557907137cd17e01fa9595def908416f4729ee4e43d",
     "packages/textbutler/src/cli.ts": "8464ac466faad5ad1f27ce835bc0315f8fd732ed6d926a4c908b7da317e06775",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
-    "packages/textbutler/src/control-service.ts": "332d11ff003bdbf62c681bc17d41926044610e2402d0345ff5a07eb4a97aa4f9",
+    "packages/textbutler/src/control-service.ts": "d4dd6260c504b3f3a9d667fbecd815473d9e7d4d617259bf9d6a355a2fffc8b7",
     "packages/textbutler/src/daemon.ts": "912b55671579faa7f62fe5acc3b08fac97df0c1ea3292ccafdac815896336eb5",
     "packages/textbutler/src/host-config.ts": "ca3215291f3e50383057a3218fe8f5bc8cb477956d28fffcdf2d78c53e3d05ad",
     "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
@@ -28,9 +28,9 @@
     "packages/textbutler/src/messages-cli.ts": "44e5db75549e212ab2686d3673c5433908f1f9554bf133e98fd574d09255e66f",
     "packages/textbutler/src/native-subscription.ts": "fcda298612c835dd673086de977a21e10a7e14ea1a409c881906460f245e5cab",
     "packages/textbutler/src/native-task.ts": "e2a3f5ebb1586700af67f540273b5c4c6c0a33c4415a139693d6ca6d0f6dcaf6",
-    "packages/textbutler/src/owner-cli.ts": "8b1f183322446366cd2044fb0e4f146b15dd705d7d3f29e1716be9035580d3c2",
-    "packages/textbutler/src/owner-messages.ts": "b901e01485592b23ac90ada314e6900a5b302dc179f7090a3a180af2604c3029",
-    "packages/textbutler/src/owner-replies.ts": "369dbf1ee9a9c646d03e0f069304abfa65530971102b71d3db84aff4b8656375",
+    "packages/textbutler/src/owner-cli.ts": "244ebc40b3c9535f434b2def3366223372cf0aaa9af3a9140c6e770137bf8dba",
+    "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
+    "packages/textbutler/src/owner-replies.ts": "c8a3cacbcc007e45d4118bf360a405d2e1dd4924f0ead8086c3393f590676c38",
     "packages/textbutler/src/provider-host.ts": "ae0ad4f052aa6cd065772c2dcfecff355296b20519b03ba38cb9a2c7978a5813",
     "packages/textbutler/src/routed-agent.ts": "113742ede2a0199dd68df749815f4e1bdde78aaf3b7259929ad409cee22e708b",
     "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
@@ -46,6 +46,6 @@
   },
   "validation": {
     "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
-    "receiptSha256": "a48ffdc36475a30820dd64b00a16933eda436f8e0b172700f9b77e471f1b4cac"
+    "receiptSha256": "675498a0e76949aaa6d9ebe2c9833d178aeebe59a026deeb3b7fc15036dea9d1"
   }
 }

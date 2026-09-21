@@ -233,8 +233,10 @@ export class OwnerReplies {
     if (cluster === null) return { draft: null, pending: item };
     if (!enrollment.ready) fail("unavailable", "Messaging catchup is incomplete. Wait for a current conversation before requesting a suggestion.");
     const history = boundedHistory(messages.filter(message => message.kind === "message" && message.direction !== "unknown")
-      .map(message => ({ id: message.id, text: message.text ?? "", at: Date.parse(message.occurredAt),
-        author: messageAuthor(message, contact, this.ports.journal) as "owner" | "contact" | "butler" })));
+      .flatMap(message => {
+        const who = messageAuthor(message, contact, this.ports.journal);
+        return who === "self" ? [] : [{ id: message.id, text: message.text ?? "", at: Date.parse(message.occurredAt), author: who as "owner" | "contact" | "butler" }];
+      }));
     signal.throwIfAborted();
     await (await this.ports.workspace(contact.id)).write("history/recent.json", JSON.stringify({ schemaVersion: 1, purpose: "context-only-never-trigger", messages: history }));
     const agent = this.replyAgent(providers);

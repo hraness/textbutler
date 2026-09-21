@@ -87,8 +87,8 @@ export class OwnerMessages {
     const { contact, binding } = await this.selected(contactId), providers = this.ports.providers();
     if (!providers) fail("unavailable", "Select a qualified agent account before requesting a summary.");
     const history = await this.read(contact, binding, limit, signal);
-    const eligible: SummaryMessage[] = history.messages.filter(message => message.kind === "message" && message.text !== null)
-      .map(message => ({ id: message.id, at: message.at, author: message.author, text: message.text! }));
+    const eligible: SummaryMessage[] = history.messages.filter(message => message.kind === "message" && message.text !== null && message.author !== "self")
+      .map(message => ({ id: message.id, at: message.at, author: message.author as SummaryMessage["author"], text: message.text! }));
     const messages = retainNewest(eligible, SUMMARY_BYTES);
     if (!messages.length) fail("unavailable", "This bounded conversation sample contains no text to summarize.");
     const result = await (this.ports.summarize ?? summarizeMessages)({ contact, messages, providers, signal, now: this.ports.now });

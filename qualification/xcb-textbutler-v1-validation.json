@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "e5bce87146672eeaffd9dff6f6e0732eacc38387ad2f332ec7669dd8a0e25ec4",
+  "sourceDigest": "a896dd5072c2f98022c3493844dda4c0dbefb841cc6f8971be0b5997d49e1a61",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "267ecd9987801db539e5c06a0494cd11adc103913b388cf7b7d4c98fff2117bc",
+  "logSha256": "bed0a54f6d55f03ab8f1eb37593453b4e580325b20670639a8b0d96f90375d54",
   "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new transport-install custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal of the 0.8.13 release version bump on reviewed main head: the changed sealed inputs are the root package version and the xcb-client capability parser accepting the renamed account identity fields. Source version, changelog and site version inputs were refreshed with all other sealed bytes unchanged. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers release metadata identity and the widened account-schema admission; native per-send service enforcement is separate.",
+    "method": "Integration-owner reseal of the self-chat attribution change on reviewed main head: the changed sealed inputs are the owner control contract gaining an optional selfChat contact flag and a self message author, the control service contact-settings plumbing and stored-state defaulting for it, the owner CLI contacts self command, and the owner message/reply surfaces excluding self echoes from composition evidence. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers the self-conversation flag admission; native per-send service enforcement and live iMessage echo behavior are separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -178,7 +178,7 @@
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "c8602038d702a35b2a7392bee30f21572afb26fcbc6eaae9fcd9445c821923e7",
+    "sha256": "8fb06e229e6b09d1da9733f6d7ddc9d9e711ff997d24c98ea3898aaf7358353c",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -192,18 +192,18 @@
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
       "package.json": "30a4761a5ee2bf12436d9831ee6d822b9c8527ba3f375e8c97c8e4c685d83f1c",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
-      "packages/control/src/index.ts": "ef481855a332e720365ff949a2b63cf5c6f507c8bbf93e13cc1e388d5962a5e6",
+      "packages/control/src/index.ts": "5d9377d4aa913b038f3a0557907137cd17e01fa9595def908416f4729ee4e43d",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
       "packages/textbutler/package.json": "eb632abde522385fb68e42696250ab363240e21def52923e70fc2c55697d6b5e",
-      "packages/textbutler/src/attribution.ts": "5969fee0cd2e12c9f6cd7fb53efcaebf2abc89e9ede21477185cc6dbc22e0168",
+      "packages/textbutler/src/attribution.ts": "582be0187a971473baff8b0545200e8e917e843de4afaacabbdc232e1da1f090",
       "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
       "packages/textbutler/src/automation-owner.ts": "9dfa51e8936c8933d2e5aa0bbe9a0a5a3e22203f0f641dc511c56e8f94ea6a52",
       "packages/textbutler/src/cli.test.ts": "107c77111ebf86eaef10f7d696d24d38494f5a503d1b687970d57e6c03048ea3",
       "packages/textbutler/src/cli.ts": "8464ac466faad5ad1f27ce835bc0315f8fd732ed6d926a4c908b7da317e06775",
-      "packages/textbutler/src/config.ts": "ce7b7e99b117e0b7d8b81368cec3f1016ef7bbe0dadace3b8e02e30c027aacfe",
+      "packages/textbutler/src/config.ts": "990c51ad8e3dadcde339b64a624aa5308e926cda9ed8a7f31f268e1b044838e1",
       "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
       "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
-      "packages/textbutler/src/control-service.ts": "332d11ff003bdbf62c681bc17d41926044610e2402d0345ff5a07eb4a97aa4f9",
+      "packages/textbutler/src/control-service.ts": "d4dd6260c504b3f3a9d667fbecd815473d9e7d4d617259bf9d6a355a2fffc8b7",
       "packages/textbutler/src/daemon-custody.test.ts": "8bc58904f2ddb921eaeccfaf272e29f87176137cdacb00cd1ab78408fa41013a",
       "packages/textbutler/src/daemon-custody.ts": "ead51b8c27bf88a0969ef9f4a7476bbedb71af5ec96d4d20919580715717ec8c",
       "packages/textbutler/src/daemon.test.ts": "d479f68d4ca41a906b70a50810c27f4ff5131f802b36bc8202910c60f49d0899",
@@ -221,7 +221,7 @@
       "packages/textbutler/src/imessage-setup.test.ts": "2246b341b5bee2714dc58065cd534bc69e4a04a464b3e94f397a50342783dad5",
       "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
       "packages/textbutler/src/index.ts": "9af45ca0dc8aeef57fc00c414a9c7bf0e1257ed57f93f26bdf1e735205d6b3ce",
-      "packages/textbutler/src/journal.ts": "3f967c92def3fd74826b35c5c2a1b2695aff2b14f57f3440e3f30bbe1c9e1f0a",
+      "packages/textbutler/src/journal.ts": "ef4b0a6daaffe2dde490943e5992efad11c2bc11bccc7412be8ae97147657a91",
       "packages/textbutler/src/launch-agent.test.ts": "3120cbdbc362a87cef45059b5d07bff3de6306c323b5c7a7759cfd8eff80b0a3",
       "packages/textbutler/src/launch-agent.ts": "16d63e713691a236071da04a77b348106ee2d822a586d0519d07a988bb59b589",
       "packages/textbutler/src/macos-app.test.ts": "6c8a14feff283fdcca30add81587b0cd8f6071a571cd7bf077fb0f7de006e047",
@@ -247,11 +247,11 @@
       "packages/textbutler/src/onboarding.test.ts": "f9a8c943624cab05f07cb0cec40d6c2d15fd1b2730e83d6b2a386558560e6614",
       "packages/textbutler/src/onboarding.ts": "8303f375a4805881ec850f9d1676450bb4373146a11b167047b71bd1165ce8bf",
       "packages/textbutler/src/owner-cli.test.ts": "485945e21d3e9ed8db14573986f0fcde6231e3464edbd508f03ef7b0e565ddbe",
-      "packages/textbutler/src/owner-cli.ts": "8b1f183322446366cd2044fb0e4f146b15dd705d7d3f29e1716be9035580d3c2",
+      "packages/textbutler/src/owner-cli.ts": "244ebc40b3c9535f434b2def3366223372cf0aaa9af3a9140c6e770137bf8dba",
       "packages/textbutler/src/owner-messages.test.ts": "c44d179638bce1908c9994958ce80a8478b6d5d2dd7d3a4f998f3cf521c35773",
-      "packages/textbutler/src/owner-messages.ts": "b901e01485592b23ac90ada314e6900a5b302dc179f7090a3a180af2604c3029",
+      "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
       "packages/textbutler/src/owner-replies.test.ts": "b5600840ba5811f41838da3f017990c0bb64a668287405c2c98981c7eac3e383",
-      "packages/textbutler/src/owner-replies.ts": "369dbf1ee9a9c646d03e0f069304abfa65530971102b71d3db84aff4b8656375",
+      "packages/textbutler/src/owner-replies.ts": "c8a3cacbcc007e45d4118bf360a405d2e1dd4924f0ead8086c3393f590676c38",
       "packages/textbutler/src/plugins.test.ts": "10c4058b3e3057040781c08a9a3035e706c86f8cbc9cf131fbd88de8ed079f89",
       "packages/textbutler/src/plugins.ts": "7d4f5c2fcc1ac6bd2f03d878bda071c8a1f2baf327004973b046f7fa91aa36a9",
       "packages/textbutler/src/policy.test.ts": "ea184ef6339f86cf09b0de166e91e99695650c078b3238aef3e2e34c39a9bc17",
@@ -261,7 +261,7 @@
       "packages/textbutler/src/provider-host.ts": "ae0ad4f052aa6cd065772c2dcfecff355296b20519b03ba38cb9a2c7978a5813",
       "packages/textbutler/src/reply-actions.ts": "c7a7d238fb9116771dee6b7c162596cef180253a456a3364bfd83d6fa8a12e01",
       "packages/textbutler/src/reply-loop.test.ts": "a18ad772cbb8c91b008139b46b87410867eee2ae269f91dea53cff51cb83fbad",
-      "packages/textbutler/src/reply-loop.ts": "6db5af0883edc62b3a417b68964acef72dd2a2a9e9760285d7bf80f6121a2c87",
+      "packages/textbutler/src/reply-loop.ts": "5c58440271499cf0d7860fd3438a97ac95eea9396564b358cfcee4b2d59b63da",
       "packages/textbutler/src/routed-agent.test.ts": "0232fbfab4b1f7eafc3e928fbc4ad7443d45073677b21f2e33a76806ed78a2be",
       "packages/textbutler/src/routed-agent.ts": "113742ede2a0199dd68df749815f4e1bdde78aaf3b7259929ad409cee22e708b",
       "packages/textbutler/src/routed-managed-agent.test.ts": "11a60dea19cadde5ad23becb2a3dce32e339df6f0af7c1bff68dba6cbe3a4201",
@@ -434,9 +434,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "d5bb9deeab5b5163f8e5789a7060d11030185fb29d7d09cbce2e97746c4d39eb",
-    "evidenceSha256": "f755ee2a15a1dead8e2ba0c6e7d7372ed5bf4292cf98a614469103b0f69d86bd",
-    "logSha256": "c30178c83c2b72dd04081af4afef5b608a12acbbfb49c6c8f9617ea5e458d9e2",
+    "validationSha256": "a48ffdc36475a30820dd64b00a16933eda436f8e0b172700f9b77e471f1b4cac",
+    "evidenceSha256": "addb17023c6d020cf8ea32fee9b16d6181777413e64f6bdc5f9ea1b4a3b85d4a",
+    "logSha256": "267ecd9987801db539e5c06a0494cd11adc103913b388cf7b7d4c98fff2117bc",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }

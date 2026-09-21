@@ -10,6 +10,8 @@ export type CapabilityId = "messages" | "contacts" | "agent" | "attachments" | "
 export interface Capability { id: CapabilityId; status: "available" | "setup-required" | "unsupported"; detail: string }
 export interface ContactSettings {
   enabled: boolean;
+  /** The owner marked this conversation as their own address. */
+  selfChat?: boolean;
   responseMode: "smart" | "keyword";
   keyword: string;
   provider: "codex" | "claude";
@@ -44,7 +46,7 @@ export interface ReplyDraftDetail {
 }
 export interface RepliesView { scannedAt: string | null; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
 export interface OwnerMessage {
-  id: string; at: number; author: "owner" | "contact" | "butler" | "unknown"; text: string | null;
+  id: string; at: number; author: "owner" | "contact" | "butler" | "self" | "unknown"; text: string | null;
   kind: "message" | "reaction" | "edit" | "delete"; relatedMessageId: string | null; textTruncated: boolean;
   attachments: readonly { name: string | null; mimeType: string | null; sizeBytes: number | null }[];
 }
@@ -130,6 +132,7 @@ export function disclosurePreview(settings: ContactSettings, text = "Hello, this
   return `${left ? `${left} ` : ""}${text}${end ? ` ${end}` : ""}`;
 }
 export function validateContactSettings(settings: ContactSettings): string | null {
+  if (settings.selfChat !== undefined && typeof settings.selfChat !== "boolean") return "The self conversation flag must be on or off.";
   if (settings.accountId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(settings.accountId)) return "Choose a configured account.";
   if (typeof settings.enabled !== "boolean" || !["smart", "keyword"].includes(settings.responseMode)
     || !["codex", "claude"].includes(settings.provider)) return "Choose a supported response mode and agent provider.";
@@ -223,7 +226,7 @@ function messageText(value: unknown, max: number): string {
 function ownerMessage(value: unknown): OwnerMessage {
   const row = record(value);
   const nullable = (value: unknown, max: number) => value === null ? null : messageText(value, max);
-  return { id: messageText(row.id, 512), at: integer(row.at), author: oneOf(row.author, ["owner", "contact", "butler", "unknown"]),
+  return { id: messageText(row.id, 512), at: integer(row.at), author: oneOf(row.author, ["owner", "contact", "butler", "self", "unknown"]),
     text: nullable(row.text, 4096), kind: oneOf(row.kind, ["message", "reaction", "edit", "delete"]), relatedMessageId: nullable(row.relatedMessageId, 512), textTruncated: bool(row.textTruncated),
     attachments: list(row.attachments, 20).map(value => { const attachment = record(value); return { name: nullable(attachment.name, 512), mimeType: nullable(attachment.mimeType, 256), sizeBytes: attachment.sizeBytes === null ? null : integer(attachment.sizeBytes, 0, 1024 ** 3) }; }) };
 }
@@ -238,6 +241,7 @@ function settings(value: unknown): ContactSettings {
     enabled: bool(row.enabled), responseMode: oneOf(row.responseMode, ["smart", "keyword"]),
     keyword: text(row.keyword, 40), provider: oneOf(row.provider, ["codex", "claude"]),
     ...(row.accountId === undefined ? {} : { accountId: text(row.accountId, 80) }),
+    ...(row.selfChat === undefined ? {} : { selfChat: bool(row.selfChat) }),
     disclosure: { character: text(symbols.character, 16), begin: text(symbols.begin, 16), end: text(symbols.end, 16) },
   };
   const error = validateContactSettings(result); if (error) throw new Error(error);
