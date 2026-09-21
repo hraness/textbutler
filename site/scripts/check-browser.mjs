@@ -336,7 +336,7 @@ try {
         assert.equal(await page.locator('details[open]').count(), 0);
         await page.getByRole('link', { name: 'See what’s ready', exact: true }).click();
         await page.waitForURL((url) => url.hash === '#development');
-        await page.getByRole('heading', { name: 'Build it. Set it up. Keep control.', exact: true }).waitFor({ state: 'visible' });
+        await page.getByRole('heading', { name: 'Start with a reply you review', exact: true }).waitFor({ state: 'visible' });
         item.interaction = 'Keyboard FAQ opened and closed; development action reached its real section.';
       } else if (sample.path === '/docs') {
         const link = page.locator('.document-prose a[href^="#"]').first();

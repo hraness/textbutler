@@ -32,6 +32,11 @@ test('renders Textbutler with the shared grammar and honest development status',
     expect(html).toContain(`data-hraness-marketing="${role}"`);
   }
   expect(html).toContain('hraness-marketing-header__brand');
+  const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
+  expect(header).toContain('aria-label="Textbutler home"');
+  expect(header).toContain('hraness-foil-mark');
+  expect(header).toContain('src="/marks/message-like-me.svg"');
+  expect(header).not.toContain('src="/icon.png"');
   expect(html).toContain('data-foil=""');
   expect(html).toContain('Textbutler');
   expect(html).toContain('See what’s ready');
@@ -83,7 +88,7 @@ test('shows synthetic contact context and disclosure without claiming transport 
   expect(html).toContain('under its own data policies');
 });
 
-test('binds Design Kit v0.10.0 to the portable Paper palette', async () => {
+test('binds Design Kit v0.11.1 to the portable Paper palette', async () => {
   const [layout, css, manifestSource, paper] = await Promise.all([
     readFile(resolve(siteRoot, 'app/layout.tsx'), 'utf8'),
     readFile(resolve(siteRoot, 'app/globals.css'), 'utf8'),
@@ -95,9 +100,9 @@ test('binds Design Kit v0.10.0 to the portable Paper palette', async () => {
   };
 
   expect(manifest.dependencies?.['@hraness/design-kit'])
-    .toBe('github:hraness/design-kit#v0.10.0');
+    .toBe('github:hraness/design-kit#v0.11.1');
   expect(manifest.dependencies?.['@hraness/ui'])
-    .toBe('github:hraness/ui#v0.5.13');
+    .toBe('github:hraness/ui#v0.5.16');
   expect(css).toContain("@import '@hraness/design-kit/styles.css';");
   expect(layout).toContain("colorScheme: 'light dark'");
   expect(layout).toContain('data-hraness-theme="paper"');
