@@ -20,8 +20,9 @@ export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>)
       <MarketingSiteHeader
         action={{ href: '/#development', label: 'Development status' }}
         ariaLabel="Primary navigation"
-        brand={<>{productMark}Textbutler</>}
+        brand="Textbutler"
         brandLabel="Textbutler home"
+        brandMark="/marks/message-like-me.svg"
         className={lantern ? "site-header hraness-material-chrome" : "site-header"}
         links={[
           { href: '/#how-it-works', label: 'How it works' },
