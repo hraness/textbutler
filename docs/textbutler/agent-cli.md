@@ -29,9 +29,9 @@ textbutler messages summarize CONTACT_ID --limit 100
 ```
 
 History includes message IDs, authorship, time, text, related message IDs and
-attachment metadata when the provider exposes it. Ghostget 0.18.20's native
-iMessage history currently omits attachment metadata. Limits range from 1 to
-200 messages. The response reports
+attachment metadata when the provider exposes it. Attachment metadata contains
+names, media types and sizes; local file paths and contents are excluded.
+Limits range from 1 to 200 messages. The response reports
 shortened text and omitted records; it is a recent sample, not a complete
 archive. It does not download or interpret attachment contents.
 
@@ -42,11 +42,23 @@ summarize the history JSON itself without starting another inference request.
 
 ## Compose, review and send
 
-For an AI suggestion, use `textbutler replies suggest CONTACT_ID`. To provide
-the content yourself, create an unsent draft:
+Choose one way to create an unsent draft. For an AI suggestion:
+
+```sh
+textbutler replies suggest CONTACT_ID
+```
+
+Suggestions read the current conversation without requiring a history import.
+If there is no unanswered incoming message, the command returns no draft.
+To provide the content yourself instead:
 
 ```sh
 textbutler messages compose CONTACT_ID --text 'Tuesday works for me.'
+```
+
+Use the returned draft ID to review it, then send only when instructed:
+
+```sh
 textbutler replies show DRAFT_ID
 textbutler replies send DRAFT_ID DIGEST
 ```
@@ -54,6 +66,9 @@ textbutler replies send DRAFT_ID DIGEST
 Use the digest returned by the complete draft review. It binds the recipient,
 content and imported media. Changed conversations or media can invalidate a
 draft. Disclosure settings apply to the reviewed and sent content.
+There is one active draft per contact; creating another replaces it. Drafts
+expire after 15 minutes and are cleared when the daemon restarts. Use
+`textbutler replies discard DRAFT_ID` to discard one explicitly.
 
 An explicitly authorized literal text can be sent in one command:
 
@@ -88,11 +103,13 @@ Attachment and sticker paths in an action object are relative to that contact's
 workspace. The daemon validates targets, capabilities and imported media.
 
 The current connector supports ordinary text and media on a Mac with the
-required permissions. Reactions and other rich actions require its separately
-configured Messages bridge. TextButler does not install that bridge or change
-macOS security settings. Outgoing threaded reply targeting is currently
-unsupported; the CLI does not turn a requested thread reply into an ordinary
-message. Incoming reply relationships remain visible in history.
+required permissions. Standard reactions, stickers, rich links and polls
+require its separately configured Messages bridge and the corresponding
+advertised capability. TextButler does not install that bridge or change macOS
+security settings. Outgoing threaded reply targeting, App Clips and experiences
+are unsupported by the iMessage connector. The CLI does not turn a requested
+thread reply into an ordinary message. Incoming reply relationships remain
+visible in history.
 
 ## Read uncertain results
 

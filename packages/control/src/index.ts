@@ -1,6 +1,7 @@
 import { parseActionIntent } from "../../transport/src/validation.ts";
 import type { ActionIntent } from "../../transport/src/types.ts";
 import type { AutomationProvider, AutomationStatus } from "../../transport/src/automation-contract.ts";
+import { parseAutomationFailure, type AutomationFailure } from "../../transport/src/automation-diagnostics.ts";
 const MESSAGE_ACTIONS = ["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"] as const;
 
 /** Owner-only desktop control protocol. Messaging authority remains in the daemon. */
@@ -18,6 +19,7 @@ export interface ContactSettings {
 export interface Contact { id: string; name: string; subtitle: string; settings: ContactSettings;
   messaging?: { provider: "imessage" | "whatsapp" | "beeper"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
 export interface Activity { id: string; at: string; contactId: string | null; title: string; detail: string }
+export type ConversationDiscoveryDiagnostic = AutomationFailure & Readonly<{ provider: AutomationProvider }>;
 export interface ProviderAccountDiagnostic {
   id: string; label: string; provider: "claude" | "codex"; route: "claude-api" | "claude-code" | "codex";
   status: "ready" | "setup-required" | "unavailable"; detail: string; defaultReplyModel: string | null; classifierModel: string | null;
@@ -102,7 +104,7 @@ export type ControlRequest =
 export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "provider-login"; accountId: string; challenge: ProviderLoginChallenge; snapshot: DesktopSnapshot }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "job"; jobId: string }
-  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "conversations"; candidates: ConversationCandidate[]; detail: string }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "conversations"; candidates: ConversationCandidate[]; detail: string; diagnostics?: readonly ConversationDiscoveryDiagnostic[] }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "enrolled"; snapshot: DesktopSnapshot; contactId: string; historyCount: number; historyOmittedCount: number; historyShortenedCount: number; historyInitialized: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "snapshot"; snapshot: DesktopSnapshot }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "memory"; contactId: string; revision: string; content: string }
@@ -260,7 +262,14 @@ export function parseControlResponse(value: unknown): ControlResponse {
   if (row.kind === "conversations") {
     const candidates = list(row.candidates, 200).map(value => { const item = record(value); return { id: text(item.id, 80), name: text(item.name, 200), subtitle: text(item.subtitle, 512), eligible: bool(item.eligible), reason: text(item.reason, 512) }; });
     if (new Set(candidates.map(candidate => candidate.id)).size !== candidates.length) throw new Error("Duplicate conversation candidate.");
-    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates, detail: text(row.detail) };
+    const diagnostics = row.diagnostics === undefined ? undefined : list(row.diagnostics, 3).map(value => {
+      const item = record(value);
+      if (Object.keys(item).sort().join(",") !== (Object.hasOwn(item, "native") ? "code,native,provider,stage" : "code,provider,stage")) throw new Error("Unexpected discovery diagnostic fields.");
+      return { provider: oneOf(item.provider, ["imessage", "whatsapp", "beeper"]), ...parseAutomationFailure({ stage: item.stage, code: item.code,
+        ...(Object.hasOwn(item, "native") ? { native: item.native } : {}) }) };
+    });
+    if (diagnostics && new Set(diagnostics.map(item => item.provider)).size !== diagnostics.length) throw new Error("Duplicate discovery diagnostic provider.");
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates, detail: text(row.detail), ...(diagnostics === undefined ? {} : { diagnostics }) };
   }
   if (row.kind === "enrolled") {
     const response = parseControlResponse({ protocol: CONTROL_PROTOCOL, ok: true, kind: "snapshot", snapshot: row.snapshot });

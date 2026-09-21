@@ -37,7 +37,7 @@ export function parseAutomationCoordinate(value: unknown): AutomationCoordinate 
   if (provider === "imessage") {
     exact(r, ["provider", "chatGuid", "service", "observedChatRowId"]);
     const chatGuid = string(r.chatGuid, 1024);
-    if (r.service !== "iMessage" || !chatGuid.startsWith("iMessage;")) throw new Error("Invalid iMessage coordinate");
+    if (r.service !== "iMessage" || !(chatGuid.startsWith("iMessage;") || chatGuid.startsWith("any;"))) throw new Error("Invalid iMessage coordinate");
     return { provider, chatGuid, service: "iMessage", observedChatRowId: integer(r.observedChatRowId, 1, Number.MAX_SAFE_INTEGER) };
   }
   if (provider === "beeper") {

@@ -8,6 +8,8 @@ export const XCB_INTEGRATION_RECEIPT = "qualification/xcb-textbutler-v1.json";
  * An additional source requires an explicit change to this inventory. */
 export const XCB_INTEGRATION_SOURCES = Object.freeze([
   "packages/control/src/index.ts",
+  "packages/transport/src/automation-contract.ts",
+  "packages/transport/src/automation-diagnostics.ts",
   "packages/textbutler/src/xcb-host.ts",
   "packages/textbutler/src/xcb-client.ts",
   "packages/textbutler/src/xcb-integration.ts",

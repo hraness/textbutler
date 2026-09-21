@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { AUTOMATION_ACTIONS, automationBindingDigest, createGhostgetAutomationClient, type AutomationGrant, type AutomationGrantRequest,
+import { AUTOMATION_ACTIONS, AutomationOperationError, automationRemoteError, automationBindingDigest, createGhostgetAutomationClient, type AutomationGrant, type AutomationGrantRequest,
   type AutomationEnrollment, type AutomationProvider, type AutomationCoordinate } from "../../transport/src/automation.ts";
 import { createAutomationOwnerPort, parseAutomationBinding, automationBinding } from "./automation-owner.ts";
 import { TextbutlerControlService, TEXTBUTLER_CONTROL_PROTOCOL as protocol } from "./control-service.ts";
@@ -194,6 +194,7 @@ test("discovery isolates provider failures and reports partial coverage without 
     ["imessage", "unavailable"], ["whatsapp", "complete"], ["beeper", "truncated"],
   ]);
   expect(JSON.stringify(port.discoveryStatus?.())).not.toContain("Sensitive path");
+  expect(port.discoveryStatus?.().providers[0]?.failure).toEqual({ stage: "unknown", code: "unknown" });
   expect(port.discoveryStatus?.().providers[2]?.detail).toContain("Older conversations may be missing");
   const snapshot = port.discoveryStatus!();
   (snapshot.providers as unknown as { detail: string }[])[0]!.detail = "Mutated by caller";
@@ -201,6 +202,7 @@ test("discovery isolates provider failures and reports partial coverage without 
   repaired = true;
   expect(await port.list(new AbortController().signal)).toHaveLength(3);
   expect(port.discoveryStatus?.().providers.every(item => item.state === "complete")).toBe(true);
+  expect(port.discoveryStatus?.().providers.every(item => item.failure === undefined)).toBe(true);
 });
 
 test("discovery bounds the combined list across three configured providers", async () => {
@@ -238,6 +240,60 @@ test("conversation selection shows unavailable providers and incomplete coverage
   expect(listing.detail).toContain("Older conversations may be missing");
   expect(listing.detail).toContain("Beeper conversations are unavailable");
   expect(f.calls).not.toContain("grant");
+});
+
+test("owner job and serialized control response preserve safe diagnostics beside other providers' candidates", async () => {
+  const f = fixture("whatsapp");
+  const failures = [
+    automationRemoteError("not-ready", "sensitive body"), automationRemoteError("unavailable", "sensitive /synthetic/path"),
+    automationRemoteError("recovery-required", "sensitive handle"),
+    automationRemoteError("unavailable", "ghostget.discovery.v1:native-chats:schema-invalid"),
+    new AutomationOperationError("transport-unavailable"), new AutomationOperationError("queue-capacity"),
+    new Error("sensitive unknown message"),
+  ];
+  for (const error of failures) {
+    let calls = 0;
+    const client = createGhostgetAutomationClient(async (method, params) => {
+      calls++;
+      expect(method).toBe("conversations");
+      if (params.provider === "imessage") throw error;
+      return { identity: f.candidate.identity, conversations: [f.candidate.conversation], complete: true };
+    });
+    const port = createAutomationOwnerPort({ client, providers: ["imessage", "whatsapp"] });
+    const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-discovery-codes-")); roots.push(dataDir);
+    const service = await TextbutlerControlService.open({ dataDir, automation: port }); services.push(service);
+    const job = await service.request({ protocol, command: "conversations.list" });
+    expect(job).toMatchObject({ ok: true, kind: "job" });
+    const listing = parseControlResponse(JSON.parse(JSON.stringify(await finish(service, job))));
+    if (!listing.ok || listing.kind !== "conversations") throw new Error("Missing discovery result");
+    expect(listing.candidates).toHaveLength(1);
+    expect(listing.detail).toContain("iMessage conversations are unavailable");
+    const failure = port.discoveryStatus!().providers[0]!.failure;
+    if (!failure) throw new Error("Missing discovery diagnostic");
+    expect(listing.diagnostics).toEqual([{ provider: "imessage", ...failure }]);
+    expect(JSON.stringify(listing.diagnostics)).not.toMatch(/sensitive|fixture|synthetic|ghostget\.discovery/u);
+    const repeated = await service.request({ protocol, command: "owner.job.read", jobId: job.ok && job.kind === "job" ? job.jobId : "invalid" });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(repeated)))).toEqual(listing);
+    expect((await service.settings()).paused).toBe(true);
+    expect((await service.settings()).contacts).toHaveLength(0);
+    expect(calls).toBe(2);
+  }
+});
+
+test("control discovery diagnostics reject open fields, invalid pairs and duplicate providers while accepting legacy results", () => {
+  const response: Extract<ControlResponse, { kind: "conversations" }> = { protocol, ok: true, kind: "conversations", candidates: [], detail: "Synthetic discovery" };
+  expect(parseControlResponse(response)).toEqual(response);
+  const diagnostic = { provider: "imessage", stage: "provider", code: "remote-unavailable" } as const;
+  const native = { phase: "native-chats", code: "deadline" } as const;
+  expect(parseControlResponse({ ...response, diagnostics: [{ ...diagnostic, native }] })).toEqual({ ...response, diagnostics: [{ ...diagnostic, native }] });
+  for (const diagnostics of [
+    [{ ...diagnostic, message: "sensitive provider message" }], [{ ...diagnostic, code: "sensitive" }],
+    [{ ...diagnostic, stage: "response-schema" }], [{ ...diagnostic, provider: "other" }],
+    [diagnostic, diagnostic], [diagnostic, diagnostic, diagnostic, diagnostic],
+    [{ ...diagnostic, native: { ...native, path: "/synthetic/private" } }],
+    [{ ...diagnostic, native: { ...native, phase: "other" } }], [{ ...diagnostic, native: { ...native, code: "other" } }],
+    [{ ...diagnostic, native: null }], [{ ...diagnostic, code: "remote-not-ready", native }],
+  ]) expect(() => parseControlResponse({ ...response, diagnostics })).toThrow();
 });
 
 test("v2 control enrollment stores identity and grants outside contact memory and supports explicit enable/disable", async () => {

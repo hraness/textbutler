@@ -436,7 +436,7 @@ export class TextbutlerControlService {
       capabilities: [
         { id: "messages", status: this.runtimeStatus.state === "unavailable" ? "setup-required" : "available", detail: this.automation ? this.runtimeStatus.detail : this.enrollment ? "Owner conversation selection is configured. Message subscriptions and autonomous sending remain unavailable." : "Configure the owner-installed Ghostget CLI to select messaging conversations." },
         { id: "contacts", status: "unsupported", detail: "The current Ghostget contract has no native Contacts directory. No contacts are imported automatically." },
-        { id: "agent", status: this.providers?.accounts().some(account => account.status === "ready") ? "available" : "setup-required", detail: this.providers?.accounts().some(account => account.status === "ready") ? "An explicitly selected Claude API account is ready. Contact selection and messaging grants still apply." : "Choose and check an explicit account. Claude API and native coding-agent routes are separate." },
+        { id: "agent", status: this.providers?.accounts().some(account => account.status === "ready") ? "available" : "setup-required", detail: this.providers?.accounts().some(account => account.status === "ready") ? "An AI account is ready. Contact account selection and messaging grants still apply." : "Choose and check an explicit account. Claude API and native coding-agent routes are separate." },
         richCapability("attachments", ["attachment"]), richCapability("reactions", ["reaction"]),
         richCapability("stickers", ["sticker"]), richCapability("links", ["link"]),
         richCapability("polls", ["poll"]), richCapability("mini-apps", ["app-clip", "experience"]),
@@ -614,9 +614,12 @@ export class TextbutlerControlService {
             subtitle: `${providerName(candidate.identity.provider)} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
             eligible: !duplicate, reason: duplicate ? "Already added" : "Ready to add" };
         });
-        const coverage = this.automation!.discoveryStatus?.().providers.filter(item => item.state !== "complete").map(item => item.detail) ?? [];
+        const discovery = this.automation!.discoveryStatus?.().providers ?? [];
+        const coverage = discovery.filter(item => item.state !== "complete").map(item => item.detail);
+        const diagnostics = discovery.flatMap(item => item.failure === undefined ? [] : [{ provider: item.provider, ...item.failure }]);
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows,
-          detail: ["Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled.", ...coverage].join(" ") };
+          detail: ["Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled.", ...coverage].join(" "),
+          ...(diagnostics.length ? { diagnostics } : {}) };
       });
       if (!this.enrollment) fail("unavailable", "Messages selection is not configured. Set up the owner-installed Ghostget CLI in Textbutler's host configuration, then restart the daemon.");
       return this.startJob(async signal => {

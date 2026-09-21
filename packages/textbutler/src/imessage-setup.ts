@@ -12,8 +12,8 @@ import { loadHostConfig, type GhostgetHostConfig } from "./host-config.ts";
 export const IMESSAGE_SETUP_RESULT = "imessage-setup-result.json";
 export const IMESSAGE_SETUP_CUSTODY = "imessage-setup-custody.json";
 export const IMESSAGE_SETUP_BINDING = "imessage-setup-binding.json";
-// This release preserves native bundles and avoids opening unrelated protected folders.
-const VERSION = "0.18.20", PROTOCOL = "ghostget.control/1";
+// Pin the native startup and discovery-diagnostics contract; admission is separate.
+const VERSION = "0.18.21", PROTOCOL = "ghostget.control/1";
 const READ = "messaging.automation.read", SEND = "messaging.automation.send.text", ATTACHMENT = "messaging.automation.send.attachment";
 const OPERATIONS = [READ, SEND, ATTACHMENT] as const;
 const sha = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
@@ -46,6 +46,7 @@ type PermissionRequest = { action: "snapshot"; accountId: string }
   | { action: "permission.set"; adapterId: "imessage-direct"; operationId: typeof OPERATIONS[number]; accountId: string; decision: "allow"; expectedRevision: number; expectedCapabilityDigest: string };
 /** Narrow test port; no arbitrary command or provider operation is representable. */
 export interface IMessageSetupPort {
+  transportInstall(): Promise<unknown>;
   authList(): Promise<unknown>;
   authAdd(): Promise<void>;
   authBind(): Promise<unknown>;
@@ -94,6 +95,14 @@ function snapshot(value: unknown, id: string, subject: string, expectedAccountRe
  * selected-account snapshot and Ghostget's authoritative CAS/digest check. */
 export async function configureIMessage(port: IMessageSetupPort, accountId: string, state = progress(), onBound?: (subjectDigest: string) => Promise<void>): Promise<IMessageSetupProgress> {
   if (!/^[a-z][a-z0-9-]{0,47}$/u.test(accountId)) throw new SetupError("explicit-imessage-account-required");
+  // Provision the pinned native transport before linking; the bundled artifact
+  // is admitted by its own hash pin and install is idempotent.
+  const installed = record(await port.transportInstall());
+  const keys = ["ok", "installed", "tool", "version", "executableSha256", ...(installed.alreadyPresent === undefined ? [] : ["alreadyPresent"])];
+  record(installed, keys);
+  if (installed.ok !== true || installed.installed !== true || installed.tool !== "imsg-private-transport"
+    || (installed.alreadyPresent !== undefined && typeof installed.alreadyPresent !== "boolean")) invalid();
+  text(installed.version, 128); digest(installed.executableSha256);
   const previous = accountFrom(await port.authList(), accountId);
   if (state.subjectDigest !== null && (previous?.subject === null || previous === null || sha(previous.subject) !== state.subjectDigest)) throw new SetupError("account-identity-changed");
   if (!previous) { await port.authAdd(); state.accountCreated = true; }
@@ -228,6 +237,7 @@ async function productionPort(config: GhostgetHostConfig, accountId: string, hom
   };
   const json = (bytes: Buffer): unknown => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   return {
+    async transportInstall() { return json(await invoke(config.executable, ["imessage", "transport", "install", "--json"])); },
     async authList() { return json(await invoke(config.executable, ["auth", "list", "--json"])); },
     async authAdd() { await invoke(config.executable, ["auth", "add", accountId, "--linked-device", "imessage", "--device-store", join(home, "Library", "Messages")]); },
     async authBind() { return json(await invoke(config.executable, ["auth", "bind", accountId, "--site", "imessage", "--json"])); },

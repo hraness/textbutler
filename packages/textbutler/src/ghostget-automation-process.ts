@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { lstat, open, realpath, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { AUTOMATION_PROTOCOL, automationBoolean, automationHash, automationId, automationProvider, automationRecord, createGhostgetAutomationClient, type AutomationProvider, type GhostgetAutomationInvoker } from "../../transport/src/automation.ts";
+import { AUTOMATION_PROTOCOL, AutomationOperationError, automationRemoteError, automationBoolean, automationHash, automationId, automationProvider, automationRecord, createGhostgetAutomationClient, type AutomationProvider, type GhostgetAutomationInvoker } from "../../transport/src/automation.ts";
 
 export interface GhostgetAutomationProcessOptions {
   executable: string;
@@ -60,7 +60,7 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   const clear = (id: string, entry: Pending) => { pending.delete(id); clearTimeout(entry.timer); if (entry.abort) entry.signal?.removeEventListener("abort", entry.abort); };
   const stop = () => {
     if (fault) return; fault = true;
-    for (const [id, entry] of pending) { clear(id, entry); entry.reject(new Error("Ghostget automation outcome is uncertain; custody is retained")); }
+    for (const [id, entry] of pending) { clear(id, entry); entry.reject(new AutomationOperationError("transport-unavailable")); }
     kill("SIGTERM"); if (!exited) forceTimer = setTimeout(() => {
       kill("SIGKILL");
       finalTimer = setTimeout(() => {
@@ -97,8 +97,9 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
         if (row.ok) { clear(row.id, entry); entry.resolve(row.result); }
         else {
           const error = automationRecord(row.error, ["code", "message"]);
-          if (!["invalid-request", "not-ready", "unavailable", "recovery-required"].includes(String(error.code)) || typeof error.message !== "string" || error.message.length > 1024) throw new Error("Ghostget error contract changed");
-          clear(row.id, entry); entry.reject(new Error(`Ghostget automation ${String(error.code)}`));
+          if (typeof error.code !== "string" || !["invalid-request", "not-ready", "unavailable", "recovery-required"].includes(error.code) || typeof error.message !== "string" || error.message.length > 1024) throw new Error("Ghostget error contract changed");
+          const failure = automationRemoteError(error.code, error.message);
+          clear(row.id, entry); entry.reject(failure);
           if (error.code === "recovery-required") stop();
         }
       }
@@ -107,7 +108,8 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   });
   child.stdin.on("error", stop);
   const send: GhostgetAutomationInvoker = (method, params, signal) => {
-    if (fault || exited || closing && method !== "close" || pending.size >= 9) return Promise.reject(new Error("Ghostget automation is unavailable or busy"));
+    if (fault || exited || closing && method !== "close") return Promise.reject(new AutomationOperationError("transport-unavailable"));
+    if (pending.size >= 9) return Promise.reject(new AutomationOperationError("queue-capacity"));
     try { signal?.throwIfAborted(); } catch { return Promise.reject(new Error("Ghostget operation cancelled before dispatch")); }
     const id = randomUUID(), frame = JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id, method, params }) + "\n";
     if (Buffer.byteLength(frame) > MAX_FRAME) return Promise.reject(new Error("Ghostget request exceeds its frame bound"));
@@ -120,7 +122,7 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   let normalChain: Promise<unknown> = Promise.resolve(), queued = 0;
   const invoke: GhostgetAutomationInvoker = (method, params, signal) => {
     if (["cancel", "revoke", "close"].includes(method)) return send(method, params, signal);
-    if (queued >= 16) return Promise.reject(new Error("Ghostget owner request queue is full"));
+    if (queued >= 16) return Promise.reject(new AutomationOperationError("queue-capacity"));
     queued++;
     const task = normalChain.catch(() => undefined).then(() => send(method, params, signal)).finally(() => { queued--; });
     normalChain = task; return task;
