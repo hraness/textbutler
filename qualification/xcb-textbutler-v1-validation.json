@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "44324d13e2275e628559aa939473706a6142547df8aea795cfbc3eb25f0da4d8",
+  "sourceDigest": "55455dee99d4efa3f4f3ecdb28c7496de7bd59404f869881c461f0134b7a6e66",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "56d5e6948fcdf14dfbffbd110d0ca0b6e00be9b960cc3319dc00ef42cb135d27",
+  "logSha256": "c4c8b4a618629719ec2fb8d1cf181858e659dbf1e0f754a398ad3795572ade53",
   "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new transport-install custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner review of the pinned native transport provisioning added to native setup and its synthetic custody tests atop PR143 head 94827e8; the live 0.14.1+private-transport.4 install and the completed read-only live check are recorded as deployment evidence, not as substitutes for this synthetic receipt. Earlier review references describe historical baseline work. This review covers TextButler setup provisioning order and failure custody; native per-send service enforcement is separate.",
+    "method": "Integration-owner reseal of the 0.8.12 release version bump on reviewed main head: the only changed sealed input is the root package version; source version, changelog and site version inputs were refreshed with all other sealed bytes unchanged. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers release metadata identity; native per-send service enforcement is separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -178,7 +178,7 @@
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "2d5eb1de2ea039447bcc29a5f05552b794a0c1b23acb6f8599a96dcc9688ac61",
+    "sha256": "80b17014699317994b9cbfb0859ec111c435e606c8cec8052d19fdc85e2a945f",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -190,7 +190,7 @@
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
-      "package.json": "0a169d2cbdc675ee5cb12347eb6d22aed17d5d1fa0639873c167f1f045d921d0",
+      "package.json": "a4f03ffe7a3ddb069a717f26237f764a59495171d214e7de19065b13d6c00ead",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
       "packages/control/src/index.ts": "ef481855a332e720365ff949a2b63cf5c6f507c8bbf93e13cc1e388d5962a5e6",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
@@ -415,7 +415,7 @@
       "src/test-fixtures.ts": "3ac9802051d38c6d3ef92a842eb35ef1dedf8c9dd6424107b5054e4933d5e6bc",
       "src/test-x-archive-fixture.ts": "3461032a8c8bd2765c1c74c8616f442cbefd356b8f24401bb32241d4a967fa00",
       "src/types.ts": "fb3c0ffecae6900505b1bec8824ff0e24b12c8e12d742cb17250600a29d85aff",
-      "src/version.ts": "8d88fe319034e1ac5b5dfc9e586bc6e5f97bd1b99862085912f790dfbcd0fd4a",
+      "src/version.ts": "5760dba66f17257411f61bad0f9f7936bea6dbe5db1a6229c40ea16edeec4cde",
       "src/whatsapp-source.test.ts": "c07fdbee0ea8b5b4f1b57f3c7101ff1a5ed62ed8d97f98597d26c1d9999aa1f4",
       "src/whatsapp-source.ts": "fd6daff5185ee81b3585c003eb1d0c07b4b4e788aa55c7b4bef0edca46f732f4",
       "src/x-archive-zip-rust.test.ts": "7fd66cb10f08a2102da3f6ca187b030ecd350580f37224d8c6b4aba7ff3093f7",
@@ -434,9 +434,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "bd292289b1720539937764c01cc271a6f1bf16cb41249f95539cb4d35de5db4a",
-    "evidenceSha256": "12a068eba1628c5adc26af2b28b9e825a3b6397f211082ba463a9d1c300b14f4",
-    "logSha256": "f387020c3751db9440c719588cb8890f1c204577c29c1ef75d0ef019492e12b1",
+    "validationSha256": "87cdf98c3a189c4836a90373c8dd48186800cee99aef0b3df96d0d1e37ed8c1a",
+    "evidenceSha256": "efdc1a8bbf4fac628a712689cdb41c4f0ee0165e267e273dcb4617b336f00233",
+    "logSha256": "56d5e6948fcdf14dfbffbd110d0ca0b6e00be9b960cc3319dc00ef42cb135d27",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }

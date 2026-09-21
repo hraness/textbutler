@@ -14,7 +14,7 @@
   },
   "sources": {
     "bun.lock": "2e6c9ea2aea734cb83423858a2118893a4561bac0030b365a1740411ace37c55",
-    "package.json": "0a169d2cbdc675ee5cb12347eb6d22aed17d5d1fa0639873c167f1f045d921d0",
+    "package.json": "a4f03ffe7a3ddb069a717f26237f764a59495171d214e7de19065b13d6c00ead",
     "packages/control/src/index.ts": "ef481855a332e720365ff949a2b63cf5c6f507c8bbf93e13cc1e388d5962a5e6",
     "packages/textbutler/src/cli.ts": "8464ac466faad5ad1f27ce835bc0315f8fd732ed6d926a4c908b7da317e06775",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
@@ -46,6 +46,6 @@
   },
   "validation": {
     "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
-    "receiptSha256": "87cdf98c3a189c4836a90373c8dd48186800cee99aef0b3df96d0d1e37ed8c1a"
+    "receiptSha256": "543f0a55df250e174bdbe6a81f8dfa345536e0470274cf324fec55de5a864496"
   }
 }
