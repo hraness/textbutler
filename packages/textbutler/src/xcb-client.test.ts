@@ -67,6 +67,20 @@ test("capabilities accept unrelated unavailable providers without starting infer
   expect(await f.client.capabilities(new AbortController().signal)).toMatchObject({ supported: true,
     accounts: [{ provider: "devin", available: false, models: [] }] });
 });
+test("capabilities accept the renamed name/email account schema", async () => {
+  const renamed = { ...wireCapabilities, accounts: [{ id: "synthetic-renamed", name: "claude/a_synthet", email: "synthetic@example.invalid",
+    provider: "claude", enabled: true, busy: false, connected: true, runtimeAdmitted: true, available: true, reason: null,
+    models: [{ key: "claude/synthetic", label: "Synthetic", observedAtMs: 1 }], qualification: null }] };
+  const f = await fixture(`if(process.argv.at(-1)!=="--capabilities" || await Bun.stdin.text()!=="")process.exit(2);console.log(${JSON.stringify(JSON.stringify(renamed))});`);
+  expect(await f.client.capabilities(new AbortController().signal)).toMatchObject({ supported: true,
+    accounts: [{ id: "synthetic-renamed", label: "claude/a_synthet", provider: "claude", available: true }] });
+});
+test("capabilities reject accounts without a display identity field", async () => {
+  const anonymous = { ...wireCapabilities, accounts: [{ id: "synthetic-anon", provider: "devin", enabled: true, busy: false,
+    connected: false, runtimeAdmitted: false, available: false, reason: null, models: [] }] };
+  const f = await fixture(`console.log(${JSON.stringify(JSON.stringify(anonymous))});`);
+  await expect(f.client.capabilities(new AbortController().signal)).rejects.toMatchObject({ code: "invalid-schema" });
+});
 test("capabilities distinguish unsafe, changed and unavailable executables before spawn", async () => {
   const f = await fixture("throw Error('must not run');");
   await chmod(f.config.executable, 0o777);

@@ -36,7 +36,7 @@
     "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
     "packages/textbutler/src/runtime.ts": "bc8082515f28c685271482b3242dd4431e8d4c11e521cb2c2ac70905578997a6",
     "packages/textbutler/src/workspace.ts": "21870f6e0ad48c62d2c08ef06efd246078a7727590cae2396f41cd5cdab167b6",
-    "packages/textbutler/src/xcb-client.ts": "76f41bdb50ff77a9f0481735cad18ec4e09f5ad21090c21537606017cfef3a11",
+    "packages/textbutler/src/xcb-client.ts": "8e816a2e9f2c75e041fb5ae02eaa20567bd989c28c2d024741033929b284dbfc",
     "packages/textbutler/src/xcb-host.ts": "52d91bfd7ee6e970540f85de98e8669fcec66191e8b1e073934fea7fc180f87c",
     "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
     "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
@@ -46,6 +46,6 @@
   },
   "validation": {
     "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
-    "receiptSha256": "543f0a55df250e174bdbe6a81f8dfa345536e0470274cf324fec55de5a864496"
+    "receiptSha256": "d5bb9deeab5b5163f8e5789a7060d11030185fb29d7d09cbce2e97746c4d39eb"
   }
 }
