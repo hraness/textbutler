@@ -22,6 +22,7 @@ function fixture(existing = false, alreadyAllowed = false) {
   const calls: Array<{ action: string; [key: string]: unknown }> = [];
   let transform: (value: ReturnType<typeof view>) => unknown = value => value;
   const port: IMessageSetupPort = {
+    async transportInstall() { calls.push({ action: "transport.install" }); return { ok: true, installed: true, alreadyPresent: false, tool: "imsg-private-transport", version: "0.14.1+private-transport.4", executableSha256: "0".repeat(64) }; },
     async authList() { calls.push({ action: "auth.list" }); return { ok: true, auth: auth ? [{ ...auth }] : [] }; },
     async authAdd() { calls.push({ action: "auth.add" }); if (auth) throw Error("no replacement"); auth = { id: ID, kind: "linked-device-store", provider: "imessage", subject: null, realmFingerprint: "a".repeat(16) }; },
     async authBind() { calls.push({ action: "auth.bind" }); auth = { ...auth!, subject: SUBJECT, realmFingerprint: "b".repeat(16) }; return { ok: true, id: ID, site: "imessage", subject: SUBJECT, realmFingerprint: "b".repeat(16) }; },
@@ -67,7 +68,7 @@ test("wrong existing provider or kind is refused before bind or permissions", as
   for (const changed of [{ provider: "whatsapp" }, { kind: "oauth-token-file" }]) {
     const f = fixture(); f.replaceAuth({ id: ID, kind: "linked-device-store", provider: "imessage", subject: SUBJECT, realmFingerprint: "b".repeat(16), ...changed });
     await expect(configureIMessage(f.port, ID)).rejects.toThrow("existing-account-conflict");
-    expect(f.calls.map(call => call.action)).toEqual(["auth.list"]);
+    expect(f.calls.map(call => call.action)).toEqual(["transport.install", "auth.list"]);
   }
 });
 test("an existing subject changing during setup is never replaced or authorized", async () => {
@@ -133,7 +134,8 @@ const args=process.argv.slice(2);record(args);
 if(state.mode==="failed-cli")process.exit(1);
 if(state.mode==="hang"){setInterval(()=>{},1000);await new Promise(()=>{});}
 if(state.mode==="orphan"){const child=spawn(process.execPath,["--no-env-file","--no-install","-e","setInterval(()=>{},1000)"],{stdio:"ignore"});writeFileSync(join(root,"orphan.json"),JSON.stringify({pid:child.pid,group:process.pid}));child.unref();}
-if(args.join(" ")==="auth list --json") console.log(JSON.stringify({ok:true,auth:state.auth?[state.auth]:[]}));
+if(args.join(" ")==="imessage transport install --json"){if(state.mode==="transport-failed")process.exit(1);console.log(JSON.stringify(state.mode==="transport-malformed"?{ok:true,installed:true}:{ok:true,installed:true,alreadyPresent:state.transportPresent===true,tool:"imsg-private-transport",version:"0.14.1+private-transport.4",executableSha256:"0".repeat(64)}));state.transportPresent=true;save();}
+else if(args.join(" ")==="auth list --json") console.log(JSON.stringify({ok:true,auth:state.auth?[state.auth]:[]}));
 else if(args.length===7&&args[0]==="auth"&&args[1]==="add"&&args[2]===id&&args[3]==="--linked-device"&&args[4]==="imessage"&&args[5]==="--device-store"&&args[6]===join(process.env.HOME,"Library","Messages")&&!state.auth){state.auth={id,kind:"linked-device-store",provider:"imessage",subject:null,realmFingerprint:"a".repeat(16)};save();console.log("Saved synthetic locator.");}
 else if(args.join(" ")===\`auth bind \${id} --site imessage --json\`){state.auth={...state.auth,subject,realmFingerprint:"b".repeat(16)};save();console.log(JSON.stringify({ok:true,id,site:"imessage",subject,realmFingerprint:"b".repeat(16)}));}
 else process.exit(2);
@@ -200,7 +202,7 @@ test("established identity survives denied preflight and loss of the latest resu
     state.auth.subject = "imessage:replacement"; state.auth.realmFingerprint = "d".repeat(16);
     await writeFile(fixturePath, JSON.stringify(state), { mode: 0o600 });
     expect(await runIMessageSetup(f.dataDir, f.options)).toMatchObject({ ok: false, code: "account-identity-changed", custody: "retained" });
-    expect((await f.calls()).slice(callsBefore.length).map(call => call.call)).toEqual([["auth", "list", "--json"]]);
+    expect((await f.calls()).slice(callsBefore.length).map(call => call.call)).toEqual([["imessage", "transport", "install", "--json"], ["auth", "list", "--json"]]);
     expect(await readFile(bindingPath)).toEqual(bindingBytes);
   }
 }, 20000);
@@ -211,6 +213,15 @@ test("malformed authoritative binding is preserved and cannot be treated as fres
     expect(await runIMessageSetup(f.dataDir, f.options)).toMatchObject({ ok: false, status: "blocked", code: "setup-binding-invalid", custody: "not-acquired" });
     expect(await f.calls()).toHaveLength(0);
     expect(await readFile(path, "utf8")).toBe(bytes);
+  }
+});
+test("a failed or malformed transport install retains custody before any account read", async () => {
+  for (const [mode, code] of [["transport-failed", "process-custody-unproven"], ["transport-malformed", "connector-metadata-invalid"]] as const) {
+    const f = await processFixture(mode);
+    expect(await runIMessageSetup(f.dataDir, f.options)).toMatchObject({ ok: false, status: "recovery-required", custody: "retained", code });
+    const calls = await f.calls();
+    expect(calls.map(call => call.call)).toEqual([["imessage", "transport", "install", "--json"]]);
+    expect(await lstat(join(f.dataDir, "state", IMESSAGE_SETUP_CUSTODY))).toBeTruthy();
   }
 });
 test("wrong helper identity retains custody and blocks any new child on explicit repeat", async () => {
