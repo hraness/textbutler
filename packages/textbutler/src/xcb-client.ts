@@ -71,7 +71,10 @@ export function parseXcbCapabilities(value: unknown): XcbCapabilities {
     || limits.maxInputBytes !== XCB_LIMITS.request || limits.maxOutputBytes !== XCB_LIMITS.output
     || limits.minTimeoutMs !== 1000 || limits.maxTimeoutMs !== 120_000 || !Array.isArray(v.accounts) || v.accounts.length > 128) return invalid();
   const accounts = v.accounts.map(raw => {
-    const a = row(raw, ["id", "label", "provider", "enabled", "busy", "connected", "runtimeAdmitted", "available", "reason", "models"], ["qualification"]);
+    // XCB renamed the account display field: `label` became `name` with an
+    // optional `email`. Both spellings stay admitted; `name` is the system
+    // identity and `label` remains a valid alias.
+    const a = row(raw, ["id", "provider", "enabled", "busy", "connected", "runtimeAdmitted", "available", "reason", "models"], ["label", "name", "email", "qualification"]);
     if (!Array.isArray(a.models) || a.models.length > 1024) return invalid();
     const models = a.models.map(rawModel => {
       const m = row(rawModel, ["key", "label", "observedAtMs"]);
@@ -83,7 +86,8 @@ export function parseXcbCapabilities(value: unknown): XcbCapabilities {
       const q = row(a.qualification, ["runtimeVersion", "runtimeDigest", "evidenceDigest", "expiresAt"]);
       qualification = { runtimeVersion: text(q.runtimeVersion), runtimeDigest: digest(q.runtimeDigest), evidenceDigest: digest(q.evidenceDigest), expiresAt: integer(q.expiresAt) };
     }
-    return { id: text(a.id), label: text(a.label, 256), provider: text(a.provider), enabled: bool(a.enabled), busy: bool(a.busy),
+    if (a.email !== undefined) text(a.email, 320);
+    return { id: text(a.id), label: text(a.label ?? a.name, 256), provider: text(a.provider), enabled: bool(a.enabled), busy: bool(a.busy),
       connected: bool(a.connected), runtimeAdmitted: bool(a.runtimeAdmitted), available: bool(a.available), reason: a.reason === null ? null : text(a.reason), models,
       ...(qualification === undefined ? {} : { qualification }) };
   });
