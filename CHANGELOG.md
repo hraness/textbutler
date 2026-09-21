@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.13 (2026-09-21)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.13` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Accept the renamed XCB account identity fields (`name` plus optional `email`, with `label` retained as an alias) in subscription capability discovery, so a verified Textbutler bundle works against both pre- and post-rename XCB runtimes.
+
 ## 0.8.12 (2026-09-21)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.12` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
