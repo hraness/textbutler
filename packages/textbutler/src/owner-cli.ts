@@ -17,11 +17,15 @@ export const OWNER_COMMAND_HELP = `Owner controls:
   contacts enable CONTACT            Enable replies for this contact
   contacts disable CONTACT           Disable replies and revoke its grant
   contacts mode CONTACT smart|keyword [--keyword WORD]
+  contacts self CONTACT on|off        Mark a conversation as your own address
   jobs show JOB_ID                    Read a pending operation's result
 
 Use an exact contact ID or a unique contact name. Adding a contact keeps
 automatic replies off. History is imported only with --history.
-Account selection never enables a contact; resume never enables contacts.`;
+Account selection never enables a contact; resume never enables contacts.
+Mark a conversation self when its only participant is your own address:
+iMessage delivers each of your texts to it inbound and echoes it outbound,
+so the echo must not count as the owner's answer.`;
 
 const ownerFamilies = new Set(["status", "pause", "resume", "messaging", "conversations", "contacts", "jobs"]);
 const identity = (value: string | undefined): value is string => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(value);
@@ -85,8 +89,9 @@ export async function handleOwnerCommand(args: readonly string[], options: {
   const activation = family === "contacts" && (verb === "enable" || verb === "disable") && args.length === 3;
   const mode = family === "contacts" && verb === "mode" && (value === "smart" || value === "keyword")
     && (args.length === 4 || args.length === 6 && args[4] === "--keyword" && typeof args[5] === "string");
+  const self = family === "contacts" && verb === "self" && args.length === 4 && (value === "on" || value === "off");
   const job = family === "jobs" && verb === "show" && args.length === 3 && identity(target);
-  if (!(status || pause || messagingList || messagingStart || conversations || contactsList || add || account || activation || mode || job)) {
+  if (!(status || pause || messagingList || messagingStart || conversations || contactsList || add || account || activation || mode || self || job)) {
     throw new OwnerCliError(`Unrecognized owner command.\n\n${OWNER_COMMAND_HELP}`);
   }
   const { request, print } = options;
@@ -118,6 +123,7 @@ export async function handleOwnerCommand(args: readonly string[], options: {
     if (!selected) throw new OwnerCliError("That agent account is not configured. Run textbutler providers list and choose an exact account ID.");
     settings.accountId = selected.id; settings.provider = selected.provider;
   } else if (activation) settings.enabled = verb === "enable";
+  else if (self) settings.selfChat = value === "on";
   else if (mode) {
     settings.responseMode = value as "smart" | "keyword";
     if (args[5] !== undefined) settings.keyword = args[5];

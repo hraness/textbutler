@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { automationContextId, createGhostgetAutomationTransport, type AutomationEvent, type AutomationMessage, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { assertAutomationBinding, type AutomationBinding } from "./automation-owner.ts";
-import { messageAuthor, pendingCluster } from "./attribution.ts";
+import { messageAuthor, pendingCluster, type MessageAuthor } from "./attribution.ts";
 import type { OwnerRuntimeState, TextbutlerControlService } from "./control-service.ts";
 import { boundedHistory } from "./enrollment.ts";
 import type { ContactSettings, Settings } from "./config.ts";
@@ -29,7 +29,7 @@ export interface ReplyLoopOptions {
 export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   const { service, client, hooks } = options, now = options.now ?? Date.now;
   const journal = service.runJournal();
-  const author = (message: AutomationMessage, contact: ContactSettings): MessageEvent["author"] => messageAuthor(message, contact, journal);
+  const author = (message: AutomationMessage, contact: ContactSettings): MessageAuthor => messageAuthor(message, contact, journal);
   let owner: OwnerRuntimeState = await service.runtimeState(), settings: Settings = owner.settings;
   let closed = false, settingsEpoch = 0, timer: ReturnType<typeof setTimeout> | undefined, ticking: Promise<void> | undefined;
   const contacts = new Map<string, ContactLoop>(), work = new Set<Promise<unknown>>();
@@ -53,7 +53,10 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     const page = await client.history(state.binding.enrollmentId, 200); assertAutomationBinding(state.binding, page.enrollment);
     for (const message of page.messages) if (author(message, contact) === "owner") state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(message.occurredAt));
     if (state.historyRevision !== page.enrollment.revision) {
-      const history = boundedHistory(page.messages.filter(message => message.kind === "message" && message.direction !== "unknown").map(message => ({ id: message.id, text: message.text ?? "", at: Date.parse(message.occurredAt), author: author(message, contact) as "owner" | "contact" | "butler" })));
+      const history = boundedHistory(page.messages.filter(message => message.kind === "message" && message.direction !== "unknown").flatMap(message => {
+        const who = author(message, contact);
+        return who === "self" ? [] : [{ id: message.id, text: message.text ?? "", at: Date.parse(message.occurredAt), author: who as "owner" | "contact" | "butler" }];
+      }));
       await (await workspace(contact.id)).write("history/recent.json", JSON.stringify({ schemaVersion: 1, purpose: "context-only-never-trigger", messages: history }));
       state.historyRevision = page.enrollment.revision;
     }
@@ -74,6 +77,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   }
   function receive(contact: ContactSettings, state: ContactLoop, event: AutomationEvent): void {
     const who = author(event.message, contact);
+    if (who === "self") return;
     if (who === "owner") state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(event.message.occurredAt));
     state.runtime.cancelContact(contact.id);
     if (event.message.kind !== "message" || who !== "contact") { delete state.pending; return; }

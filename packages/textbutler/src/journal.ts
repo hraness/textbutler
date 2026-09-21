@@ -119,6 +119,12 @@ export class RunJournal {
   isButlerMessage(contactId: string, messageId: string): boolean {
     return this.database.query("SELECT 1 FROM sent_messages WHERE messageId = ? AND contactId = ? LIMIT 1").get(messageId, contactId) !== null;
   }
+  /** Self-chat inbound echoes arrive under fresh IDs; text-less ones carry no
+   * disclosure wrap, so send recency is the only signal they are ours. */
+  lastButlerSendAt(contactId: string): number | null {
+    const row = this.database.query<{ sentAt: number | null }, [string]>("SELECT MAX(sentAt) AS sentAt FROM sent_messages WHERE contactId = ?").get(contactId);
+    return row?.sentAt ?? null;
+  }
   /** Message IDs are provider-unique; bootstrap uses the global form before a contact exists. */
   knownSentMessage(messageId: string): boolean {
     return this.database.query("SELECT 1 FROM sent_messages WHERE messageId = ? LIMIT 1").get(messageId) !== null;
