@@ -167,7 +167,7 @@ Message Like Me requires Bun 1.3.14 or newer. Install the exact public npm
 package, then install both bundled Agent Skills:
 
 ```sh
-bun add --global @hraness/message-like-me@0.8.13
+bun add --global @hraness/message-like-me@0.8.14
 messagelikeme skill install
 ```
 
