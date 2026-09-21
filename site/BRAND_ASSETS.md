@@ -1,10 +1,11 @@
 # Textbutler website identity
 
-The 🤖 identity follows the owner’s September 13, 2026 identity selection. Header marks use the native emoji; browser and touch icons use the supplied PNG artwork.
+The header uses the checked transparent `/marks/message-like-me.svg` artwork through the shared metallic foil treatment. The content footer, browser icon, and touch icon retain their supplied PNG artwork.
 
-The supplied PNGs are the website’s checked artwork. Preserve their bytes when updating other branding.
+These are the existing checked assets. Preserve their bytes when updating other branding.
 
 | File | Size | SHA-256 |
 | --- | --- | --- |
-| icon.png | 512×512 | `15965486d444b7207b3e4e4884118998a3cccb96240d5cb5a39a0d484b833bc8` |
-| apple-icon.png | 180×180 | `9be59c1aabf4a965a7197d92e01928e32cd1f54cc61d2dae848430e644858749` |
+| public/marks/message-like-me.svg | viewBox 590×588 | `5d30fa25c2f69d5dd1c4315189a3e9653be232baaf6cbf5cb4ce46b8dbcaab27` |
+| app/icon.png | 32×32 | `f8caaf3f57ed39afc416518f779a5b1a6ffb328084746ed2f25ce9edc57cd2ea` |
+| app/apple-icon.png | 180×180 | `b5d31c84819e46aeb41fd3c8c1d8227cde2c060101a2a5dcc02e18f33054ac6a` |
