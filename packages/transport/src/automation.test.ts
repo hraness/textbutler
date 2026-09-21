@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { automationContextId, automationBindingDigest, automationHash, automationFailure, automationRemoteError, createGhostgetAutomationClient, createGhostgetAutomationTransport, type AutomationEnrollment, type AutomationPlan, type GhostgetAutomationInvoker } from "./automation";
+import { automationContextId, automationBindingDigest, automationHash, automationFailure, automationRemoteError, createGhostgetAutomationClient, createGhostgetAutomationTransport, parseAutomationCoordinate, parseAutomationEnrollment, type AutomationEnrollment, type AutomationPlan, type GhostgetAutomationInvoker } from "./automation";
 import { parseActionIntent } from "./validation";
 
 const now = Date.parse("2026-09-11T00:00:00.000Z");
@@ -70,6 +70,55 @@ test("native poll intent is bounded and keeps provider-default selection explici
   expect(parseActionIntent({ kind: "poll", question: "Tea?", options: ["Yes", "No"], maximumSelections: null })).toMatchObject({ kind: "poll", maximumSelections: null });
   for (const options of [["Same", "Same"], ["One"]]) expect(() => parseActionIntent({ kind: "poll", question: "Tea?", options, maximumSelections: null })).toThrow();
   expect(() => parseActionIntent({ kind: "poll", question: "Tea?", options: ["Yes", "No"], maximumSelections: 3 })).toThrow();
+});
+
+test("iMessage coordinates preserve literal native prefixes and retain service, byte and row bounds", () => {
+  for (const prefix of ["iMessage;", "any;"]) {
+    const coordinate = { provider: "imessage" as const, chatGuid: `${prefix}-;fixture@example.test`, service: "iMessage" as const, observedChatRowId: 1 };
+    expect(parseAutomationCoordinate(coordinate)).toEqual(coordinate);
+    const bounded = `${prefix}${"é".repeat(Math.floor((1024 - prefix.length) / 2))}${"x".repeat((1024 - prefix.length) % 2)}`;
+    expect(Buffer.byteLength(bounded)).toBe(1024);
+    expect(parseAutomationCoordinate({ ...coordinate, chatGuid: bounded, observedChatRowId: Number.MAX_SAFE_INTEGER })).toMatchObject({ chatGuid: bounded, observedChatRowId: Number.MAX_SAFE_INTEGER });
+    for (const patch of [
+      { chatGuid: `${bounded}x` }, { chatGuid: `${prefix}-;fixture\0other` },
+      ...["SMS", "RCS", "any", "imessage", null, undefined].map(service => ({ service })),
+      ...[0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, "1", null, undefined].map(observedChatRowId => ({ observedChatRowId })),
+      { additional: true },
+    ]) expect(() => parseAutomationCoordinate({ ...coordinate, ...patch })).toThrow();
+  }
+  for (const chatGuid of ["SMS;-;fixture", "RCS;-;fixture", "Any;-;fixture", "imessage;-;fixture", "anywhere;-;fixture", "any", "prefixany;-;fixture"])
+    expect(() => parseAutomationCoordinate({ provider: "imessage", chatGuid, service: "iMessage", observedChatRowId: 1 })).toThrow();
+});
+
+test("literal iMessage GUIDs survive discovery and enrollment without becoming interchangeable", async () => {
+  for (const prefix of ["iMessage;", "any;"]) {
+    const identity = { ...automationFixture().enrollment.identity, provider: "imessage" as const, accountSubject: "synthetic-imessage" };
+    const coordinate = { provider: "imessage" as const, chatGuid: `${prefix}-;fixture@example.test`, service: "iMessage" as const, observedChatRowId: 1 };
+    const conversation = { coordinate, title: "Synthetic", kind: "single" as const, participants: ["fixture@example.test"] };
+    const enrollment: AutomationEnrollment = { id: "enrollment:imessage", identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision: 1, ready: true, reason: null };
+    let historyCoordinate = coordinate;
+    const client = createGhostgetAutomationClient(async (method, params) => {
+      if (method === "conversations") return { identity, conversations: [conversation], complete: true };
+      if (method === "enroll") { expect(params.coordinate).toEqual(coordinate); return enrollment; }
+      if (method === "history") return { enrollment, messages: [{ id: "message:fixture", coordinate: historyCoordinate, direction: "incoming", occurredAt: new Date(now).toISOString(), text: "Synthetic", kind: "message", relatedMessageId: null, attachments: [] }] };
+      throw new Error("Unexpected synthetic operation");
+    });
+    expect((await client.conversations("imessage")).conversations[0]!.coordinate).toEqual(coordinate);
+    expect(await client.enroll("imessage", coordinate)).toEqual(enrollment);
+    expect((await client.history(enrollment.id)).messages[0]!.coordinate).toEqual(coordinate);
+    for (const changed of [
+      { ...coordinate, chatGuid: `${prefix === "any;" ? "iMessage;" : "any;"}-;fixture@example.test` },
+      { ...coordinate, observedChatRowId: 2 },
+    ]) {
+      const changedConversation = { ...conversation, coordinate: changed }, changedDigest = automationBindingDigest(identity, changedConversation);
+      expect(changedDigest).not.toBe(enrollment.bindingDigest);
+      expect(() => parseAutomationEnrollment({ ...enrollment, conversation: changedConversation })).toThrow("Changed enrollment binding");
+      const changedClient = createGhostgetAutomationClient(async () => ({ ...enrollment, conversation: changedConversation, bindingDigest: changedDigest }));
+      await expect(changedClient.enroll("imessage", coordinate)).rejects.toThrow("Enrollment target changed");
+      historyCoordinate = changed;
+      await expect(client.history(enrollment.id)).rejects.toThrow("History changed enrollment");
+    }
+  }
 });
 
 test("discovery distinguishes rejected remote requests from invalid successful response data", async () => {

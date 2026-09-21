@@ -65,7 +65,7 @@ describe("persistent owner control service", () => {
     expect(response).toMatchObject({ ok: true, kind: "snapshot", snapshot: { settings: { paused: true }, contacts: [], providerAccounts: [
       { id: "native-codex", provider: "codex", route: "codex", status: "ready", defaultReplyModel: "codex/observed", classifierModel: "codex/observed" },
       { id: "native-claude-code", provider: "claude", route: "claude-code", status: "ready", defaultReplyModel: "claude/observed", classifierModel: "claude/observed" },
-    ] } });
+    ], capabilities: expect.arrayContaining([{ id: "agent", status: "available", detail: "An AI account is ready. Contact account selection and messaging grants still apply." }]) } });
     expect(response).toEqual(raw); expect(generated).toBe(0);
   });
   test("ready account snapshots still require models, route identity and qualified account state", async () => {

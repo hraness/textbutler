@@ -29,9 +29,9 @@ textbutler messages summarize CONTACT_ID --limit 100
 ```
 
 History includes message IDs, authorship, time, text, related message IDs and
-attachment metadata when the provider exposes it. The native iMessage contract
-currently omits attachment metadata. Limits range from 1 to
-200 messages. The response reports
+attachment metadata when the provider exposes it. Attachment metadata contains
+names, media types and sizes; local file paths and contents are excluded.
+Limits range from 1 to 200 messages. The response reports
 shortened text and omitted records; it is a recent sample, not a complete
 archive. It does not download or interpret attachment contents.
 

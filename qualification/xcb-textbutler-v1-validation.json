@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "scope": "TextButler contact-profile composition, owner messaging controls and native startup/setup source; synthetic tests only, including a development Ghostget 0.18.21 fixture and closed discovery diagnostics. Actual Ghostget release/artifact admission, native XCB/provider admission, macOS permissions and live messaging verification remain independent.",
+  "scope": "TextButler contact-profile composition, owner messaging controls and native startup/setup source; synthetic tests only, including a development Ghostget 0.18.21 fixture, closed discovery diagnostics, literal iMessage/any GUID read and enrollment identity, and route-neutral AI readiness copy. Actual Ghostget artifact admission, native send service enforcement, XCB/provider admission, macOS permissions and live messaging verification remain independent.",
   "toolchain": "Bun 1.3.14",
   "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
   "result": {
     "exitCode": 0,
-    "passed": 238,
+    "passed": 240,
     "failed": 0,
-    "assertions": 1883,
+    "assertions": 1952,
     "files": 18
   },
   "additionalChecks": [
@@ -24,11 +24,11 @@
       "evidence": "Observed current coupled composition completion; compiler output is empty. All 246 retained inputs were unchanged before and after the suite and both typechecks."
     }
   ],
-  "sourceInventoryCount": 29,
-  "sourceDigest": "ee0336bed34160f3442ee135f025729ee04dc98e197631cb53f4ccbdbe508d5e",
+  "sourceInventoryCount": 30,
+  "sourceDigest": "d05fae96dadf5f1bee2d5ee2a8fced19c07245327424e66445028cc596b6a46c",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
-    "packages/textbutler/src/control-service.test.ts": "272c2c2a64b087b28d9459b1f68b12658bb029ef7cb06868c24d9687523adc88",
+    "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
     "packages/textbutler/src/ghostget-automation-process.test.ts": "9c2b2303a6deae4d92f5a4c54f3c969799086d45b214f5e4fd2620a499f0b193",
     "packages/textbutler/src/imessage-setup.test.ts": "8a30658941fc6cdb83b4d2f4350e83f89a36fc93e8483ce035cdfd1597f10db5",
     "packages/textbutler/src/message-summary.test.ts": "286cd717f0741fd40ac8caa47df14c436e66697834446fdaaa3add283b387419",
@@ -43,7 +43,7 @@
     "packages/textbutler/src/workspace.test.ts": "dd7782f94a0d2c91cea80bd374c10ee95c41373203af290c6154a61d568dfd13",
     "packages/textbutler/src/xcb-client.test.ts": "46aa882ce616e84e823514f9fbc5a4a9c924b8ac29ec4d804dd4ba8bb7e29418",
     "packages/textbutler/src/xcb-host.test.ts": "2b0a5a41236edf44b4a1ee049c5245bd53df1f708d966113726daee9175969c6",
-    "packages/transport/src/automation.test.ts": "fe1d5232d3716fa1efd5863cda5b99056fb065b613be4d578dd1f94544e28597",
+    "packages/transport/src/automation.test.ts": "1b61bbd3d514ebe15bea5ec453a330b2d533b91040193207abd46cc8594cdc03",
     "scripts/xcb-integration-admission.test.ts": "e567b1e06d2900b15e37cc8ba634cdb14dc35948dee8d01c63992626f87234ee"
   },
   "typeInputs": {
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "eac1d22364ad8719830c1cad9b23afe0ce4e3ebdea56e09626f27cdbc084ac3e",
-  "logScope": "Complete actual stdout and stderr from the expanded 18-file synthetic composition invocation; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "f387020c3751db9440c719588cb8890f1c204577c29c1ef75d0ef019492e12b1",
+  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new literal-GUID tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Independent integration-owner review of the combined discovery-diagnostic implementation, exact Ghostget 0.18.21 setup pin and documentation delta atop validated b79296a65a1c45a2c5cd8db6bd28707300eaf4b7; independent diagnostics worker review of closed wire fields and request settlement; independent composition-owner review of the one-line source-inventory addition. Current coupled 18-file synthetic suite and both package typechecks passed with all 246 captured inputs unchanged. Earlier review references describe historical baseline work.",
+    "method": "Independent integration-owner review of the literal-coordinate parser and tests plus route-neutral readiness copy atop reviewed draft PR143 head 9d4548ea574d4156e81084dfcdb694d125a0f1d3; independent composition-owner review of the one-line automation-contract source-inventory addition. Current coupled 18-file synthetic suite and both package typechecks passed with all 246 captured inputs unchanged. Earlier review references describe historical baseline work. This review covers TextButler read, enrollment and history identity semantics; native per-send service enforcement is separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -128,6 +128,17 @@
           "docs/textbutler/ghostget-contract.md"
         ],
         "result": "Approved additive per-provider discovery diagnostics with closed stage/code pairs, exact allowlisted native markers, no raw messages/paths/handles/bodies/stderr, unchanged generic failure and partial-provider behavior. Newline marker and non-string remote error settlement findings were repaired; tests retain custody for malformed/recovery failures and require successful normal close. Exact 0.18.21 admission rejects earlier versions before setup launch or permissions. The new diagnostic module is explicitly bound in the 29-source inventory. All 246 source, synthetic fixture, test, type, reviewed documentation and instruction inputs remained unchanged across 238 tests, 1883 assertions and both successful package typechecks."
+      },
+      {
+        "reviewerRole": "Integration owner, independent of literal-coordinate and readiness-copy implementation; composition owner independently reviewed source-inventory addition",
+        "files": [
+          "packages/transport/src/automation-contract.ts",
+          "packages/transport/src/automation.test.ts",
+          "packages/textbutler/src/control-service.ts",
+          "packages/textbutler/src/control-service.test.ts",
+          "scripts/xcb-integration-admission.ts"
+        ],
+        "result": "Approved only the exact iMessage; and any; GUID prefix allowlist while preserving service=iMessage, literal GUID bytes, the existing byte/NUL limits, exact keys, positive safe row identity, and binding equality. Synthetic discovery/enrollment/history cases reject prefix or row changes even when a provider recomputes the enrollment digest. Route-neutral readiness copy avoids implying a Claude API account or an already-selected contact account. The coordinate contract is explicitly bound in the 30-source inventory. All 246 inputs remained unchanged across 240 tests, 1952 assertions and both successful package typechecks. No native send service guard or live messaging result is claimed."
       }
     ],
     "findingsResolved": [
@@ -149,13 +160,15 @@
       "Distinguish remote discovery rejection, local response validation, queue/transport failure and unknown error without exposing provider text",
       "Accept native discovery detail only from an exact full-string marker with closed phase/code pairs on remote-unavailable",
       "Reject non-string remote codes before clearing their pending request, retaining failed custody and bounded settlement",
-      "Admit exactly Ghostget 0.18.21 in the development setup fixture; prior release or installation is not inferred from synthetic success"
+      "Admit exactly Ghostget 0.18.21 in the development setup fixture; prior release or installation is not inferred from synthetic success",
+      "Preserve literal any; iMessage coordinates through discovery, enrollment and history while rejecting SMS/unknown prefixes, non-iMessage service and changed exact bindings",
+      "Describe any ready AI route without incorrectly claiming a selected Claude API account"
     ],
-    "remaining": "The synthetic development 0.18.21 fixture proves exact-version admission and diagnostic propagation, not an actual Ghostget release, native discovery success, Messages access or delivery. Canonical Ghostget 0.18.21 release/artifact admission and application installation remain separate gates. Native app execution, macOS permissions, exact XCB executable/provider admission, account/recipient verification and live messaging behavior require separate evidence; this receipt makes no live-provider or delivery claim."
+    "remaining": "Synthetic development 0.18.21 fixtures establish TextButler exact-version parsing, diagnostics and literal coordinate identity, not an actual Ghostget release, native send service enforcement, Messages access or delivery. Canonical Ghostget artifact admission and native per-send service checks remain separate gates. Application installation, macOS permissions, exact XCB executable/provider admission, account/recipient verification and live messaging behavior require separate evidence; this receipt makes no live-provider or delivery claim."
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "0b401350316cf08dc50519a4cbac3d21f8c7b1e58a4617d3d4fff0e5e50d8984",
+    "sha256": "78386529c18c15adea5e255f399b423c5524da660384f4d00d4509f7c17620a5",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -179,8 +192,8 @@
       "packages/textbutler/src/cli.ts": "8464ac466faad5ad1f27ce835bc0315f8fd732ed6d926a4c908b7da317e06775",
       "packages/textbutler/src/config.ts": "ce7b7e99b117e0b7d8b81368cec3f1016ef7bbe0dadace3b8e02e30c027aacfe",
       "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
-      "packages/textbutler/src/control-service.test.ts": "272c2c2a64b087b28d9459b1f68b12658bb029ef7cb06868c24d9687523adc88",
-      "packages/textbutler/src/control-service.ts": "85335fab09fa430685f176e732476147f12e5a006e8ac4d812b66dbf1626ece1",
+      "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
+      "packages/textbutler/src/control-service.ts": "332d11ff003bdbf62c681bc17d41926044610e2402d0345ff5a07eb4a97aa4f9",
       "packages/textbutler/src/daemon-custody.test.ts": "8bc58904f2ddb921eaeccfaf272e29f87176137cdacb00cd1ab78408fa41013a",
       "packages/textbutler/src/daemon-custody.ts": "ead51b8c27bf88a0969ef9f4a7476bbedb71af5ec96d4d20919580715717ec8c",
       "packages/textbutler/src/daemon.test.ts": "d479f68d4ca41a906b70a50810c27f4ff5131f802b36bc8202910c60f49d0899",
@@ -257,9 +270,9 @@
       "packages/textbutler/test-fixtures/ghostget-automation.ts": "fed39cfcaf9afce3d3d193a9ead14ba600186eda97749fa00938d272bb0987f4",
       "packages/textbutler/test-fixtures/ghostget-owner.ts": "9e3134cce06ece726edac9758d5b3b3b562a848c97ba69ec7a3b4b46316a67b7",
       "packages/textbutler/tsconfig.json": "639cd9738fe64eb0f069f295a3ca5d6a9ec123aff8d8e1c63d288d128865c87b",
-      "packages/transport/src/automation-contract.ts": "9f1c992ccad59bbd79adde401ed44146cfdda2f402c07d6c467aa2797d035bed",
+      "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
       "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
-      "packages/transport/src/automation.test.ts": "fe1d5232d3716fa1efd5863cda5b99056fb065b613be4d578dd1f94544e28597",
+      "packages/transport/src/automation.test.ts": "1b61bbd3d514ebe15bea5ec453a330b2d533b91040193207abd46cc8594cdc03",
       "packages/transport/src/automation.ts": "3bb966e0bbd47d75606040f85c2bd601d96aa8b3926e05106e9ae93f9c69a3ef",
       "packages/transport/src/cli.test.ts": "dca9f639aa31b897d21c1499728b5dc52a179ac25bde36e75d71dbc6435bd31a",
       "packages/transport/src/cli.ts": "b295db0de0e0da0a88f1e7a750a0cb0a0124c92b5645d12a3671b113ed84571f",
@@ -331,7 +344,7 @@
       "scripts/validate-skill.ts": "2c983db18bb0553d1bd6c8a057fa0f38fdaab88452c13a6c2477d268e00b60ce",
       "scripts/verify-textbutler-macos-app.ts": "e31427b114da7fc719bda89b46664d025ae464224ccd0f1c6951f5ce23c7af61",
       "scripts/xcb-integration-admission.test.ts": "e567b1e06d2900b15e37cc8ba634cdb14dc35948dee8d01c63992626f87234ee",
-      "scripts/xcb-integration-admission.ts": "e2189f6930adaae391ea520f06de4ff287b6ab85f6e5cf00ec3cb7a5ef581e3d",
+      "scripts/xcb-integration-admission.ts": "1d56b8854381d4a540a7522b024fe1de11ed04816d86a4dc210503ef1b271a14",
       "src/agentic-messaging-v1.test.ts": "91263731c9a2db0e11cf2b3d78e48c84997d87e63f65f6a8bcae8947026956c7",
       "src/agentic-messaging-v1.ts": "72a160b400442ca01c912386b319494a4137993bb8c3a9790e0a6d5fd752fbb2",
       "src/args.test.ts": "de3e81d60de85cf90a1cd63b53f4f520a8c08456d95c8ba546701e0ff08addea",
@@ -411,9 +424,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "c44870e43ce80c22e4adb4e446a30d0ea195a5ce8ecc103cee26d84dbdf42929",
-    "evidenceSha256": "dc7afa7e7adcb28b47f13197b65099febfe6dc62e2d7fb41b99740421e363dc0",
-    "logSha256": "776b035fc1493d8e85c6a6741df51b8b8843a280f826f14935b08e112b48030c",
-    "scope": "Historical baseline evidence; its review references below are retained as history and do not claim current live verification."
+    "validationSha256": "0c0976ab3b8c9842b1b540294d4aaa9de76ced5a540507b5cc383b032ec9d37a",
+    "evidenceSha256": "0365cc7d98aee58629b8c5e9922a605736b83b9b8b54ded4284f57f9f56608bb",
+    "logSha256": "eac1d22364ad8719830c1cad9b23afe0ce4e3ebdea56e09626f27cdbc084ac3e",
+    "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }

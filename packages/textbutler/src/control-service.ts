@@ -436,7 +436,7 @@ export class TextbutlerControlService {
       capabilities: [
         { id: "messages", status: this.runtimeStatus.state === "unavailable" ? "setup-required" : "available", detail: this.automation ? this.runtimeStatus.detail : this.enrollment ? "Owner conversation selection is configured. Message subscriptions and autonomous sending remain unavailable." : "Configure the owner-installed Ghostget CLI to select messaging conversations." },
         { id: "contacts", status: "unsupported", detail: "The current Ghostget contract has no native Contacts directory. No contacts are imported automatically." },
-        { id: "agent", status: this.providers?.accounts().some(account => account.status === "ready") ? "available" : "setup-required", detail: this.providers?.accounts().some(account => account.status === "ready") ? "An explicitly selected Claude API account is ready. Contact selection and messaging grants still apply." : "Choose and check an explicit account. Claude API and native coding-agent routes are separate." },
+        { id: "agent", status: this.providers?.accounts().some(account => account.status === "ready") ? "available" : "setup-required", detail: this.providers?.accounts().some(account => account.status === "ready") ? "An AI account is ready. Contact account selection and messaging grants still apply." : "Choose and check an explicit account. Claude API and native coding-agent routes are separate." },
         richCapability("attachments", ["attachment"]), richCapability("reactions", ["reaction"]),
         richCapability("stickers", ["sticker"]), richCapability("links", ["link"]),
         richCapability("polls", ["poll"]), richCapability("mini-apps", ["app-clip", "experience"]),
