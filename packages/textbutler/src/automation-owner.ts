@@ -1,4 +1,4 @@
-import { AUTOMATION_ACTIONS, automationBindingDigest, automationHash, automationId, parseAutomationEnrollment, parseAutomationGrant, type AutomationConversation,
+import { AUTOMATION_ACTIONS, automationFailure, automationBindingDigest, automationHash, automationId, parseAutomationEnrollment, parseAutomationGrant, type AutomationFailure, type AutomationConversation,
   type AutomationEnrollment, type AutomationGrant, type AutomationGrantRequest, type AutomationIdentity, type AutomationProvider, type AutomationStatus, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import type { HistoryMessage } from "./enrollment.ts";
 
@@ -7,7 +7,7 @@ export type AutomationBinding = Readonly<{ version: 2; enrollmentId: string; ide
   conversation: AutomationConversation; bindingDigest: string }>;
 export type AutomationCandidate = Readonly<{ identity: AutomationIdentity; conversation: AutomationConversation }>;
 export type AutomationDiscoveryStatus = Readonly<{ providers: readonly Readonly<{
-  provider: AutomationProvider; state: "complete" | "truncated" | "unavailable"; detail: string;
+  provider: AutomationProvider; state: "complete" | "truncated" | "unavailable"; detail: string; failure?: AutomationFailure;
 }>[] }>;
 export interface OwnerAutomationPort {
   providers(): readonly AutomationProvider[];
@@ -84,9 +84,9 @@ export function createAutomationOwnerPort(options: { client: GhostgetAutomationC
           for (const conversation of page.conversations) result.push({ identity: page.identity, conversation });
           observed.push({ provider, state: page.complete ? "complete" : "truncated",
             detail: page.complete ? `${name} conversation list is complete.` : `${name} returned a partial list of up to ${limit} recent conversations. Older conversations may be missing.` });
-        } catch {
+        } catch (error) {
           signal.throwIfAborted();
-          observed.push({ provider, state: "unavailable", detail: `${name} conversations are unavailable. Check its connection and permissions in Ghostget, then refresh.` });
+          observed.push({ provider, state: "unavailable", detail: `${name} conversations are unavailable. Check its connection and permissions in Ghostget, then refresh.`, failure: automationFailure(error) });
         }
       }
       signal.throwIfAborted(); discovery = { providers: observed }; return result;

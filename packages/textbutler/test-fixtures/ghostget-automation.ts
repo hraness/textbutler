@@ -14,6 +14,19 @@ process.stdin.on("data", (chunk: string) => {
   while ((at = buffer.indexOf("\n")) !== -1) {
     const request = JSON.parse(buffer.slice(0, at)); buffer = buffer.slice(at + 1);
     if (request.method === "initialize") reply(request, { initialized: true });
+    else if (request.method === "conversations" && mode.startsWith("remote-")) {
+      process.stdout.write(JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id: request.id, ok: false,
+        error: { code: mode.slice("remote-".length), message: "private fixture body, handle and /synthetic/private/path" } }) + "\n");
+    }
+    else if (request.method === "conversations" && mode === "native-diagnostic") {
+      process.stdout.write(JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id: request.id, ok: false,
+        error: { code: "unavailable", message: "ghostget.discovery.v1:native-chats:response-invalid" } }) + "\n");
+    }
+    else if (request.method === "conversations" && mode === "non-string-error") {
+      process.stdout.write(JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id: request.id, ok: false,
+        error: { code: ["unavailable"], message: "ghostget.discovery.v1:native-chats:failed" } }) + "\n");
+    }
+    else if (request.method === "conversations") reply(request, { privateBody: "Must never be published" });
     else if (request.method === "submit") sending = request;
     else if (request.method === "cancel") {
       reply(request, { cancelled: true });

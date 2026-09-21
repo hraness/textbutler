@@ -12,7 +12,7 @@ function capability(operationId: string, revision: number, permission: string) {
   return { digest: String(revision + (OPERATIONS.indexOf(operationId) + 1)).padStart(64, "a"), adapterId: "imessage-direct", operationId, pluginId: "imessage", surface: "imessage", transport: "local-cli", risk: operationId === READ ? "R1" : "R3", effect: operationId === READ ? "none" : "synthetic scoped text", state: "available", executorSource: "built-in", interfaceSource: "bundled", permission };
 }
 function view(revision: number, managed: boolean, permissions: Record<string, string>) {
-  return { version: "0.18.20", accountId: ID, accounts: [{ id: ID, provider: "imessage", kind: "linked-device-store", subject: SUBJECT, revision: "c".repeat(64), status: "configured", source: null, tokenStorage: null }],
+  return { version: "0.18.21", accountId: ID, accounts: [{ id: ID, provider: "imessage", kind: "linked-device-store", subject: SUBJECT, revision: "c".repeat(64), status: "configured", source: null, tokenStorage: null }],
     capabilities: OPERATIONS.map(operation => capability(operation, revision, managed ? permissions[operation] ?? "deny" : "unmanaged")), interfaces: [], policy: { managed, revision }, web: { revision: 0, gatewayOnly: false, rules: [] }, approvals: [], connectionProviders: [], vault: { provider: "1password", available: true, purpose: "x-user-token-import" } };
 }
 function fixture(existing = false, alreadyAllowed = false) {
@@ -83,6 +83,7 @@ test("foreign, duplicate, malformed and unavailable capabilities never receive g
     (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.17" }),
     (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.18" }),
     (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.19" }),
+    (v: ReturnType<typeof view>) => ({ ...v, version: "0.18.20" }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: [...v.capabilities, v.capabilities[0]] }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.filter(c => c.operationId !== ATTACHMENT) }),
     (v: ReturnType<typeof view>) => ({ ...v, capabilities: v.capabilities.map(c => c.operationId === ATTACHMENT ? { ...c, adapterId: "imessage-bridge" } : c) }),
@@ -117,7 +118,7 @@ async function processFixture(mode = "normal") {
   const root = await realpath(await mkdtemp(join(tmpdir(), "textbutler-imessage-setup-"))); roots.push(root);
   const packageRoot = join(root, "ghostget"), home = join(root, "home"), dataDir = join(root, "data"), stateHome = join(root, "connector-state");
   for (const path of [packageRoot, home, dataDir, stateHome, join(dataDir, "state"), join(packageRoot, "src"), join(packageRoot, "src", "control")]) await mkdir(path, { mode: 0o700 });
-  await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: "@hraness/ghostget", version: "0.18.20", type: "module" }), { mode: 0o600 });
+  await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: "@hraness/ghostget", version: "0.18.21", type: "module" }), { mode: 0o600 });
   const common = `import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 const root=process.env.GHOSTGET_STATE_HOME, file=join(root,"fixture.json"), log=join(root,"calls.jsonl");
@@ -140,7 +141,7 @@ else process.exit(2);
   await writeFile(join(packageRoot, "src", "control", "helper.ts"), common + `
 let buffer="";process.stdin.on("data",chunk=>{buffer+=chunk;const at=buffer.indexOf("\\n");if(at<0)return;const frame=JSON.parse(buffer.slice(0,at)),request=frame.request;record(request);
 let data;
-if(request.action==="snapshot")data={kind:"snapshot",snapshot:{version:"0.18.20",accountId:id,accounts:[{id,provider:"imessage",kind:"linked-device-store",subject,revision:"c".repeat(64)}],capabilities:operations.map(operationId=>({digest:String(state.revision+(operations.indexOf(operationId)+1)).padStart(64,"a"),adapterId:"imessage-direct",operationId,pluginId:"imessage",surface:"imessage",transport:"local-cli",risk:operationId===read?"R1":"R3",effect:"synthetic",state:"available",executorSource:"built-in",interfaceSource:"bundled",permission:state.managed?state.permissions[operationId]??"deny":"unmanaged"})),interfaces:[],policy:{managed:state.managed,revision:state.revision},web:{},approvals:[],connectionProviders:[],vault:{}}};
+if(request.action==="snapshot")data={kind:"snapshot",snapshot:{version:"0.18.21",accountId:id,accounts:[{id,provider:"imessage",kind:"linked-device-store",subject,revision:"c".repeat(64)}],capabilities:operations.map(operationId=>({digest:String(state.revision+(operations.indexOf(operationId)+1)).padStart(64,"a"),adapterId:"imessage-direct",operationId,pluginId:"imessage",surface:"imessage",transport:"local-cli",risk:operationId===read?"R1":"R3",effect:"synthetic",state:"available",executorSource:"built-in",interfaceSource:"bundled",permission:state.managed?state.permissions[operationId]??"deny":"unmanaged"})),interfaces:[],policy:{managed:state.managed,revision:state.revision},web:{},approvals:[],connectionProviders:[],vault:{}}};
 else if(request.action==="permission.enable"&&request.expectedRevision===state.revision){state.managed=true;state.revision++;save();data={kind:"success",message:"Enabled."};}
 else if(request.action==="permission.set"&&state.mode==="stale"){console.log(JSON.stringify({id:frame.id,protocol:frame.protocol,ok:false,code:"OPERATION_PERMISSION_CHANGED",message:"Refresh."}));return;}
 else if(request.action==="permission.set"&&request.accountId===id&&request.adapterId==="imessage-direct"&&operations.includes(request.operationId)&&request.expectedRevision===state.revision&&request.expectedCapabilityDigest===String(state.revision+(operations.indexOf(request.operationId)+1)).padStart(64,"a")){state.permissions[request.operationId]="allow";state.revision++;save();data={kind:"success",message:"Saved."};}
@@ -153,8 +154,8 @@ console.log(JSON.stringify({id:state.mode==="wrong-id"?"wrong-id":frame.id,proto
   await writeFile(join(dataDir, "state", "host.json"), JSON.stringify({ schemaVersion: 1, ghostget: { executable, runtimeExecutable, authId: ID, stateHome, automationAccounts: [{ provider: "imessage", authId: ID }] } }), { mode: 0o600 });
   return { root, packageRoot, home, dataDir, stateHome, executable, options: { home, platform: "darwin", automationPermission: "allowed", launchGeneration: "12345678-1234-1234-1234-123456789abc", processLimits: { commandMs: 2000, cleanupMs: 100 } }, async calls() { try { return (await readFile(join(stateHome, "calls.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line)); } catch { return []; } } };
 }
-test("connector releases without native startup fixes are refused before launch", async () => {
-  for (const version of ["0.18.16", "0.18.17", "0.18.18", "0.18.19"]) {
+test("connector releases before the pinned native discovery contract are refused before launch", async () => {
+  for (const version of ["0.18.16", "0.18.17", "0.18.18", "0.18.19", "0.18.20"]) {
     const f = await processFixture();
     await writeFile(join(f.packageRoot, "package.json"), JSON.stringify({ name: "@hraness/ghostget", version, type: "module" }), { mode: 0o600 });
     expect(await runIMessageSetup(f.dataDir, f.options)).toMatchObject({ ok: false, status: "blocked", custody: "not-acquired", code: "unsupported-connector-version" });

@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import { AUTOMATION_ACTIONS, automationBoolean, automationHash, automationId, automationProvider, automationRecord, parseAutomationConversation, parseAutomationCoordinate, parseAutomationEnrollment, parseAutomationGrant, parseAutomationIdentity, parseAutomationMessage, parseAutomationRun, parseAutomationStatus, type AutomationAction, type AutomationCoordinate, type AutomationEnrollment, type AutomationEvent, type AutomationGrantRequest, type AutomationPlan, type AutomationProvider } from "./automation-contract";
 import { array, canonicalJson, digest, failure, integer, parseActionIntent, string, success, timestamp } from "./validation";
 import { TRANSPORT_PROTOCOL, type ActionPlan, type HistoryMessage, type TextbutlerTransport } from "./types";
+import { AutomationOperationError } from "./automation-diagnostics.ts";
 export * from "./automation-contract";
+export * from "./automation-diagnostics.ts";
 
 /** Only the trusted daemon owns this port. It is never an agent tool. */
 export type GhostgetAutomationInvoker = (method: string, params: Readonly<Record<string, unknown>>, signal?: AbortSignal) => Promise<unknown>;
@@ -16,10 +18,13 @@ export function createGhostgetAutomationClient(invoke: GhostgetAutomationInvoker
       if (result.identity.provider !== provider) throw new Error("Provider status changed network"); return result;
     },
     async conversations(provider: AutomationProvider, limit = 200, signal?: AbortSignal) {
-      const r = automationRecord(await invoke("conversations", { provider: automationProvider(provider), limit: integer(limit, 1, 200) }, signal), ["identity", "conversations", "complete"]);
-      const identity = parseAutomationIdentity(r.identity), conversations = array(r.conversations, limit).map(parseAutomationConversation);
-      if (identity.provider !== provider || conversations.some(item => item.coordinate.provider !== provider)) throw new Error("Discovery changed network");
-      return { identity, conversations, complete: automationBoolean(r.complete) };
+      const value = await invoke("conversations", { provider: automationProvider(provider), limit: integer(limit, 1, 200) }, signal);
+      try {
+        const r = automationRecord(value, ["identity", "conversations", "complete"]);
+        const identity = parseAutomationIdentity(r.identity), conversations = array(r.conversations, limit).map(parseAutomationConversation);
+        if (identity.provider !== provider || conversations.some(item => item.coordinate.provider !== provider)) throw new Error("Discovery changed network");
+        return { identity, conversations, complete: automationBoolean(r.complete) };
+      } catch { throw new AutomationOperationError("response-schema"); }
     },
     async enroll(provider: AutomationProvider, coordinate: AutomationCoordinate, signal?: AbortSignal) {
       const selected = parseAutomationCoordinate(coordinate);

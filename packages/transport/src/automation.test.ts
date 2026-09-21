@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { automationContextId, automationBindingDigest, automationHash, createGhostgetAutomationClient, createGhostgetAutomationTransport, type AutomationEnrollment, type AutomationPlan, type GhostgetAutomationInvoker } from "./automation";
+import { automationContextId, automationBindingDigest, automationHash, automationFailure, automationRemoteError, createGhostgetAutomationClient, createGhostgetAutomationTransport, type AutomationEnrollment, type AutomationPlan, type GhostgetAutomationInvoker } from "./automation";
 import { parseActionIntent } from "./validation";
 
 const now = Date.parse("2026-09-11T00:00:00.000Z");
@@ -70,4 +70,46 @@ test("native poll intent is bounded and keeps provider-default selection explici
   expect(parseActionIntent({ kind: "poll", question: "Tea?", options: ["Yes", "No"], maximumSelections: null })).toMatchObject({ kind: "poll", maximumSelections: null });
   for (const options of [["Same", "Same"], ["One"]]) expect(() => parseActionIntent({ kind: "poll", question: "Tea?", options, maximumSelections: null })).toThrow();
   expect(() => parseActionIntent({ kind: "poll", question: "Tea?", options: ["Yes", "No"], maximumSelections: 3 })).toThrow();
+});
+
+test("discovery distinguishes rejected remote requests from invalid successful response data", async () => {
+  const f = automationFixture();
+  for (const code of ["invalid-request", "not-ready", "unavailable", "recovery-required"] as const) {
+    const remote = automationRemoteError(code); let calls = 0;
+    const client = createGhostgetAutomationClient(async () => { calls++; throw remote; });
+    await expect(client.conversations("whatsapp")).rejects.toBe(remote);
+    expect(automationFailure(remote)).toEqual({ stage: "provider", code: `remote-${code}` });
+    expect(calls).toBe(1);
+  }
+  for (const value of [
+    { identity: f.enrollment.identity, conversations: [f.enrollment.conversation], complete: true, privatePath: "/synthetic/private" },
+    { identity: f.enrollment.identity, conversations: [{ ...f.enrollment.conversation, participants: ["private\0handle"] }], complete: true },
+    { identity: f.enrollment.identity, conversations: [], complete: "private-body" },
+    { identity: { ...f.enrollment.identity, provider: "beeper" }, conversations: [], complete: true },
+  ]) {
+    const client = createGhostgetAutomationClient(async () => value);
+    const error = await client.conversations("whatsapp").catch(error => error);
+    expect(automationFailure(error)).toEqual({ stage: "response-schema", code: "response-schema" });
+    expect(String(error)).not.toContain("private");
+  }
+  const client = createGhostgetAutomationClient(async () => { throw new Error("private upstream body/path"); });
+  expect(automationFailure(await client.conversations("whatsapp").catch(error => error))).toEqual({ stage: "unknown", code: "unknown" });
+});
+
+test("only complete allowlisted native markers survive remote unavailable classification", () => {
+  const phases = ["admission", "native-preflight", "native-status", "native-chats", "native-projection", "reauthorization", "native-finalization", "host-status", "host-identity", "host-response"] as const;
+  const codes = ["failed", "cancelled", "deadline", "cleanup-unverified", "process-failed", "process-stderr", "streams-failed", "response-invalid", "rpc-rejected", "rpc-invalid-params", "rpc-method-unavailable", "schema-invalid", "coordinate-invalid", "identity-changed", "database-unreadable"] as const;
+  for (const phase of phases) for (const code of codes) {
+    const marker = `ghostget.discovery.v1:${phase}:${code}`;
+    expect(automationFailure(automationRemoteError("unavailable", marker))).toEqual({ stage: "provider", code: "remote-unavailable", native: { phase, code } });
+  }
+  for (const message of ["ghostget.discovery.v1:native-chats:response-invalid\n", "ghostget.discovery.v1:native-chats:response-invalid\r", "ghostget.discovery.v1:unknown:failed",
+    "ghostget.discovery.v1:native-chats:unknown", "prefix ghostget.discovery.v1:native-chats:failed", "ghostget.discovery.v1:native-chats:failed /synthetic/private",
+    { phase: "native-chats", code: "failed" }, "Sensitive handle and body", "x".repeat(1024)]) {
+    expect(automationFailure(automationRemoteError("unavailable", message))).toEqual({ stage: "provider", code: "remote-unavailable" });
+  }
+  for (const code of ["not-ready", "recovery-required", "invalid-request"] as const) {
+    expect(automationFailure(automationRemoteError(code, "ghostget.discovery.v1:native-chats:failed"))).toEqual({ stage: "provider", code: `remote-${code}` });
+  }
+  expect(() => automationRemoteError("private-code")).toThrow("contract changed");
 });

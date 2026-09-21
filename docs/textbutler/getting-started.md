@@ -120,8 +120,10 @@ installing the app does not start replies or change macOS permissions. In
 Enable its switch. macOS may require your password in its own dialog.
 
 Configure the exact Ghostget `src/cli.ts`, Bun runtime, private state directory
-and `imessage:ACCOUNT` binding using `setup` above. The native setup role supports
-Ghostget 0.18.20. It links only that account to this Mac's Messages store and
+and `imessage:ACCOUNT` binding using `setup` above. This development version pins
+Ghostget 0.18.21; its matching artifact and live conversation checks remain pending.
+Use an admitted matching artifact before running native setup. Setup links only
+that account to this Mac's Messages store and
 enables Ghostget's account-specific automation read, text and attachment-send capabilities.
 Contact selection and automatic replies remain separate choices.
 

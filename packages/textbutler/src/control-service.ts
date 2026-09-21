@@ -614,9 +614,12 @@ export class TextbutlerControlService {
             subtitle: `${providerName(candidate.identity.provider)} · ${candidate.conversation.participants.join(", ")}`.slice(0, 512),
             eligible: !duplicate, reason: duplicate ? "Already added" : "Ready to add" };
         });
-        const coverage = this.automation!.discoveryStatus?.().providers.filter(item => item.state !== "complete").map(item => item.detail) ?? [];
+        const discovery = this.automation!.discoveryStatus?.().providers ?? [];
+        const coverage = discovery.filter(item => item.state !== "complete").map(item => item.detail);
+        const diagnostics = discovery.flatMap(item => item.failure === undefined ? [] : [{ provider: item.provider, ...item.failure }]);
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "conversations", candidates: rows,
-          detail: ["Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled.", ...coverage].join(" ") };
+          detail: ["Choose an exact one-to-one messaging conversation. Adding a contact keeps its butler disabled.", ...coverage].join(" "),
+          ...(diagnostics.length ? { diagnostics } : {}) };
       });
       if (!this.enrollment) fail("unavailable", "Messages selection is not configured. Set up the owner-installed Ghostget CLI in Textbutler's host configuration, then restart the daemon.");
       return this.startJob(async signal => {

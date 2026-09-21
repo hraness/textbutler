@@ -15,13 +15,13 @@
   "sources": {
     "bun.lock": "2e6c9ea2aea734cb83423858a2118893a4561bac0030b365a1740411ace37c55",
     "package.json": "0a169d2cbdc675ee5cb12347eb6d22aed17d5d1fa0639873c167f1f045d921d0",
-    "packages/control/src/index.ts": "a74c2165691b4bd4a0e835ba0bdd6f9b8b662770ca02e0e9862a38783fbf15ff",
+    "packages/control/src/index.ts": "ef481855a332e720365ff949a2b63cf5c6f507c8bbf93e13cc1e388d5962a5e6",
     "packages/textbutler/src/cli.ts": "8464ac466faad5ad1f27ce835bc0315f8fd732ed6d926a4c908b7da317e06775",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
-    "packages/textbutler/src/control-service.ts": "cfc0dcc3141f9aa40a9c5745b4437abf2066a43376833cbf3a4a5472a99ed3e8",
+    "packages/textbutler/src/control-service.ts": "85335fab09fa430685f176e732476147f12e5a006e8ac4d812b66dbf1626ece1",
     "packages/textbutler/src/daemon.ts": "912b55671579faa7f62fe5acc3b08fac97df0c1ea3292ccafdac815896336eb5",
     "packages/textbutler/src/host-config.ts": "ca3215291f3e50383057a3218fe8f5bc8cb477956d28fffcdf2d78c53e3d05ad",
-    "packages/textbutler/src/imessage-setup.ts": "0bf2511b785ea948369c94aff8c5c532b1fc02c30a7b7026f1d836a8f2939560",
+    "packages/textbutler/src/imessage-setup.ts": "7d10f96796fc7958e74bf8caf1c89ce89eadfc92ad79bb1c855554240edf718c",
     "packages/textbutler/src/launch-agent.ts": "16d63e713691a236071da04a77b348106ee2d822a586d0519d07a988bb59b589",
     "packages/textbutler/src/macos-app.ts": "7b6635763f7f3ca70609d5a2398e3a6f17d33f70a12664f1e8b4507f5a2004b9",
     "packages/textbutler/src/message-summary.ts": "75163888ce53a7535a93f23a8228853d984af7a3677a4c8d0709cf6384187523",
@@ -39,11 +39,12 @@
     "packages/textbutler/src/xcb-client.ts": "76f41bdb50ff77a9f0481735cad18ec4e09f5ad21090c21537606017cfef3a11",
     "packages/textbutler/src/xcb-host.ts": "52d91bfd7ee6e970540f85de98e8669fcec66191e8b1e073934fea7fc180f87c",
     "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
+    "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
     "scripts/build-textbutler.ts": "22a207a92da457eb5a09badbd57ea98298657d89bfb447cffa079de7ab6f2271",
-    "scripts/xcb-integration-admission.ts": "c1b4391f2e8e7790111f182a42164af58efa952d89fb5763dc14919f1586be4d"
+    "scripts/xcb-integration-admission.ts": "e2189f6930adaae391ea520f06de4ff287b6ab85f6e5cf00ec3cb7a5ef581e3d"
   },
   "validation": {
-    "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts",
-    "receiptSha256": "c44870e43ce80c22e4adb4e446a30d0ea195a5ce8ecc103cee26d84dbdf42929"
+    "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
+    "receiptSha256": "0c0976ab3b8c9842b1b540294d4aaa9de76ced5a540507b5cc383b032ec9d37a"
   }
 }
