@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "97abe8f6b097880ac66c90d839f780981937bb092d204c365b4f38b7f6c18dff",
+  "sourceDigest": "b205a548f6b451871b297accfe80383bb543070d85ac028c8f4b94d9c4c61b74",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "e0851bc893a21efc00b4f6124c6a810be82d13dee0b8fc4a7f6972357e066d3a",
+  "logSha256": "f2fb8a147a2f988f37008141af5bad2b468d4c35fdf52d38bbca8ffad90f9338",
   "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new transport-install custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal of the admitted-event staleness fix on reviewed main head: the changed sealed inputs are the runtime passing the admission timestamp into the post-composition recheck so a slow draft cannot expire an admitted event, and the runtime tests covering that path. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers the admission-time staleness basis; native per-send service enforcement and live iMessage echo behavior are separate.",
+    "method": "Integration-owner reseal of the 0.8.15 release version bump on reviewed main head: the changed sealed inputs are the root package version carrying the merged admitted-event staleness fix. Source version, changelog and site version inputs were refreshed with all other sealed bytes unchanged. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers release metadata identity; the staleness fix was reviewed in the preceding feature merge, and native per-send service enforcement is separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -178,7 +178,7 @@
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "ecf6c7e85ba5dbdd48bea3244b20b3cf43ea900ffc814c5379b2d089336480fb",
+    "sha256": "5e9c97f78daf2e6dd54f94da8ff785e76d25dcba9d2a48487d7294ae50afc832",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -190,7 +190,7 @@
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
-      "package.json": "b5a6b46f4c5f75dca174cc8135fa721e8039bf56a2cd907f028235f96e838710",
+      "package.json": "cf3dde79299fa7c3f67fd4f02829275572fed1344226658469e459f0a210b746",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
       "packages/control/src/index.ts": "5d9377d4aa913b038f3a0557907137cd17e01fa9595def908416f4729ee4e43d",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
@@ -415,7 +415,7 @@
       "src/test-fixtures.ts": "3ac9802051d38c6d3ef92a842eb35ef1dedf8c9dd6424107b5054e4933d5e6bc",
       "src/test-x-archive-fixture.ts": "3461032a8c8bd2765c1c74c8616f442cbefd356b8f24401bb32241d4a967fa00",
       "src/types.ts": "fb3c0ffecae6900505b1bec8824ff0e24b12c8e12d742cb17250600a29d85aff",
-      "src/version.ts": "dfb24e3d198f6e133dd8e6330e66d0b5b8d959129ac94f3ef0131f3e58ec600e",
+      "src/version.ts": "218679f9f89aaddbe9a0a94ee56a3040dcd2110b77e40b87d393839fe57da9f9",
       "src/whatsapp-source.test.ts": "c07fdbee0ea8b5b4f1b57f3c7101ff1a5ed62ed8d97f98597d26c1d9999aa1f4",
       "src/whatsapp-source.ts": "fd6daff5185ee81b3585c003eb1d0c07b4b4e788aa55c7b4bef0edca46f732f4",
       "src/x-archive-zip-rust.test.ts": "7fd66cb10f08a2102da3f6ca187b030ecd350580f37224d8c6b4aba7ff3093f7",
@@ -434,9 +434,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "4edfb6f92fd1d766a2053a1656159d9ce6384591cf42c7e80d4875483a53fd92",
-    "evidenceSha256": "1682680105226280255524c19899b753d5ce23bf23f15133a92f239c11262b93",
-    "logSha256": "dd6dcdd212abea40c97f7116fd7bcb311a92eca056274c34bd0eed607ca06696",
+    "validationSha256": "e4057e7f9940ad3983b55c7a47499cbf2c14a83c45ef8bc4c8a4c83d2f25e71c",
+    "evidenceSha256": "cee52d58a14fed03e83baa99e98fa4e01d6492ad7d369782e971b5208ad257a6",
+    "logSha256": "e0851bc893a21efc00b4f6124c6a810be82d13dee0b8fc4a7f6972357e066d3a",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }
