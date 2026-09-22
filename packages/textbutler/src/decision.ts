@@ -44,16 +44,17 @@ export function decideReply(settings: Settings, contact: ContactSettings, event:
   if (!settings.contacts.some(c => c.id === contact.id && c.revision === contact.revision)) return { outcome: "ignore", reason: "settings-changed" };
   if (settings.paused || !contact.enabled || contact.pausedUntil > now) return { outcome: "ignore", reason: "paused" };
   if (event.contactId !== contact.id || event.routeId !== contact.routeId) return { outcome: "ignore", reason: "route-mismatch" };
-  if (event.historical || event.group || event.kind !== "message" || event.author !== "contact") return { outcome: "ignore", reason: "not-live-direct-inbound" };
+  const invoked = event.author === "owner" && keywordPresent(event.text, contact.keyword);
+  if (event.historical || event.group || event.kind !== "message" || (event.author !== "contact" && !invoked)) return { outcome: "ignore", reason: "not-live-direct-inbound" };
   if (![now, event.occurredAt, event.observedAt, state.synchronizedAt].every(Number.isSafeInteger) || event.occurredAt > now + 30_000 || event.observedAt > now || event.occurredAt < (admittedAt ?? now) - 120_000) return { outcome: "ignore", reason: "stale-event" };
   if (event.revision !== state.latestRevision) return { outcome: "ignore", reason: "superseded" };
   if (state.synchronizedAt > now || state.synchronizedAt < now - 15_000) return { outcome: "defer", reason: "refresh-required" };
   if (state.ownerTyping === true) return { outcome: "ignore", reason: "owner-typing" };
-  if (state.lastOwnerAt !== null && (state.lastOwnerAt >= event.occurredAt || now - state.lastOwnerAt < contact.humanCooldownMs)) return { outcome: "ignore", reason: "owner-active" };
+  if (state.lastOwnerAt !== null && (invoked ? state.lastOwnerAt > event.occurredAt : state.lastOwnerAt >= event.occurredAt || now - state.lastOwnerAt < contact.humanCooldownMs)) return { outcome: "ignore", reason: "owner-active" };
   if (state.repliesInLastHour >= contact.maxRepliesPerHour) return { outcome: "ignore", reason: "rate-limit" };
   const eligibleAt = event.observedAt + contact.debounceMs;
   if (now < eligibleAt) return { outcome: "defer", reason: "collecting-messages", eligibleAt };
-  if (keywordPresent(event.text, contact.keyword)) return { outcome: "reply", reason: "keyword" };
+  if (keywordPresent(event.text, contact.keyword)) return { outcome: "reply", reason: invoked ? "owner-keyword" : "keyword" };
   if (contact.mode === "keyword") return { outcome: "ignore", reason: "keyword-absent" };
   return { outcome: "classify", reason: state.ownerTyping === "unknown" ? "smart-without-typing-signal" : "smart" };
 }

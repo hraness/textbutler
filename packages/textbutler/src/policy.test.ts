@@ -51,7 +51,17 @@ describe("reply admission", () => {
     expect(decideReply(settings, contact, event, { ...state, ownerTyping: true }, now).reason).toBe("owner-typing");
   });
   test("ignores replay, outgoing, groups and nonmessage events", () => {
-    for (const patch of [{ historical: true }, { author: "owner" as const }, { author: "butler" as const }, { group: true }, { kind: "reaction" as const }, { revision: "old" }, { routeId: "elsewhere" }]) expect(decideReply(settings, contact, { ...event, ...patch }, state, now).outcome).toBe("ignore");
+    for (const patch of [{ historical: true }, { author: "owner" as const, text: "I am answering this" }, { author: "butler" as const }, { group: true }, { kind: "reaction" as const }, { revision: "old" }, { routeId: "elsewhere" }]) expect(decideReply(settings, contact, { ...event, ...patch }, state, now).outcome).toBe("ignore");
+  });
+  test("owner keyword invocation replies unless the owner takes over after it", () => {
+    const invoke = { ...event, author: "owner" as const };
+    expect(decideReply(settings, contact, invoke, state, now)).toMatchObject({ outcome: "reply", reason: "owner-keyword" });
+    // The invocation is not owner presence: equal time or earlier owner activity never suppresses it.
+    expect(decideReply(settings, contact, invoke, { ...state, lastOwnerAt: event.occurredAt }, now).outcome).toBe("reply");
+    expect(decideReply(settings, contact, invoke, { ...state, lastOwnerAt: now - 20_000 }, now).outcome).toBe("reply");
+    // A newer owner message is a takeover and still ends the invocation.
+    expect(decideReply(settings, contact, invoke, { ...state, lastOwnerAt: event.occurredAt + 1000 }, now).reason).toBe("owner-active");
+    expect(decideReply(settings, contact, { ...invoke, kind: "reaction" as const }, state, now).outcome).toBe("ignore");
   });
   test("debounce, stale sync, rate cap, and smart classifier are separate gates", () => {
     expect(decideReply(settings, contact, { ...event, observedAt: now - 100 }, state, now).reason).toBe("collecting-messages");
