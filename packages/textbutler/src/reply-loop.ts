@@ -5,7 +5,7 @@ import { messageAuthor, pendingCluster, type MessageAuthor } from "./attribution
 import type { OwnerRuntimeState, TextbutlerControlService } from "./control-service.ts";
 import { boundedHistory } from "./enrollment.ts";
 import type { ContactSettings, Settings } from "./config.ts";
-import type { MessageEvent } from "./decision.ts";
+import { keywordPresent, type MessageEvent } from "./decision.ts";
 import type { Hooks } from "./hooks.ts";
 import { ButlerRuntime, type ButlerAgent, type ConversationSnapshot } from "./runtime.ts";
 import { createRoutedButlerAgent } from "./routed-agent.ts";
@@ -51,7 +51,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   async function snapshot(contact: ContactSettings, state: ContactLoop): Promise<ConversationSnapshot> {
     const enrollment = await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
     const page = await client.history(state.binding.enrollmentId, 200); assertAutomationBinding(state.binding, page.enrollment);
-    for (const message of page.messages) if (author(message, contact) === "owner") state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(message.occurredAt));
+    for (const message of page.messages) if (author(message, contact) === "owner" && !(message.kind === "message" && message.text !== null && keywordPresent(message.text, contact.keyword))) state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(message.occurredAt));
     if (state.historyRevision !== page.enrollment.revision) {
       const history = boundedHistory(page.messages.filter(message => message.kind === "message" && message.direction !== "unknown").flatMap(message => {
         const who = author(message, contact);
@@ -81,12 +81,13 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
       if (state.pending && Number(event.revision) > Number(state.pending.revision)) state.pending = { ...state.pending, revision: String(event.revision) };
       return;
     }
-    if (who === "owner") state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(event.message.occurredAt));
+    const invoked = who === "owner" && event.message.kind === "message" && keywordPresent(event.message.text ?? "", contact.keyword);
+    if (who === "owner" && !invoked) state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(event.message.occurredAt));
     state.runtime.cancelContact(contact.id);
-    if (event.message.kind !== "message" || who !== "contact") { delete state.pending; return; }
+    if (event.message.kind !== "message" || (who !== "contact" && !invoked)) { delete state.pending; return; }
     // Oversized/invalid events are refused by policy instead of silently changing
     // the text the person asked the butler to interpret.
-    state.pending = { id: event.message.id, contactId: contact.id, routeId: bindingRoute(state), revision: String(event.revision), occurredAt: Date.parse(event.message.occurredAt), observedAt: now(), author: who, kind: "message", text: event.message.text ?? "", historical: false, group: false };
+    state.pending = { id: event.message.id, contactId: contact.id, routeId: bindingRoute(state), revision: String(event.revision), occurredAt: Date.parse(event.message.occurredAt), observedAt: now(), author: invoked ? "owner" : "contact", kind: "message", text: event.message.text ?? "", historical: false, group: false };
   }
   const bindingRoute = (state: ContactLoop) => state.binding.enrollmentId;
   async function tickOnce(): Promise<void> {

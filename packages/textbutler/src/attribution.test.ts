@@ -30,8 +30,21 @@ test("ordinary chats keep echo-free attribution", () => {
   expect(messageAuthor(row("c", "outgoing", disclose("done"), NOW), person, log)).toBe("butler");
   // Even a wrapped text sent by the person stays theirs outside a self chat.
   expect(messageAuthor(row("d", "incoming", disclose("done"), NOW), person, log)).toBe("contact");
-  // An identical owner echo ends the pending run, as before this feature.
+  // A plain owner text ends the pending run: the conversation is answered.
   expect(pendingCluster([row("a", "incoming", "hi", NOW - 1), row("b", "outgoing", "hi", NOW)], person, log)).toBeNull();
+});
+
+test("a keyword-bearing owner run is pending; plain owner text is not", () => {
+  const person = contact(false), log = journal();
+  expect(pendingCluster([row("a", "outgoing", "hey butler tell me what you can do", NOW)], person, log)).toMatchObject({ count: 1, latestId: "a" });
+  expect(pendingCluster([row("b", "outgoing", "I am answering this", NOW)], person, log)).toBeNull();
+  // A newer owner follow-up travels with the invocation.
+  const run = [row("c", "outgoing", "butler what time is it", NOW - 1), row("d", "outgoing", "in utc please", NOW)];
+  expect(pendingCluster(run, person, log)).toMatchObject({ count: 2, latestId: "d" });
+  // Contact text then owner text: only the owner tail is pending.
+  expect(pendingCluster([row("e", "incoming", "question?", NOW - 2), ...run], person, log)).toMatchObject({ count: 2, latestId: "d" });
+  // A butler reply ends it.
+  expect(pendingCluster([row("f", "outgoing", "butler hi", NOW), row("g", "outgoing", disclose("Done"), NOW + 1)], person, log)).toBeNull();
 });
 
 test("self chat treats the outbound echo as the owner's own text, never an answer", () => {

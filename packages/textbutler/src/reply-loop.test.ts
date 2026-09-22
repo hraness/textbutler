@@ -60,6 +60,19 @@ test("backfill and an active owner conversation never reach the response agent",
   f.add("I am answering this", "outgoing"); f.add("butler another request"); await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
   expect(f.stats().compositions).toBe(0); expect(f.sent).toHaveLength(0);
 });
+test("an owner keyword invocation replies; plain owner text still answers", async () => {
+  const f = await fixture(); await f.loop.tick();
+  f.add("hey butler tell me what you can do", "outgoing"); await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(1);
+  // Recent owner activity does not block an explicit invocation.
+  f.add("still talking", "outgoing"); f.add("butler another thing", "outgoing");
+  await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(2);
+  // Plain owner text answers the thread and cools the butler down.
+  f.add("I am answering this", "outgoing"); f.add("butler one more");
+  await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(2);
+});
 test("global pause immediately cancels an in-progress composition", async () => {
   const f = await fixture(); await f.loop.tick();
   let started!: () => void; const composing = new Promise<void>(resolve => { started = resolve; });
