@@ -1,6 +1,7 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { assertOwnedPath, readOwnedFileStable } from "@hraness/local-custody/private-paths";
 import { parseClaudePriceCatalog, type ClaudePriceCatalog } from "@hraness/agentmixer";
+import { parseFastDriverConfig, type FastDriverConfig } from "./fast-driver.ts";
 
 export type GhostgetHostConfig = Readonly<{ executable: string; runtimeExecutable?: string; authId: string; stateHome?: string;
   automationAccounts?: readonly Readonly<{ provider: "imessage" | "whatsapp" | "beeper"; authId: string }>[] }>;
@@ -10,7 +11,8 @@ export type ProviderAccountConfig = Readonly<{ id: string; label: string }> & (
   | Readonly<{ route: "claude-api"; credentialFile: string; replyModel: string; prices: ClaudePriceCatalog; maxBudgetUsd: number }>
   | Readonly<{ route: "claude-code" | "codex" }>
 );
-export type HostConfig = Readonly<{ schemaVersion: 1; ghostget?: GhostgetHostConfig; xcb?: XcbHostConfig; providerAccounts?: readonly ProviderAccountConfig[] }>;
+export type HabitatHostConfig = Readonly<{ enabled: boolean; driver: FastDriverConfig; evolutionModel: string | null; debounceMs: number }>;
+export type HostConfig = Readonly<{ schemaVersion: 1; ghostget?: GhostgetHostConfig; xcb?: XcbHostConfig; providerAccounts?: readonly ProviderAccountConfig[]; habitat?: HabitatHostConfig }>;
 function invalid(): never { throw new Error("Invalid private Textbutler host configuration"); }
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
@@ -22,15 +24,23 @@ function path(value: unknown): string {
 }
 export function parseHostConfig(value: unknown): HostConfig {
   const config = record(value);
-  if (config.schemaVersion !== 1 || Object.keys(config).some(key => !["schemaVersion", "ghostget", "xcb", "providerAccounts"].includes(key))) return invalid();
+  if (config.schemaVersion !== 1 || Object.keys(config).some(key => !["schemaVersion", "ghostget", "xcb", "providerAccounts", "habitat"].includes(key))) return invalid();
   let providerAccounts: readonly ProviderAccountConfig[] | undefined;
   if (config.providerAccounts !== undefined) {
     if (!Array.isArray(config.providerAccounts) || config.providerAccounts.length > 8) return invalid();
     providerAccounts = Object.freeze(config.providerAccounts.map(parseProviderAccount));
     if (new Set(providerAccounts.map(account => account.id)).size !== providerAccounts.length) return invalid();
   }
+  let habitat: HabitatHostConfig | undefined;
+  if (config.habitat !== undefined) {
+    const value = record(config.habitat);
+    if (Object.keys(value).sort().join(",") !== "debounceMs,driver,enabled,evolutionModel" || typeof value.enabled !== "boolean"
+      || !Number.isSafeInteger(value.debounceMs) || (value.debounceMs as number) < 1000 || (value.debounceMs as number) > 8000
+      || value.evolutionModel !== null && (typeof value.evolutionModel !== "string" || !/^claude\/[A-Za-z0-9_.-]{1,80}(?:\/[A-Za-z0-9_.-]{1,40})?$/u.test(value.evolutionModel))) return invalid();
+    try { habitat = Object.freeze({ enabled: value.enabled, driver: parseFastDriverConfig(value.driver), evolutionModel: value.evolutionModel as string | null, debounceMs: value.debounceMs as number }); } catch { return invalid(); }
+  }
   const common = { schemaVersion: 1 as const, ...(providerAccounts === undefined ? {} : { providerAccounts }),
-    ...(config.xcb === undefined ? {} : { xcb: parseXcbConfig(config.xcb) }) };
+    ...(habitat === undefined ? {} : { habitat }), ...(config.xcb === undefined ? {} : { xcb: parseXcbConfig(config.xcb) }) };
   if (config.ghostget === undefined) return Object.freeze(common);
   const ghostget = record(config.ghostget);
   if (Object.keys(ghostget).some(key => !["executable", "runtimeExecutable", "authId", "stateHome", "automationAccounts"].includes(key)) || typeof ghostget.authId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(ghostget.authId)) return invalid();

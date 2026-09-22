@@ -106,6 +106,16 @@ An owner send reuses the contact's live standing grant when it covers the needed
 
 `replies.send` returns `submitted`, `failed`, `partial`, `cancelled`, or `indeterminate`. An indeterminate owner send blocks the next reply for that contact — automatic or owner-initiated — until the journaled intent is reconciled, exactly like an automatic send.
 
+## Contact habitats
+
+When the owner enables `habitat` in `host.json`, each enrolled conversation gets an isolated habitat: a bounded, durable learning state stored in the private run journal, plus a fast reply driver and a slower background evolver. Habitat state is never shared between conversations — two threads to the same person keep separate habitats.
+
+The fast driver answers ordinary replies with one bounded model call instead of the multi-turn subscription loop. The default route is a Vercel AI Gateway Qwen model with reasoning disabled; a local OpenAI-compatible endpoint is the alternative route. Prompt, context, output and wall-clock budgets are fixed in code. A classified response and its composition share the same inference, and follow-up learning starts only after the transport accepts a submitted reply — never on a draft.
+
+Evolution runs in the background when the contact is idle: it re-reads the reply's intended purpose against a bounded window of later messages and reactions, proposes a candidate plan, replays incumbent and candidate on retained cases with blinded ordering, and asks an independent judge for per-case scores. Promotion requires follow-up evidence, cited evidence IDs, safety on every case, no regression, and a bounded improvement margin. Every step keeps replayable Algal receipts in the private journal. Plans are data, not code: they can adjust guidance, context size, reply length, humor and bounded tool flags, but never providers, accounts, recipients, permissions, disclosure, or executable programs. Explicit owner rollback restores a retained ancestor plan.
+
+External effects stay host-brokered and off by default. Web search uses the gateway's server-side Exa tool; it is disabled in the default plan, admitted queries are checked against the private corpus for identifier shapes, verbatim spans and proper nouns, and results are untrusted excerpts. Meme search matches a bounded public Imgflip catalog locally, admits only known template images after byte and signature validation, and never uploads conversation text or captions. Billed calls reserve against a global daily budget in the journal before dispatch; provider-reported generation costs settle each reservation to its actual amount, and ambiguous outcomes retain the conservative reservation with no retry. The production gateway key itself also carries a provider-enforced daily quota.
+
 ## Hooks and plugins
 
 The initial lifecycle is `message.received`, `reply.decide`, `reply.compose`, `reply.before-send`, `reply.sent`, `memory.updated`, and `run.failed`. Hooks have a named/versioned owner-installed extension, deterministic registration order, a deadline, and a cancellation signal. Failure before dispatch closes admission. A notification-hook failure after a receipt cannot change that receipt or trigger resend.

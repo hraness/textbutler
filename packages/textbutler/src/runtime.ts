@@ -7,7 +7,9 @@ import { Hooks, type HookContext } from "./hooks.ts";
 import { RunJournal, type RunState } from "./journal.ts";
 
 export type ConversationSnapshot = Readonly<{ state: ConversationState; contextId: string; messageIds: readonly string[] }>;
-export type AgentRequest = Readonly<{ runId: string; contact: ContactSettings; event: MessageEvent; signal: AbortSignal }>;
+export type AgentRequest = Readonly<{ runId: string; contact: ContactSettings; event: MessageEvent; signal: AbortSignal; capabilities?: readonly string[] }>;
+export class NoReplyNeeded extends Error {}
+export type SubmittedReply = Readonly<{ runId: string; contact: ContactSettings; event: MessageEvent; actions: readonly ActionIntent[]; messageIds: readonly string[]; at: number }>;
 export interface ButlerAgent {
   /** True only after the installed provider's actual tool and file boundary is qualified. */
   qualified(contact: ContactSettings): Promise<boolean>;
@@ -24,6 +26,7 @@ export type RuntimePorts = Readonly<{
   delegatedGrant: (contact: ContactSettings) => Promise<string | null>;
   validateFile: (contact: ContactSettings, path: string) => Promise<void>;
   clock?: () => number;
+  onSubmitted?: (reply: SubmittedReply) => void;
 }>;
 export type ProcessOutcome = Readonly<{ status: "ignored" | "deferred" | "blocked" | "duplicate-or-busy" | RunState; reason: string; runId?: string }>;
 
@@ -75,7 +78,7 @@ export class ButlerRuntime {
     this.active.set(contact.id, controller);
     const timeout = setTimeout(() => controller.abort(), 120_000);
     const hook: HookContext = { contactId: contact.id, runId, eventId: event.id, signal: controller.signal };
-    const request: AgentRequest = { runId, contact, event, signal: controller.signal };
+    const request: AgentRequest = { runId, contact, event, signal: controller.signal, capabilities: capabilities.value.capabilities.filter(value => value.available).map(value => value.capability) };
     let state: RunState = "running";
     const finish = (next: RunState, reason: string): ProcessOutcome => {
       this.ports.journal.transition(runId, state, next, reason, this.clock());
@@ -119,9 +122,13 @@ export class ButlerRuntime {
       if (!receipt.ok) return finish("indeterminate", "dispatch-result-unknown");
       if (receipt.value.acceptedMessageIds) this.ports.journal.recordSentMessages(contact.id, receipt.value.runId, receipt.value.acceptedMessageIds, this.clock());
       const result = finish(receipt.value.state, receipt.value.state);
+      if (receipt.value.state === "submitted") {
+        try { this.ports.onSubmitted?.({ runId, contact, event, actions, at: this.clock(), messageIds: (receipt.value.acceptedMessageIds ?? []).filter((id): id is string => id !== null) }); } catch {}
+      }
       try { await this.ports.hooks.emit("reply.sent", hook); } catch { /* Receipt remains authoritative if a notification hook fails. */ }
       return result;
-    } catch {
+    } catch (error) {
+      if (state === "running" && error instanceof NoReplyNeeded) return finish("ignored", "agent-silent");
       const result = finish(state === "dispatching" ? "indeterminate" : controller.signal.aborted ? "cancelled" : "failed", state === "dispatching" ? "dispatch-result-unknown" : "run-failed");
       try { await this.ports.hooks.emit("run.failed", hook); } catch { /* No retry caused by a hook. */ }
       return result;

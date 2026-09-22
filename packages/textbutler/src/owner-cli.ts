@@ -19,6 +19,8 @@ export const OWNER_COMMAND_HELP = `Owner controls:
   contacts mode CONTACT smart|keyword [--keyword WORD]
   contacts self CONTACT on|off        Mark a conversation as your own address
   jobs show JOB_ID                    Read a pending operation's result
+  habitats show CONTACT              Inspect the plan, learning history and budget
+  habitats rollback CONTACT REVISION Roll back while automatic replies are paused
 
 Use an exact contact ID or a unique contact name. Adding a contact keeps
 automatic replies off. History is imported only with --history.
@@ -27,7 +29,7 @@ Mark a conversation self when its only participant is your own address:
 iMessage delivers each of your texts to it inbound and echoes it outbound,
 so the echo must not count as the owner's answer.`;
 
-const ownerFamilies = new Set(["status", "pause", "resume", "messaging", "conversations", "contacts", "jobs"]);
+const ownerFamilies = new Set(["status", "pause", "resume", "messaging", "conversations", "contacts", "jobs", "habitats"]);
 const identity = (value: string | undefined): value is string => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(value);
 const knownProvider = (value: string | undefined): value is "imessage" | "whatsapp" | "beeper" => value === "imessage" || value === "whatsapp" || value === "beeper";
 
@@ -91,7 +93,8 @@ export async function handleOwnerCommand(args: readonly string[], options: {
     && (args.length === 4 || args.length === 6 && args[4] === "--keyword" && typeof args[5] === "string");
   const self = family === "contacts" && verb === "self" && args.length === 4 && (value === "on" || value === "off");
   const job = family === "jobs" && verb === "show" && args.length === 3 && identity(target);
-  if (!(status || pause || messagingList || messagingStart || conversations || contactsList || add || account || activation || mode || self || job)) {
+  const habitat = family === "habitats" && (verb === "show" && args.length === 3 || verb === "rollback" && args.length === 4 && /^(?:0|[1-9]\d{0,15})$/u.test(value ?? "") && Number.isSafeInteger(Number(value)));
+  if (!(status || pause || messagingList || messagingStart || conversations || contactsList || add || account || activation || mode || self || job || habitat)) {
     throw new OwnerCliError(`Unrecognized owner command.\n\n${OWNER_COMMAND_HELP}`);
   }
   const { request, print } = options;
@@ -117,6 +120,8 @@ export async function handleOwnerCommand(args: readonly string[], options: {
   if (add) return report(await awaitOwnerJob({ protocol: CONTROL_PROTOCOL, command: "contact.enroll", candidateId: target!, expectedRevision: snapshot.revision,
     initializeHistory: value === "--history" }, request));
   const contact = resolveOwnerContact(snapshot, target!);
+  if (habitat) return report(await request(verb === "show" ? { protocol: CONTROL_PROTOCOL, command: "habitat.read", contactId: contact.id }
+    : { protocol: CONTROL_PROTOCOL, command: "habitat.rollback", contactId: contact.id, expectedRevision: Number(value) }));
   const settings = { ...contact.settings, disclosure: { ...contact.settings.disclosure } };
   if (account) {
     const selected = snapshot.providerAccounts?.find(candidate => candidate.id === value);

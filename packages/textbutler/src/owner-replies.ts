@@ -116,6 +116,7 @@ export class OwnerReplies {
   private scannedAt: number | null = null;
   private agent: ButlerAgent | undefined;
   constructor(private readonly ports: OwnerRepliesPorts) {}
+  useAgent(agent: ButlerAgent): void { this.agent = agent; }
 
   /** The reply loop reports the cluster it already observed; scans replace it. */
   notePending(contactId: string, value: PendingObservation | null): void {

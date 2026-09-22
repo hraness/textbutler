@@ -26,7 +26,12 @@ export class RunJournal {
       CREATE TABLE IF NOT EXISTS pending_grants (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS grant_intents (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, enrollmentId TEXT NOT NULL, bindingDigest TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sent_messages (messageId TEXT PRIMARY KEY, contactId TEXT NOT NULL, runId TEXT NOT NULL, sentAt INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS sent_messages_contact ON sent_messages(contactId, sentAt);`);
+      CREATE INDEX IF NOT EXISTS sent_messages_contact ON sent_messages(contactId, sentAt);
+      CREATE TABLE IF NOT EXISTS habitat_state (contactId TEXT PRIMARY KEY, revision INTEGER NOT NULL, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS api_reservations (id TEXT PRIMARY KEY, day INTEGER NOT NULL, microUsd INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS api_reservations_day ON api_reservations(day);
+      CREATE TABLE IF NOT EXISTS api_settlements (id TEXT PRIMARY KEY, generationId TEXT UNIQUE NOT NULL, microUsd INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS habitat_evidence (contactId TEXT NOT NULL, digest TEXT NOT NULL, value TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(contactId,digest));`);
   }
   static async open(path: string): Promise<RunJournal> {
     const absolute = resolve(path);
@@ -47,6 +52,66 @@ export class RunJournal {
   }
   static memory(): RunJournal { return new RunJournal(new Database(":memory:", { strict: true })); }
   accountLeases(): SqliteAccountLeases { return new SqliteAccountLeases(this.database); }
+  apiUsage(now: number): number {
+    if (!Number.isSafeInteger(now) || now < 0) throw Error("Invalid usage clock");
+    return this.database.query<{ total: number }, [number]>("SELECT COALESCE(SUM(COALESCE(s.microUsd,r.microUsd)),0) AS total FROM api_reservations r LEFT JOIN api_settlements s ON s.id=r.id WHERE r.day=?")
+      .get(Math.floor(now / 86_400_000))!.total;
+  }
+  reserveApiUsage(id: string, now: number, microUsd: number, limit: number): void {
+    if (!/^[A-Za-z0-9][A-Za-z0-9:._-]{0,255}$/u.test(id) || !Number.isSafeInteger(microUsd) || microUsd < 1
+      || !Number.isSafeInteger(limit) || limit < 1 || limit > 10_000_000) throw Error("Invalid API reservation");
+    this.database.transaction(() => {
+      if (this.database.query("SELECT 1 FROM api_reservations WHERE id=?").get(id)) throw Error("API operation already reserved; no retry");
+      if (this.apiUsage(now) + microUsd > limit) throw Error("Daily API budget exhausted");
+      this.database.query("DELETE FROM api_reservations WHERE day < ?").run(Math.floor(now / 86_400_000) - 90);
+      if ((this.database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM api_reservations").get()?.count ?? 0) >= 100_000) throw Error("API reservation capacity reached");
+      this.database.query("INSERT INTO api_reservations VALUES(?,?,?)").run(id, Math.floor(now / 86_400_000), microUsd);
+    })();
+  }
+  /** Provider-reported cost replaces the reservation's conservative estimate. The provider's
+   * generation identity deduplicates settlement of an ambiguous response; absent it, the
+   * original reservation stands. */
+  settleApiUsage(id: string, generationId: string, microUsd: number): void {
+    if (!/^[A-Za-z0-9][A-Za-z0-9:._-]{0,255}$/u.test(generationId) || !Number.isSafeInteger(microUsd) || microUsd < 1 || microUsd > 10_000_000) throw Error("Invalid API settlement");
+    this.database.transaction(() => {
+      if (!this.database.query("SELECT 1 FROM api_reservations WHERE id=?").get(id)) throw Error("API settlement identity changed");
+      const previous = this.database.query<{ generationId: string; microUsd: number }, [string]>("SELECT generationId,microUsd FROM api_settlements WHERE id=?").get(id);
+      if (previous) { if (previous.generationId !== generationId || previous.microUsd !== microUsd) throw Error("API settlement identity changed"); return; }
+      this.database.query("INSERT INTO api_settlements VALUES(?,?,?)").run(id, generationId, microUsd);
+      if ((this.database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM api_settlements").get()?.count ?? 0) > 100_000) throw Error("API settlement capacity reached");
+      this.database.query("DELETE FROM api_settlements WHERE id NOT IN (SELECT id FROM api_reservations)").run();
+    })();
+  }
+  recordHabitatEvidence(contactId: string, digest: string, value: string, now: number): void {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(contactId) || !/^sha256:[a-f0-9]{64}$/u.test(digest)
+      || Buffer.byteLength(value) > 262_144 || !Number.isSafeInteger(now) || now < 0) throw Error("Invalid habitat evidence");
+    this.database.transaction(() => {
+      const previous = this.database.query<{ value: string }, [string, string]>("SELECT value FROM habitat_evidence WHERE contactId=? AND digest=?").get(contactId, digest);
+      if (previous && previous.value !== value) throw Error("Habitat evidence identity changed");
+      if (previous) return;
+      if ((this.database.query<{ count: number }, []>("SELECT COUNT(DISTINCT contactId) AS count FROM habitat_evidence").get()?.count ?? 0) >= 128
+        && !this.database.query("SELECT 1 FROM habitat_evidence WHERE contactId=? LIMIT 1").get(contactId)) throw Error("Habitat evidence capacity reached");
+      this.database.query("INSERT INTO habitat_evidence VALUES(?,?,?,?)").run(contactId, digest, value, now);
+      this.database.query("DELETE FROM habitat_evidence WHERE contactId=? AND digest NOT IN (SELECT digest FROM habitat_evidence WHERE contactId=? ORDER BY at DESC,digest DESC LIMIT 32)").run(contactId, contactId);
+    })();
+  }
+  habitatEvidence(contactId: string, digest: string): string | null {
+    return this.database.query<{ value: string }, [string, string]>("SELECT value FROM habitat_evidence WHERE contactId=? AND digest=?").get(contactId, digest)?.value ?? null;
+  }
+  habitatState(contactId: string): { revision: number; value: string } | null {
+    return this.database.query<{ revision: number; value: string }, [string]>("SELECT revision,value FROM habitat_state WHERE contactId=?").get(contactId);
+  }
+  writeHabitatState(contactId: string, expectedRevision: number, value: string): void {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(contactId) || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0
+      || Buffer.byteLength(value) > 524_288) throw Error("Invalid habitat state");
+    this.database.transaction(() => {
+      const previous = this.habitatState(contactId);
+      if ((previous?.revision ?? 0) !== expectedRevision) throw Error("Habitat state conflict");
+      if (!previous && (this.database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM habitat_state").get()?.count ?? 0) >= 128) throw Error("Habitat capacity reached");
+      this.database.query("INSERT INTO habitat_state VALUES(?,?,?) ON CONFLICT(contactId) DO UPDATE SET revision=excluded.revision,value=excluded.value")
+        .run(contactId, expectedRevision + 1, value);
+    })();
+  }
   /** Commit before requesting any upstream grant; unknown results are looked up, never recreated. */
   recordGrantIntent(value: GrantIntent): void {
     const intent = grantIntent(value), existing = this.database.query<GrantIntent, [string]>("SELECT * FROM grant_intents WHERE id=?").get(intent.id);
