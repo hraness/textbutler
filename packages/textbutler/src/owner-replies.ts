@@ -11,7 +11,7 @@ import type { ProviderHost } from "./provider-host.ts";
 import type { ContactWorkspace } from "./workspace.ts";
 import { ControlFailure, type OwnerBinding, type OwnerRuntimeState } from "./control-service.ts";
 import { createRoutedButlerAgent } from "./routed-agent.ts";
-import type { AgentRequest, ButlerAgent } from "./runtime.ts";
+import { NoReplyNeeded, type AgentRequest, type ButlerAgent } from "./runtime.ts";
 import type { MessageEvent } from "./decision.ts";
 import { discloseReplyActions } from "./reply-actions.ts";
 import type { ReplyDraftDetail } from "../../control/src/index.ts";
@@ -246,7 +246,8 @@ export class OwnerReplies {
     const event: MessageEvent = { id: latest.id, contactId: contact.id, routeId: binding.enrollmentId, revision: String(enrollment.revision),
       occurredAt: Date.parse(latest.occurredAt), observedAt: this.ports.now(), author: "contact", kind: "message", text: latest.text ?? "", historical: false, group: false };
     const request: AgentRequest = { runId: `suggest:${randomUUID()}`, contact, event, signal };
-    const value = await agent.compose(request);
+    let value: unknown;
+    try { value = await agent.compose(request); } catch (error) { if (error instanceof NoReplyNeeded) return { draft: null, pending: item }; throw error; }
     const summary = typeof (value as { summary?: unknown })?.summary === "string" ? (value as { summary: string }).summary : "";
     const actions = (value as { actions?: unknown })?.actions;
     if (!summary.trim() || Buffer.byteLength(summary) > 4_096 || !Array.isArray(actions) || actions.length < 1 || actions.length > 7) throw new Error("Invalid agent suggestion");

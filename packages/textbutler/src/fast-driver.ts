@@ -60,18 +60,21 @@ export function createFastDriver(input: FastDriverConfig, ports: { journal: Pick
     const content = result.choices[0]!.message.content;
     if (Buffer.byteLength(content) > outputBytes) throw Error("Fast driver output budget exceeded");
     const parsed = parseXcbJson(content);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).join(",") !== "value") throw Error("Invalid fast driver output");
-    return { output: (parsed as { value: JsonValue }).value, metadata: { executor: `textbutler-${config.kind}`, retryable: false,
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("Invalid fast driver output");
+    const output = Object.keys(parsed).join(",") === "value" ? (parsed as { value: JsonValue }).value : parsed as JsonValue;
+    return { output, metadata: { executor: `textbutler-${config.kind}`, retryable: false,
       usage: { model: config.model, ...(result.usage === undefined ? {} : { tokensIn: result.usage.prompt_tokens, tokensOut: result.usage.completion_tokens }) } } };
   }
   return {
     config,
     executor(operationId: string): Executor {
       let started = false;
-      const run = (request: EffectRequest, signal?: AbortSignal) => {
+      const run = async (request: EffectRequest, signal?: AbortSignal) => {
         if (started || request.kind !== "agent" && request.kind !== "classifier") throw Error("Fast driver operation already used or unsupported");
         started = true;
-        return completion(operationId, JSON.stringify({ instructions: request.prompt, context: request.context, output: request.output }), request.budget.maxOutputBytes, signal);
+        const result = await completion(operationId, JSON.stringify({ instructions: request.prompt, context: request.context, output: request.output }), request.budget.maxOutputBytes, signal);
+        if (request.output.kind === "json" && request.output.schema?.type === "object" && (typeof result.output !== "object" || result.output === null || Array.isArray(result.output))) throw Error("Invalid fast driver output");
+        return result;
       };
       return { id: `textbutler-${config.kind}`, capabilities: { effects: ["agent", "classifier"] }, cacheable: false, retryable: false,
         execute: async (request, signal) => (await run(request, signal)).output, executeEffect: run };

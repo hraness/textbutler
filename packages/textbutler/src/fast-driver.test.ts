@@ -53,6 +53,18 @@ test("provider-reported generation cost settles the conservative reservation onc
   } finally { journal.close(); }
 });
 
+test("a bare object response is accepted and a non-object value still fails closed", async () => {
+  const journal = RunJournal.memory();
+  try {
+    let body = JSON.stringify({ respond: false, confidence: 0.9, reason: "not_needed", summary: "x", actions: [], tool: null });
+    const driver = createFastDriver(config, { journal, now: () => now, credential: async () => "synthetic-private-key",
+      fetch: async () => Response.json({ choices: [{ finish_reason: "stop", message: { content: body } }], usage: { prompt_tokens: 10, completion_tokens: 10 } }) });
+    expect(await driver.executor("bare-1").execute(request)).toMatchObject({ respond: false });
+    body = JSON.stringify({ value: "a string is not an object output" });
+    await expect(driver.executor("bare-2").execute(request)).rejects.toThrow("Invalid fast driver output");
+  } finally { journal.close(); }
+});
+
 test("truncated output, redirects, malformed usage and unapproved local destinations fail closed", async () => {
   expect(() => parseFastDriverConfig({ ...config, model: "unapproved/model" })).toThrow();
   expect(() => parseFastDriverConfig({ ...config, dailyBudgetUsd: 0 })).toThrow();
