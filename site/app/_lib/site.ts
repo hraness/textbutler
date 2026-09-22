@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 export const SITE_NAME = 'Textbutler';
 export const SITE_ORIGIN = 'https://textbutler.app';
 export const SITE_DESCRIPTION =
-  'A local message assistant for Mac, with a guided inbox, replies you review, and iMessage, WhatsApp and Beeper connections. Source pilot; AI replies remain unavailable.';
+  'A local message assistant for Mac. Draft replies in a guided inbox, review every word, and connect iMessage, WhatsApp and Beeper. Source pilot; AI replies remain unavailable.';
 export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 export const GETTING_STARTED_URL = `${GITHUB_URL}/blob/main/docs/textbutler/getting-started.md`;

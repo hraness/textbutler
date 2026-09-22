@@ -43,6 +43,10 @@ const HOME_QUESTIONS = [
     answer: 'You can try the source pilot on your Mac. The guided terminal helps you configure messaging, add a conversation, review your inbox and send replies you write yourself. That path needs a ready Ghostget connection but no AI account. New installations start paused. The native menu companion uses a verified prebuilt runner; no local Rust build is needed. No windowed app download is provided.',
   },
   {
+    question: 'Can Textbutler draft a message for me?',
+    answer: 'You draft replies yourself in the guided inbox, review the complete text, and choose when to send; that path needs no AI account. A verified installed bundle with an admitted Claude Code or Codex subscription can let the butler compose disclosed replies on its own once you enable the contact and resume globally. The source daemon keeps AI replies unavailable.',
+  },
+  {
     question: 'Will it interrupt my conversations?',
     answer: 'Manual replies send only after your explicit choice. Automatic replies require a verified installed Textbutler bundle, current xcb and application admission, an enabled contact and global resume. They wait through message bursts, yield after a recent message from you, and recheck the conversation before sending. The current connections do not expose typing activity.',
   },
@@ -120,7 +124,7 @@ export default function Home() {
             heading="A little help in your conversations"
             headingId="textbutler-title"
             name="Textbutler"
-            summary="Bring selected iMessage, WhatsApp and Beeper conversations into a local inbox. Write a reply, review it, and stay in control from your Mac."
+            summary="Bring selected iMessage, WhatsApp and Beeper conversations into a local inbox. Draft a reply, review it, and stay in control from your Mac."
           />
           </div>
 
@@ -129,7 +133,7 @@ export default function Home() {
             <MarketingFlow ariaLabel="How contact-based assistance is designed to work" steps={[
               { label: 'Choose a contact', detail: 'Choose one direct conversation from a configured connection. New contacts start disabled; the default active limit is five.' },
               { label: 'Give it context', detail: 'Optionally import recent history as context. Guidance, preferences, and dated memories live in an ordinary folder you can read and edit.' },
-              { label: 'Review your reply', detail: 'Use the inbox to find unanswered messages. Type a reply and review the complete text before sending. No AI account is needed.' },
+              { label: 'Draft your reply', detail: 'Use the inbox to find unanswered messages. Draft a reply and review the complete text before sending. No AI account is needed.' },
               { label: 'Keep the conversation yours', detail: 'Automatic replies remain a separate choice, requiring a qualified agent, an enabled contact and global resume. The source CLI has no ready AI engine.' },
             ]} />
           </MarketingSection>
