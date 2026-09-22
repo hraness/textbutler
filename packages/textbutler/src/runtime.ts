@@ -59,7 +59,8 @@ export class ButlerRuntime {
     if (!contact) return { status: "ignored", reason: "unknown-contact" };
     if (this.ports.journal.hasUncertainSend(contact.id)) return { status: "blocked", reason: "reconcile-previous-send" };
     const snapshot = await this.refresh(contact, event);
-    const decision = decideReply(settings, contact, event, snapshot.state, this.clock());
+    const admittedAt = this.clock();
+    const decision = decideReply(settings, contact, event, snapshot.state, admittedAt);
     if (decision.outcome === "ignore") return { status: "ignored", reason: decision.reason };
     if (decision.outcome === "defer") return { status: "deferred", reason: decision.reason };
     const capabilities = await this.ports.transport.capabilities();
@@ -100,7 +101,7 @@ export class ButlerRuntime {
       const currentContact = current.contacts.find(c => c.id === contact.id);
       if (!currentContact || currentContact.revision !== contact.revision || currentContact.routeId !== contact.routeId) return finish("cancelled", "settings-changed");
       const refreshed = await this.refresh(currentContact, event);
-      const lastDecision = decideReply(current, currentContact, event, refreshed.state, this.clock());
+      const lastDecision = decideReply(current, currentContact, event, refreshed.state, this.clock(), admittedAt);
       if (controller.signal.aborted || !["reply", "classify"].includes(lastDecision.outcome) || refreshed.state.latestRevision !== snapshot.state.latestRevision || refreshed.contextId !== snapshot.contextId) return finish("cancelled", "conversation-changed");
       const plan = await this.ports.transport.prepare({ intentId: runId, conversationId: contact.routeId, contextId: refreshed.contextId, actions });
       if (!plan.ok) return finish("failed", plan.error.code);

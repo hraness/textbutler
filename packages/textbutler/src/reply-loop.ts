@@ -77,7 +77,10 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   }
   function receive(contact: ContactSettings, state: ContactLoop, event: AutomationEvent): void {
     const who = author(event.message, contact);
-    if (who === "self") return;
+    if (who === "self" || who === "butler") {
+      if (state.pending && Number(event.revision) > Number(state.pending.revision)) state.pending = { ...state.pending, revision: String(event.revision) };
+      return;
+    }
     if (who === "owner") state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(event.message.occurredAt));
     state.runtime.cancelContact(contact.id);
     if (event.message.kind !== "message" || who !== "contact") { delete state.pending; return; }

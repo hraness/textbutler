@@ -74,3 +74,14 @@ test("smart mode classifies once and disabling prevents subsequent turns", async
   f.change({ ...f.settings(), contacts: f.settings().contacts.map(contact => ({ ...contact, enabled: false, revision: contact.revision + 1 })) });
   f.add("butler answer again"); f.advance(9000); await f.loop.tick(); await f.loop.idle(); expect(f.sent).toHaveLength(1);
 });
+test("self-chat echoes never answer the pending inbound or erase a newer one", async () => {
+  const f = await fixture();
+  f.change({ ...f.settings(), contacts: f.settings().contacts.map(contact => ({ ...contact, selfChat: true })) });
+  await f.loop.tick();
+  f.add("butler what is up", "outgoing"); f.add("butler what is up", "incoming");
+  await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(1);
+  f.add("butler one more", "incoming"); f.add("🤖{ Hello }", "incoming"); f.add("🤖{ Hello }", "outgoing");
+  await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(2);
+});
