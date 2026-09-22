@@ -10,8 +10,12 @@ import type { Hooks } from "./hooks.ts";
 import { ButlerRuntime, type ButlerAgent, type ConversationSnapshot } from "./runtime.ts";
 import { createRoutedButlerAgent } from "./routed-agent.ts";
 import { ContactWorkspace } from "./workspace.ts";
+import { createHabitatAgent } from "./habitat-agent.ts";
+import { createHabitatEvolutionExecutor } from "./habitat-evolution.ts";
+import type { HabitatHostConfig } from "./host-config.ts";
+import type { FastDriver } from "./fast-driver.ts";
 
-type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "notePending">;
+type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "notePending"> & { setReplyAgent?: (agent: ButlerAgent) => void };
 type ContactLoop = { binding: AutomationBinding; settingsRevision: number; cursor: string | null; initialized: boolean; runtime: ButlerRuntime; pending?: MessageEvent; blocked?: string; running: boolean; lastOwnerAt: number | null; historyRevision: number | null };
 export interface ReplyLoopOptions {
   service: LoopService;
@@ -21,6 +25,7 @@ export interface ReplyLoopOptions {
   agent?: ButlerAgent;
   now?: () => number;
   automatic?: boolean;
+  habitat?: { config: HabitatHostConfig; driver: FastDriver };
   onStatus?: (value: { state: "running" | "paused" | "unavailable"; detail: string }) => void;
 }
 
@@ -30,24 +35,38 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   const { service, client, hooks } = options, now = options.now ?? Date.now;
   const journal = service.runJournal();
   const author = (message: AutomationMessage, contact: ContactSettings): MessageAuthor => messageAuthor(message, contact, journal);
-  let owner: OwnerRuntimeState = await service.runtimeState(), settings: Settings = owner.settings;
+  const effective = (value: Settings): Settings => options.habitat?.config.enabled ? { ...value, contacts: value.contacts.map(contact => ({ ...contact, debounceMs: Math.min(contact.debounceMs, options.habitat!.config.debounceMs) })) } : value;
+  let owner: OwnerRuntimeState = await service.runtimeState(), settings: Settings = effective(owner.settings);
   let closed = false, settingsEpoch = 0, timer: ReturnType<typeof setTimeout> | undefined, ticking: Promise<void> | undefined;
   const contacts = new Map<string, ContactLoop>(), work = new Set<Promise<unknown>>();
   const workspace = (id: string) => ContactWorkspace.create(join(service.dataDir, "contacts", id));
   const active = (id: string, revision: number) => !closed && !settings.paused && settings.contacts.some(contact => contact.id === id && contact.enabled && contact.revision === revision && contact.pausedUntil <= now());
-  const agent = options.agent ?? (service.providers ? createRoutedButlerAgent({ router: service.providers.router,
+  const habitat = options.habitat?.config.enabled ? createHabitatAgent({ journal, driver: options.habitat.driver, getWorkspace: workspace, now,
+    active: contact => active(contact.id, contact.revision),
+    async capabilities(contact) {
+      const binding = owner.bindings[contact.id]; if (binding?.version !== 2) throw Error("Habitat conversation is unavailable");
+      const transport = createGhostgetAutomationTransport({ client, enrollmentId: binding.enrollmentId, admitAsset: async path => (await workspace(contact.id)).admitAsset(path), now });
+      const result = await transport.capabilities(); if (!result.ok) throw Error("Habitat messaging capabilities are unavailable");
+      return result.value.capabilities.filter(value => value.available).map(value => value.capability);
+    },
+    ...(options.habitat.config.evolutionModel === null || !service.providers ? {} : { evolution: (contact: ContactSettings, runId: string) =>
+      createHabitatEvolutionExecutor({ contact: { ...contact, provider: "claude", accountId: "native-claude-code" }, providers: service.providers!, model: options.habitat!.config.evolutionModel!, runId, now }) }),
+  }) : undefined;
+  if (habitat) service.setReplyAgent?.(habitat.agent);
+  const agent = options.agent ?? habitat?.agent ?? (service.providers ? createRoutedButlerAgent({ router: service.providers.router,
     selection: (contact, purpose) => service.providers!.selection(contact, purpose),
     runManagedTask: (request, broker) => service.providers!.runManagedTask(request, broker),
     getWorkspace: workspace, hooks, isActive: active, now }) : {
     async qualified() { return false; }, async classify() { throw new Error("Agent setup required"); }, async compose() { throw new Error("Agent setup required"); },
   });
   const changed = (next: Settings) => {
-    settings = next;
+    settings = effective(next);
+    habitat?.reconcile();
     for (const [id, state] of contacts) {
       if (!active(id, state.settingsRevision)) { state.runtime.cancelContact(id); delete state.pending; state.initialized = false; }
     }
   };
-  const unsubscribe = service.onSettingsChanged(next => { settingsEpoch++; changed(next); });
+  const unsubscribe = service.onSettingsChanged(next => { settingsEpoch++; changed(next); habitat?.settingsChanged(); });
   async function snapshot(contact: ContactSettings, state: ContactLoop): Promise<ConversationSnapshot> {
     const enrollment = await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
     const page = await client.history(state.binding.enrollmentId, 200); assertAutomationBinding(state.binding, page.enrollment);
@@ -72,11 +91,16 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     state.runtime = new ButlerRuntime({ settings: () => settings, refresh: current => snapshot(current, state), agent,
       transport: createGhostgetAutomationTransport({ client, enrollmentId: binding.enrollmentId, admitAsset: async path => (await workspace(contact.id)).admitAsset(path), now }),
       journal: service.runJournal(), hooks, delegatedGrant: current => service.delegatedGrant(current),
+      ...(habitat === undefined ? {} : { onSubmitted: habitat.submitted }),
       validateFile: async (_contact, path) => { await (await workspace(contact.id)).admitAsset(path); }, clock: now });
     contacts.set(contact.id, state); return state;
   }
   function receive(contact: ContactSettings, state: ContactLoop, event: AutomationEvent): void {
     const who = author(event.message, contact);
+    if (habitat && (who === "owner" || who === "contact") && (event.message.kind === "message" || event.message.kind === "reaction")) {
+      try { habitat.observe(contact.id, { id: event.message.id, at: Date.parse(event.message.occurredAt), author: who, kind: event.message.kind,
+        text: [...(event.message.text ?? "")].slice(0, 512).join(""), relatedMessageId: event.message.relatedMessageId }); } catch {}
+    }
     if (who === "self" || who === "butler") {
       if (state.pending && Number(event.revision) > Number(state.pending.revision)) state.pending = { ...state.pending, revision: String(event.revision) };
       return;
@@ -114,6 +138,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
         if (!state.initialized) { state.initialized = true; delete state.pending; await snapshot(contact, state); continue; }
         if (service.runJournal().hasUncertainSend(contact.id)) state.blocked = "A previous send needs reconciliation.";
         const event = state.pending;
+        if (!event && !state.running && !state.blocked) habitat?.schedule(contact);
         if (!event || state.running || !active(contact.id, contact.revision) || now() < event.observedAt + contact.debounceMs) continue;
         state.running = true;
         const task = state.runtime.process(event).then(outcome => {
@@ -140,6 +165,6 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   return { tick, async idle() { await ticking; await Promise.allSettled([...work]); }, async close() {
     if (closed) return; closed = true; if (timer) clearTimeout(timer); unsubscribe();
     for (const state of contacts.values()) state.runtime.pause();
-    await ticking; await Promise.allSettled([...work]);
+    await ticking; await Promise.allSettled([...work]); await habitat?.close();
   } };
 }

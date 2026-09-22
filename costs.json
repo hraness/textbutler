@@ -1,6 +1,46 @@
 {
   "version": 1,
   "surfaces": {
+    "local:contact-habitats": {
+      "kind": "authoritative", "retention": "account", "owner": "packages/textbutler/src/contact-habitat.ts", "deletion": "docs/textbutler/local-data.md",
+      "budget": { "contacts": 128, "bytesPerContact": 524288, "episodesPerContact": 16, "followupsPerEpisode": 5, "lineageEntries": 16, "evaluationsPerDayPerContact": 8 },
+      "note": "private journal state; contact-scoped plans, bounded observation windows, at-most-once checkpoint claims and conditional host-owned promotion"
+    },
+    "local:habitat-evidence": {
+      "kind": "derived", "retention": "persistent", "source": "bounded Algal executions of contact programs", "owner": "packages/textbutler/src/journal.ts",
+      "budget": { "contacts": 128, "retainedReceiptsPerContact": 32, "bytesPerReceipt": 262144 },
+      "note": "private complete manifest and run receipt pairs; retained evidence replays without live provider calls; oldest evidence is evicted on new publication"
+    },
+    "local:api-reservations": {
+      "kind": "authoritative", "retention": "ttl:P90D", "owner": "packages/textbutler/src/journal.ts", "deletion": "docs/textbutler/local-data.md",
+      "budget": { "rows": 100000, "reservationMicroUsd": 25000, "maximumConfiguredDailyMicroUsd": 10000000 },
+      "note": "global UTC-day reservations committed before Gateway or Exa requests; ambiguous results retain their reservation and operation identity; provider-reported costs replace estimates through api-settlements; production keys also carry a provider-enforced daily quota"
+    },
+    "local:api-settlements": {
+      "kind": "authoritative", "retention": "ttl:P90D", "owner": "packages/textbutler/src/journal.ts", "deletion": "docs/textbutler/local-data.md",
+      "budget": { "rows": 100000 },
+      "note": "generationId-keyed provider cost confirmations; idempotent per operation and generation identity, orphaned rows are pruned with their reservations"
+    },
+    "provider:habitat-gateway": {
+      "kind": "derived", "retention": "ephemeral", "source": "explicit owner-selected fast-driver configuration and contact context", "owner": "packages/textbutler/src/fast-driver.ts",
+      "budget": { "requestBytes": 131072, "responseBytes": 65536, "maximumOutputTokens": 1024, "modelCallsPerReply": 3, "toolsPerReply": 2 },
+      "note": "fixed Gateway origin and Alibaba provider allowlist; no automatic provider fallback, top-up or uncertain retry; generation-info metadata reads settle provider-reported cost into the same daily ledger"
+    },
+    "provider:habitat-gateway-exa": {
+      "kind": "derived", "retention": "ephemeral", "source": "plan-gated model search requests admitted by private-corpus query filtering", "owner": "packages/textbutler/src/gateway-search.ts",
+      "budget": { "searchesPerReply": 1, "queryBytes": 256, "resultsPerSearch": 5, "resultBytes": 262144, "searchFeeMicroUsd": 7000 },
+      "note": "server-side Exa tool via the same Gateway key and daily ledger; webSearch is off in the default plan; queries with identifier shapes, private 2-3 word spans, or private proper nouns are refused; results are untrusted excerpts"
+    },
+    "local:public-meme-catalog": {
+      "kind": "derived", "retention": "ttl:PT1H", "source": "Imgflip public popular-template API", "owner": "packages/textbutler/src/meme-search.ts",
+      "budget": { "responseBytes": 262144, "templates": 200, "matches": 8 },
+      "note": "in-memory catalog only; queries are matched locally and never sent to Imgflip; not full-library search"
+    },
+    "local:public-meme-assets": {
+      "kind": "authoritative", "retention": "account", "owner": "packages/textbutler/src/workspace.ts", "deletion": "docs/textbutler/local-data.md",
+      "budget": { "bytesPerAsset": 4194304, "sharedFilesPerContact": 500 },
+      "note": "catalog-bound JPEG/PNG bytes published privately by the trusted media broker; no arbitrary URLs, caption uploads, or automatic send"
+    },
     "local:owner-imported-media": {
       "kind": "authoritative",
       "retention": "account",

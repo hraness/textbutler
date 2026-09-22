@@ -23,6 +23,14 @@ A pending transition also keeps `state/macos-app-upgrade.json` in the data
 directory until completion or rollback is proven. Keep both locations intact
 while an upgrade is unresolved.
 
+When habitats are enabled, the run journal additionally keeps per-contact
+habitat state (the promoted reply plan, bounded reply episodes, observed
+follow-up windows, evaluation records and rollback lineage), replayable
+inference receipts for each evaluation, and a global daily table of API
+usage reservations with their provider-cost settlements. Gateway and other
+provider credentials live under `state/provider-credentials` with owner-only
+permissions; they never enter contact workspaces or journal evidence.
+
 The explicit legacy iMessage crash reconciliation script accepts a private
 witness for the Ghostget 0.18.16 startup failure. It checks the original crash,
 app, connector, account and process state, then archives a bounded settlement

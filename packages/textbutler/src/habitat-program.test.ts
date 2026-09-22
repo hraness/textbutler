@@ -1,0 +1,29 @@
+import { expect, test } from "bun:test";
+import { MemoryStore, manifestToJson, verifyReceipt, type JsonValue } from "@hraness/algal";
+import { DEFAULT_HABITAT_PLAN } from "./contact-habitat.ts";
+import { executeHabitatProgram } from "./habitat-program.ts";
+
+test("the contact driver executes a real bounded Algal organism with replayable evidence", async () => {
+  let calls = 0;
+  const result = await executeHabitatProgram({ phase: "respond", plan: DEFAULT_HABITAT_PLAN, context: { message: "Synthetic request" }, signal: new AbortController().signal,
+    executor: { id: "synthetic-driver", async execute() { calls++; return { summary: "Synthetic", actions: [{ kind: "text", text: "Hello" }] }; } } });
+  expect(calls).toBe(1); expect(result.receipt.outcome).toBe("complete");
+  expect(result.receipt.work.agentCalls).toBe(1);
+  expect(result.output).toEqual({ summary: "Synthetic", actions: [{ kind: "text", text: "Hello" }] });
+  const replay = await verifyReceipt(result.receipt as unknown as JsonValue, manifestToJson(result.manifest), new MemoryStore(), new Map());
+  expect(replay.ok).toBe(true); expect(calls).toBe(1);
+  const stored = JSON.parse(JSON.stringify(result));
+  expect((await verifyReceipt(stored.receipt, stored.manifest, new MemoryStore(), new Map())).ok).toBe(true);
+  const changed = await executeHabitatProgram({ phase: "respond", plan: { ...DEFAULT_HABITAT_PLAN, guidance: "Prefer a short example." }, context: { message: "Synthetic request" }, signal: new AbortController().signal,
+    executor: { id: "synthetic-driver", async execute() { return { answer: "Example" }; } } });
+  expect(changed.receipt.manifestDigest).not.toBe(result.receipt.manifestDigest);
+});
+
+test("cancellation before dispatch starts no model and over-bound inputs fail closed", async () => {
+  let calls = 0;
+  const controller = new AbortController(); controller.abort();
+  const options = { phase: "respond" as const, plan: DEFAULT_HABITAT_PLAN, context: {}, signal: controller.signal, executor: { id: "synthetic", async execute() { calls++; return {}; } } };
+  await expect(executeHabitatProgram(options)).rejects.toThrow();
+  await expect(executeHabitatProgram({ ...options, signal: new AbortController().signal, context: { text: "x".repeat(200_000) } })).rejects.toThrow();
+  expect(calls).toBe(0);
+});

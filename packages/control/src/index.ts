@@ -76,6 +76,7 @@ export interface DesktopSnapshot {
   automation?: { state: "running" | "paused" | "unavailable"; detail: string };
   messagingProviders?: readonly ("imessage" | "whatsapp" | "beeper")[];
   replies?: RepliesView;
+  habitat?: { driver: "gateway" | "local"; model: string; evolutionModel: string | null; debounceMs: number; dailyBudgetMicroUsd: number };
 }
 export interface ConversationCandidate { id: string; name: string; subtitle: string; eligible: boolean; reason: string }
 export type ControlRequest =
@@ -89,6 +90,8 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "provider.accounts.logout"; accountId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "messaging.start"; provider: "imessage" | "whatsapp" | "beeper" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.settings.update"; contactId: string; expectedRevision: number; settings: ContactSettings }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "habitat.read"; contactId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "habitat.rollback"; contactId: string; expectedRevision: number }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.read"; contactId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.write"; contactId: string; expectedRevision: string; content: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "global.settings.update"; expectedRevision: number; settings: DesktopSnapshot["settings"] }
@@ -110,6 +113,7 @@ export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "enrolled"; snapshot: DesktopSnapshot; contactId: string; historyCount: number; historyOmittedCount: number; historyShortenedCount: number; historyInitialized: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "snapshot"; snapshot: DesktopSnapshot }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "memory"; contactId: string; revision: string; content: string }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "habitat"; contactId: string; revision: number; content: string; installationDailyReservedMicroUsd: number }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "replies"; scannedAt: string; checked: number; unreadable: number; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-suggestion"; draft: ReplyDraftView | null; pending: PendingReplyItem }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-draft"; draft: ReplyDraftDetail }
@@ -283,6 +287,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "enrolled", snapshot: response.snapshot, contactId, historyCount: integer(row.historyCount, 0, 200), historyOmittedCount: integer(row.historyOmittedCount, 0, 200), historyShortenedCount: integer(row.historyShortenedCount, 0, 200), historyInitialized: bool(row.historyInitialized) };
   }
   if (row.kind === "memory") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "memory", contactId: text(row.contactId, 256), revision: digest(row.revision), content: text(row.content, 65_536) };
+  if (row.kind === "habitat") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "habitat", contactId: text(row.contactId, 80), revision: integer(row.revision, 0), content: text(row.content, 262_144), installationDailyReservedMicroUsd: integer(row.installationDailyReservedMicroUsd, 0) };
   if (row.kind === "replies") {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "replies", scannedAt: text(row.scannedAt, 64), checked: integer(row.checked, 0, 10_000),
       unreadable: integer(row.unreadable, 0, 10_000), pending: list(row.pending, 200).map(pendingReplyItem), drafts: list(row.drafts, 64).map(replyDraftView) };
@@ -349,6 +354,9 @@ export function parseControlResponse(value: unknown): ControlResponse {
     ...(source.automation === undefined ? {} : { automation: { state: oneOf(record(source.automation).state, ["running", "paused", "unavailable"]), detail: text(record(source.automation).detail, 512) } }),
     ...(source.messagingProviders === undefined ? {} : { messagingProviders: list(source.messagingProviders, 3).map(value => oneOf(value, ["imessage", "whatsapp", "beeper"])) }),
     ...(source.replies === undefined ? {} : { replies: repliesView(source.replies) }),
+    ...(source.habitat === undefined ? {} : { habitat: { driver: oneOf(record(source.habitat).driver, ["gateway", "local"]), model: text(record(source.habitat).model, 160),
+      evolutionModel: record(source.habitat).evolutionModel === null ? null : text(record(source.habitat).evolutionModel, 160),
+      debounceMs: integer(record(source.habitat).debounceMs, 1000, 8000), dailyBudgetMicroUsd: integer(record(source.habitat).dailyBudgetMicroUsd, 0, 10_000_000) } }),
   };
   if (new Set(snapshot.contacts.map(contact => contact.id)).size !== snapshot.contacts.length
     || new Set(snapshot.capabilities.map(capability => capability.id)).size !== snapshot.capabilities.length

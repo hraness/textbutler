@@ -2,7 +2,7 @@ import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { attachControlSocket, requestControlSocket } from "@hraness/local-custody/control-socket";
-import { assertOwnedPath, ensurePrivateDirectory } from "@hraness/local-custody/private-paths";
+import { assertOwnedPath, ensurePrivateDirectory, readOwnedFileStable } from "@hraness/local-custody/private-paths";
 import { TextbutlerControlService, TEXTBUTLER_CONTROL_PROTOCOL, parseControlRequest } from "./control-service.ts";
 import { parseControlResponse, type ControlResponse } from "../../control/src/index.ts";
 import type { Settings } from "./config.ts";
@@ -18,6 +18,8 @@ import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
 import { createGhostgetAutomationProcess } from "./ghostget-automation-process.ts";
 import { createAutomationOwnerPort } from "./automation-owner.ts";
 import { createDaemonReplyLoop } from "./reply-loop.ts";
+import { createFastDriver } from "./fast-driver.ts";
+import { bundledXcbIntegrationAdmission, validXcbIntegrationAdmission } from "./xcb-integration.ts";
 
 export const MAX_CONTROL_FRAME_BYTES = 1_048_576;
 const MAX_CONNECTIONS = 16;
@@ -87,7 +89,20 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
         ...(options.managedCodex === undefined ? {} : { managedCodex: options.managedCodex }),
         ...(nativeSubscriptions === undefined ? {} : { nativeSubscriptions }) }) });
     await service.recoverInactiveGrants();
-    if (messaging) replyLoop = await createDaemonReplyLoop({ service, client: messaging.client, hooks: extensions.hooks, onStatus: value => service!.setRuntimeStatus(value) });
+    let habitat: Parameters<typeof createDaemonReplyLoop>[0]["habitat"];
+    if (host.habitat?.enabled) {
+      if (!validXcbIntegrationAdmission(bundledXcbIntegrationAdmission())) throw Error("Habitat execution requires a reviewed, admitted Textbutler bundle");
+      const config = host.habitat;
+      const driver = createFastDriver(config.driver, { journal: service.runJournal(), ...(config.driver.kind === "gateway" ? { credential: async () => {
+        const directory = join(dataDir, "state", "provider-credentials");
+        await assertOwnedPath(directory, { kind: "directory", canonical: true, ownerOnly: true });
+        return new TextDecoder("utf-8", { fatal: true }).decode(await readOwnedFileStable(join(directory, (config.driver as Extract<typeof config.driver, { kind: "gateway" }>).credentialFile), 8192)).trim();
+      } } : {}) });
+      habitat = { config, driver };
+      service.setHabitatConfig(config);
+    }
+    if (messaging) replyLoop = await createDaemonReplyLoop({ service, client: messaging.client, hooks: extensions.hooks,
+      ...(habitat === undefined ? {} : { habitat }), onStatus: value => service!.setRuntimeStatus(value) });
     else if (messagingUnavailable) service.setRuntimeStatus({ state: "unavailable", detail: "Ghostget automation setup or previous process custody needs owner attention. No automatic replies are running." });
   } catch (error) {
     const failures: unknown[] = [error];

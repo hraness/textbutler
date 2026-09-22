@@ -16,6 +16,9 @@ import { OwnerReplies, type PendingObservation } from "./owner-replies.ts";
 import { OwnerMessages } from "./owner-messages.ts";
 import { parseActionIntent } from "../../transport/src/index.ts";
 import { Hooks } from "./hooks.ts";
+import type { ButlerAgent } from "./runtime.ts";
+import { ContactHabitat } from "./contact-habitat.ts";
+import type { HabitatHostConfig } from "./host-config.ts";
 
 export const TEXTBUTLER_CONTROL_PROTOCOL = "textbutler.control.v1" as const;
 const MAX_SETTINGS_BYTES = 524_288;
@@ -78,6 +81,11 @@ export function parseControlRequest(value: unknown): ControlRequest {
     const loginId = text(item.loginId, 160);
     if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(loginId)) fail("invalid-request", "Invalid provider sign-in identity.");
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, accountId: contactId(item.accountId), loginId };
+  }
+  if (item.command === "habitat.read" || item.command === "habitat.rollback") {
+    exact(item, ["protocol", "command", "contactId", ...(item.command === "habitat.rollback" ? ["expectedRevision"] : [])]);
+    return item.command === "habitat.read" ? { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId) }
+      : { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), expectedRevision: integer(item.expectedRevision) };
   }
   if (item.command === "replies.scan") {
     exact(item, ["protocol", "command"]); return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command };
@@ -249,6 +257,9 @@ export class TextbutlerControlService {
   async settings(): Promise<Settings> { return (await this.current()).state.settings; }
   async runtimeState(): Promise<OwnerRuntimeState> { const { settings, bindings, grants, revision } = (await this.current()).state; return { settings, bindings, grants, revision }; }
   runJournal(): RunJournal { return this.journal; }
+  private habitatConfig: HabitatHostConfig | undefined;
+  setReplyAgent(agent: ButlerAgent): void { this.replies?.useAgent(agent); }
+  setHabitatConfig(config: HabitatHostConfig): void { this.habitatConfig = config; }
   setRuntimeStatus(status: { state: "running" | "paused" | "unavailable"; detail: string }): void {
     if (!["running", "paused", "unavailable"].includes(status.state) || typeof status.detail !== "string" || status.detail.length > 512) throw new Error("Invalid runtime diagnostic");
     this.runtimeStatus = { ...status };
@@ -434,6 +445,9 @@ export class TextbutlerControlService {
           grantExpiresAt: grant?.expiresAt ?? null } }),
         settings: { enabled: contact.enabled, selfChat: contact.selfChat, responseMode: contact.mode, keyword: contact.keyword, provider: contact.provider, accountId: contact.accountId, disclosure: { ...contact.disclosure } } }; }),
       ...(this.providers ? { providerAccounts: this.providers.accounts() } : {}),
+      ...(this.habitatConfig?.enabled ? { habitat: { driver: this.habitatConfig.driver.kind, model: this.habitatConfig.driver.model,
+        evolutionModel: this.habitatConfig.evolutionModel, debounceMs: this.habitatConfig.debounceMs,
+        dailyBudgetMicroUsd: this.habitatConfig.driver.kind === "gateway" ? Math.floor(this.habitatConfig.driver.dailyBudgetUsd * 1_000_000) : 0 } } : {}),
       capabilities: [
         { id: "messages", status: this.runtimeStatus.state === "unavailable" ? "setup-required" : "available", detail: this.automation ? this.runtimeStatus.detail : this.enrollment ? "Owner conversation selection is configured. Message subscriptions and autonomous sending remain unavailable." : "Configure the owner-installed Ghostget CLI to select messaging conversations." },
         { id: "contacts", status: "unsupported", detail: "The current Ghostget contract has no native Contacts directory. No contacts are imported automatically." },
@@ -549,6 +563,20 @@ export class TextbutlerControlService {
         signal.throwIfAborted();
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "snapshot", snapshot: await this.snapshot() };
       });
+    }
+    if (request.command === "habitat.read" || request.command === "habitat.rollback") {
+      if (!current.state.settings.contacts.some(contact => contact.id === request.contactId)) fail("invalid-request", "Unknown contact habitat.");
+      const habitat = new ContactHabitat(this.journal, request.contactId);
+      if (request.command === "habitat.rollback") {
+        if (!current.state.settings.paused) fail("conflict", "Pause automatic replies before rolling back a habitat.");
+        try { habitat.rollback(request.expectedRevision); } catch { fail("conflict", "The habitat changed or has no retained predecessor. Read it before rolling back."); }
+      }
+      const state = habitat.snapshot(), config = this.habitatConfig;
+      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "habitat", contactId: request.contactId, revision: state.revision,
+        installationDailyReservedMicroUsd: this.journal.apiUsage(Date.now()), content: JSON.stringify({ enabled: config?.enabled ?? false,
+          driver: config?.driver.kind ?? null, model: config?.driver.model ?? null, evolutionModel: config?.evolutionModel ?? null,
+          dailyBudgetUsd: config?.driver.kind === "gateway" ? config.driver.dailyBudgetUsd : 0,
+          plan: state.champion, episodes: state.episodes.length, evaluations: state.evaluations, lineage: state.lineage }) };
     }
     if (request.command === "messages.history") return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true,
       kind: "message-history", ...await this.messages.history(request.contactId, request.limit, signal) }));

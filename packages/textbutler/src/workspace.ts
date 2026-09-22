@@ -103,10 +103,20 @@ export class ContactWorkspace {
    * Content identity makes repeat imports idempotent. Publish complete private
    * bytes without replacing an existing contact file. */
   async importAsset(input: Uint8Array, extension = "bin"): Promise<{ path: string; sha256: string; bytes: number }> {
+    return this.publishAsset(input, extension, "owner");
+  }
+  async importPublicAsset(input: Uint8Array, extension: string): Promise<{ path: string; sha256: string; bytes: number }> {
+    if (!(input instanceof Uint8Array) || !["png", "jpg"].includes(extension) || input.byteLength > 4_194_304) throw Error("Public image exceeds its type or byte bound");
+    const png = input.length >= 8 && Buffer.from(input.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    const jpeg = input.length >= 3 && input[0] === 255 && input[1] === 216 && input[2] === 255;
+    if (!(extension === "png" && png || extension === "jpg" && jpeg)) throw Error("Public image signature mismatch");
+    return this.publishAsset(input, extension, "public");
+  }
+  private async publishAsset(input: Uint8Array, extension: string, source: "owner" | "public"): Promise<{ path: string; sha256: string; bytes: number }> {
     if (!(input instanceof Uint8Array) || input.byteLength < 1 || input.byteLength > MAX_ASSET_BYTES || !/^[a-z0-9]{1,10}$/u.test(extension))
       throw new Error("Media must be 1 byte to 16 MiB with a supported file extension");
     const bytes = Buffer.from(input), sha256 = createHash("sha256").update(bytes).digest("hex");
-    const path = `outbox/owner-${sha256}.${extension}`, destination = this.path(path);
+    const path = `outbox/${source}-${sha256}.${extension}`, destination = this.path(path);
     const existing = async () => {
       const observed = await this.admitAsset(path);
       if (observed.sha256 !== sha256 || observed.bytes.length !== bytes.length) throw new Error("Imported media identity changed");
