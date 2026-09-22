@@ -47,6 +47,23 @@ test("nontext intent gets a disclosed companion before the action", async () => 
   expect((await fixture.runtime.process(event)).status).toBe("submitted");
   expect(fixture.submitted[0]?.[0]).toEqual({ kind: "text", text: "🤖{ I like that idea. }" });
 });
+test("an admitted event does not go stale while a slow reply is drafted", async () => {
+  let clockNow = now;
+  const fixture = setup({ clock: () => clockNow });
+  const aged = { ...event, occurredAt: now - 100_000, observedAt: now - 100_000 };
+  fixture.ports.agent.compose = async () => {
+    clockNow += 150_000;
+    fixture.setSnapshot({ ...fixture.getSnapshot(), state: { ...fixture.getSnapshot().state, synchronizedAt: clockNow } });
+    return { summary: "I can help.", actions: [{ kind: "text" as const, text: "Hello there." }] };
+  };
+  expect((await fixture.runtime.process(aged)).status).toBe("submitted");
+  expect(fixture.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
+});
+test("an event that surfaces already stale is still ignored", async () => {
+  const fixture = setup();
+  expect((await fixture.runtime.process({ ...event, occurredAt: now - 130_000, observedAt: now - 130_000 })).reason).toBe("stale-event");
+  expect(fixture.submitted).toEqual([]);
+});
 test("owner takeover while composing cancels the send", async () => {
   const fixture = setup();
   fixture.ports.agent.compose = async () => {

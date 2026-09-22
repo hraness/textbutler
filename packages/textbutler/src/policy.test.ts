@@ -60,4 +60,10 @@ describe("reply admission", () => {
     expect(decideReply(settings, contact, { ...event, text: "Can you find a recipe?" }, state, now).outcome).toBe("classify");
     expect(decideReply({ ...settings, paused: true }, contact, event, state, now).reason).toBe("paused");
   });
+  test("event age is measured from admission, not the post-composition recheck", () => {
+    const aged = { ...event, occurredAt: now - 150_000, observedAt: now - 150_000 };
+    expect(decideReply(settings, contact, aged, { ...state, synchronizedAt: now }, now).reason).toBe("stale-event");
+    expect(decideReply(settings, contact, aged, { ...state, synchronizedAt: now }, now, now - 100_000).outcome).toBe("reply");
+    expect(decideReply(settings, contact, aged, { ...state, lastOwnerAt: now - 20_000 }, now, now - 100_000).reason).toBe("owner-active");
+  });
 });

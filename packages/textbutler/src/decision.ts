@@ -39,13 +39,13 @@ export function keywordPresent(text: string, keyword: string): boolean {
   }
   return false;
 }
-export function decideReply(settings: Settings, contact: ContactSettings, event: MessageEvent, state: ConversationState, now: number): ReplyDecision {
+export function decideReply(settings: Settings, contact: ContactSettings, event: MessageEvent, state: ConversationState, now: number, admittedAt?: number): ReplyDecision {
   if (!event.id || event.id.length > 256 || !event.revision || event.revision.length > 256 || typeof event.text !== "string" || Buffer.byteLength(event.text) > 16_384 || typeof event.historical !== "boolean" || typeof event.group !== "boolean" || ![true, false, "unknown"].includes(state.ownerTyping) || !Number.isSafeInteger(state.repliesInLastHour) || state.repliesInLastHour < 0 || (state.lastOwnerAt !== null && (!Number.isSafeInteger(state.lastOwnerAt) || state.lastOwnerAt < 0 || state.lastOwnerAt > now + 30_000))) return { outcome: "ignore", reason: "invalid-event-or-state" };
   if (!settings.contacts.some(c => c.id === contact.id && c.revision === contact.revision)) return { outcome: "ignore", reason: "settings-changed" };
   if (settings.paused || !contact.enabled || contact.pausedUntil > now) return { outcome: "ignore", reason: "paused" };
   if (event.contactId !== contact.id || event.routeId !== contact.routeId) return { outcome: "ignore", reason: "route-mismatch" };
   if (event.historical || event.group || event.kind !== "message" || event.author !== "contact") return { outcome: "ignore", reason: "not-live-direct-inbound" };
-  if (![now, event.occurredAt, event.observedAt, state.synchronizedAt].every(Number.isSafeInteger) || event.occurredAt > now + 30_000 || event.observedAt > now || event.occurredAt < now - 120_000) return { outcome: "ignore", reason: "stale-event" };
+  if (![now, event.occurredAt, event.observedAt, state.synchronizedAt].every(Number.isSafeInteger) || event.occurredAt > now + 30_000 || event.observedAt > now || event.occurredAt < (admittedAt ?? now) - 120_000) return { outcome: "ignore", reason: "stale-event" };
   if (event.revision !== state.latestRevision) return { outcome: "ignore", reason: "superseded" };
   if (state.synchronizedAt > now || state.synchronizedAt < now - 15_000) return { outcome: "defer", reason: "refresh-required" };
   if (state.ownerTyping === true) return { outcome: "ignore", reason: "owner-typing" };

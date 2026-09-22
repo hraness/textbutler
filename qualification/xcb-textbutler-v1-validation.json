@@ -5,9 +5,9 @@
   "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
   "result": {
     "exitCode": 0,
-    "passed": 243,
+    "passed": 245,
     "failed": 0,
-    "assertions": 1968,
+    "assertions": 1972,
     "files": 18
   },
   "additionalChecks": [
@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "32d8d6dd337357a73ead39af52d7367d7805f3d9ae6ec82be4175ca563858ca7",
+  "sourceDigest": "97abe8f6b097880ac66c90d839f780981937bb092d204c365b4f38b7f6c18dff",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -39,7 +39,7 @@
     "packages/textbutler/src/owner-replies.test.ts": "b5600840ba5811f41838da3f017990c0bb64a668287405c2c98981c7eac3e383",
     "packages/textbutler/src/provider-host.test.ts": "95c63010a19fa86daac6d758b78398dc3e786c31c3ced61884f6140786b1efa4",
     "packages/textbutler/src/routed-agent.test.ts": "0232fbfab4b1f7eafc3e928fbc4ad7443d45073677b21f2e33a76806ed78a2be",
-    "packages/textbutler/src/runtime.test.ts": "c45d9edb6a7b7cb2315ad808bf4b534a5f0e135267a559cf7589f1cc05c05e09",
+    "packages/textbutler/src/runtime.test.ts": "ff86029994e92bb0426037edb8eeb03736fe22e98a678c106f9605cb2050aed1",
     "packages/textbutler/src/workspace.test.ts": "dd7782f94a0d2c91cea80bd374c10ee95c41373203af290c6154a61d568dfd13",
     "packages/textbutler/src/xcb-client.test.ts": "2e6b64077ac72b29350fc1b57182c7f556e04643933d560f2ffb52490e2399c7",
     "packages/textbutler/src/xcb-host.test.ts": "2b0a5a41236edf44b4a1ee049c5245bd53df1f708d966113726daee9175969c6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "dd6dcdd212abea40c97f7116fd7bcb311a92eca056274c34bd0eed607ca06696",
+  "logSha256": "e0851bc893a21efc00b4f6124c6a810be82d13dee0b8fc4a7f6972357e066d3a",
   "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the new transport-install custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal of the 0.8.14 release version bump on reviewed main head: the changed sealed inputs are the root package version carrying the merged self-chat attribution work. Source version, changelog and site version inputs were refreshed with all other sealed bytes unchanged. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers release metadata identity; the self-chat admission was reviewed in the preceding feature merge, and native per-send service enforcement is separate.",
+    "method": "Integration-owner reseal of the admitted-event staleness fix on reviewed main head: the changed sealed inputs are the runtime passing the admission timestamp into the post-composition recheck so a slow draft cannot expire an admitted event, and the runtime tests covering that path. The coupled 18-file synthetic suite and both package typechecks were rerun with unchanged inputs. Earlier review references, including the transport provisioning review, describe the retained baseline work. This review covers the admission-time staleness basis; native per-send service enforcement and live iMessage echo behavior are separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -178,7 +178,7 @@
   },
   "inputSnapshot": {
     "count": 246,
-    "sha256": "274c0f64c6d749ab441a4f5cd6ce7b12738066d160f86acd77752018b048a535",
+    "sha256": "ecf6c7e85ba5dbdd48bea3244b20b3cf43ea900ffc814c5379b2d089336480fb",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -208,7 +208,7 @@
       "packages/textbutler/src/daemon-custody.ts": "ead51b8c27bf88a0969ef9f4a7476bbedb71af5ec96d4d20919580715717ec8c",
       "packages/textbutler/src/daemon.test.ts": "d479f68d4ca41a906b70a50810c27f4ff5131f802b36bc8202910c60f49d0899",
       "packages/textbutler/src/daemon.ts": "912b55671579faa7f62fe5acc3b08fac97df0c1ea3292ccafdac815896336eb5",
-      "packages/textbutler/src/decision.ts": "4eb3429df48ecf193ee3c3cb396e8d9797be79ecc53e8ad35e6276d7f88f601a",
+      "packages/textbutler/src/decision.ts": "e3fe8fe0067355aad58c0f289972f9686ef73da735fd204fef46e8a53f837b57",
       "packages/textbutler/src/enrollment.test.ts": "4f8d83b6ea5a281a30423eb12ab7d41fac89ed2d9f7178e4b949d5e1168b4ff6",
       "packages/textbutler/src/enrollment.ts": "0a553c4364842a1643b2041302dba0635d7f56e8ee2afae3adc5a70113792e05",
       "packages/textbutler/src/ghostget-automation-process.test.ts": "9c2b2303a6deae4d92f5a4c54f3c969799086d45b214f5e4fd2620a499f0b193",
@@ -254,20 +254,20 @@
       "packages/textbutler/src/owner-replies.ts": "c8a3cacbcc007e45d4118bf360a405d2e1dd4924f0ead8086c3393f590676c38",
       "packages/textbutler/src/plugins.test.ts": "10c4058b3e3057040781c08a9a3035e706c86f8cbc9cf131fbd88de8ed079f89",
       "packages/textbutler/src/plugins.ts": "7d4f5c2fcc1ac6bd2f03d878bda071c8a1f2baf327004973b046f7fa91aa36a9",
-      "packages/textbutler/src/policy.test.ts": "ea184ef6339f86cf09b0de166e91e99695650c078b3238aef3e2e34c39a9bc17",
+      "packages/textbutler/src/policy.test.ts": "419e33c72c6e3cb3684cfb1e799c8b029b0ddf4d6a367db292b3ae68701a3e95",
       "packages/textbutler/src/provider-host-handoff.test.ts": "e59c2ff164e618a0bf671283747f3097bb5fe11d6def1b2197610d2de99e7aa1",
       "packages/textbutler/src/provider-host-recovery.test.ts": "1e7403a87e4942dd8c4591b1958090d1a8f6eea845769b7fcc2fd6802d18a340",
       "packages/textbutler/src/provider-host.test.ts": "95c63010a19fa86daac6d758b78398dc3e786c31c3ced61884f6140786b1efa4",
       "packages/textbutler/src/provider-host.ts": "ae0ad4f052aa6cd065772c2dcfecff355296b20519b03ba38cb9a2c7978a5813",
       "packages/textbutler/src/reply-actions.ts": "c7a7d238fb9116771dee6b7c162596cef180253a456a3364bfd83d6fa8a12e01",
-      "packages/textbutler/src/reply-loop.test.ts": "a18ad772cbb8c91b008139b46b87410867eee2ae269f91dea53cff51cb83fbad",
-      "packages/textbutler/src/reply-loop.ts": "5c58440271499cf0d7860fd3438a97ac95eea9396564b358cfcee4b2d59b63da",
+      "packages/textbutler/src/reply-loop.test.ts": "84997a091c1dcb6fb141569d6161cf8f6d3078a970afe9f1d886dcbad186263d",
+      "packages/textbutler/src/reply-loop.ts": "5298fba8e3727484daa724aa62581cde0b436209e5ecb8e5ef101070547b4616",
       "packages/textbutler/src/routed-agent.test.ts": "0232fbfab4b1f7eafc3e928fbc4ad7443d45073677b21f2e33a76806ed78a2be",
       "packages/textbutler/src/routed-agent.ts": "113742ede2a0199dd68df749815f4e1bdde78aaf3b7259929ad409cee22e708b",
       "packages/textbutler/src/routed-managed-agent.test.ts": "11a60dea19cadde5ad23becb2a3dce32e339df6f0af7c1bff68dba6cbe3a4201",
       "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
-      "packages/textbutler/src/runtime.test.ts": "c45d9edb6a7b7cb2315ad808bf4b534a5f0e135267a559cf7589f1cc05c05e09",
-      "packages/textbutler/src/runtime.ts": "bc8082515f28c685271482b3242dd4431e8d4c11e521cb2c2ac70905578997a6",
+      "packages/textbutler/src/runtime.test.ts": "ff86029994e92bb0426037edb8eeb03736fe22e98a678c106f9605cb2050aed1",
+      "packages/textbutler/src/runtime.ts": "43b5a485481cfa4b68d260bb9fa717d295b1049cccbcaa327463e881a029e68e",
       "packages/textbutler/src/tui.test.ts": "2f20d957c218360937d6e2d4fdca315f68a05e5f473046181831bfe682ad2820",
       "packages/textbutler/src/tui.ts": "5c2cc396be104da2b50408579af5edb3c20352925dd308298af621190982567d",
       "packages/textbutler/src/workspace.test.ts": "dd7782f94a0d2c91cea80bd374c10ee95c41373203af290c6154a61d568dfd13",
@@ -434,9 +434,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "675498a0e76949aaa6d9ebe2c9833d178aeebe59a026deeb3b7fc15036dea9d1",
-    "evidenceSha256": "c6219d07cc0485985dd6a4fda88e2b6f2e1ef3994ff5b6b8c6f7963a688c7cf9",
-    "logSha256": "bed0a54f6d55f03ab8f1eb37593453b4e580325b20670639a8b0d96f90375d54",
+    "validationSha256": "4edfb6f92fd1d766a2053a1656159d9ce6384591cf42c7e80d4875483a53fd92",
+    "evidenceSha256": "1682680105226280255524c19899b753d5ce23bf23f15133a92f239c11262b93",
+    "logSha256": "dd6dcdd212abea40c97f7116fd7bcb311a92eca056274c34bd0eed607ca06696",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }
