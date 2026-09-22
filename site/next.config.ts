@@ -41,12 +41,20 @@ export const frameSafePreviewHeaders = [
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   async redirects() {
-    return [{
-      source: '/:path*',
-      has: [{ type: 'host', value: 'www.messagelikeme.com' }],
-      destination: 'https://messagelikeme.com/:path*',
-      permanent: true,
-    }];
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.messagelikeme.com' }],
+        destination: 'https://textbutler.app/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'messagelikeme.com' }],
+        destination: 'https://textbutler.app/:path*',
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [
