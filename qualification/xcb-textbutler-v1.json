@@ -30,7 +30,7 @@
     "packages/textbutler/src/native-task.ts": "e2a3f5ebb1586700af67f540273b5c4c6c0a33c4415a139693d6ca6d0f6dcaf6",
     "packages/textbutler/src/owner-cli.ts": "67761bee07477793879c04bae1ab9761f2a9d63c260fe236c885ff55b83b3847",
     "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
-    "packages/textbutler/src/owner-replies.ts": "59246b238336d8f1877a50e50ec6625bc7b095e987343d7bf15b6d18fa78403d",
+    "packages/textbutler/src/owner-replies.ts": "47a2858fee67977fd3575fb15f87267e30c5fa014199c72af0605e8a21c76112",
     "packages/textbutler/src/provider-host.ts": "ae0ad4f052aa6cd065772c2dcfecff355296b20519b03ba38cb9a2c7978a5813",
     "packages/textbutler/src/routed-agent.ts": "113742ede2a0199dd68df749815f4e1bdde78aaf3b7259929ad409cee22e708b",
     "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
@@ -46,6 +46,6 @@
   },
   "validation": {
     "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
-    "receiptSha256": "c7e3cdc166b4e36e02f4a23a829e89a3a3df65b23de1d37d2bdabc3a4aa59eeb"
+    "receiptSha256": "8133a2849fad729de361d28bb4d193d56c433461ba51a2377e37946c8b4eb1b4"
   }
 }

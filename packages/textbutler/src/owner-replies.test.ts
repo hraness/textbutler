@@ -16,6 +16,7 @@ import { automationBinding, createAutomationOwnerPort } from "./automation-owner
 import { Hooks } from "./hooks.ts";
 import { RunJournal } from "./journal.ts";
 import { OwnerReplies, type OwnerRepliesPorts } from "./owner-replies.ts";
+import { NoReplyNeeded } from "./runtime.ts";
 import type { OwnerRuntimeState } from "./control-service.ts";
 import type { ProviderHost } from "./provider-host.ts";
 import { ContactWorkspace } from "./workspace.ts";
@@ -161,6 +162,16 @@ test("suggest drafts a disclosed reply for the pending run and never dispatches"
   expect(fixture.sent).toEqual([]);
   const view = fixture.replies.view(fixture.state);
   expect(view.drafts.map(value => value.id)).toEqual([draft!.id]);
+});
+
+test("a silent agent suggestion returns no draft instead of a generic failure", async () => {
+  const fixture = await setup();
+  fixture.replies.useAgent({ qualified: async () => true, classify: async () => ({ outcome: "reply" }),
+    compose: async () => { throw new NoReplyNeeded(); } });
+  const { draft, pending } = await fixture.replies.suggest("contact-1", AbortSignal.timeout(5000));
+  expect(draft).toBeNull();
+  expect(pending.pendingCount).toBe(2);
+  expect(fixture.replies.view(fixture.state).drafts).toEqual([]);
 });
 
 test("sending a reviewed draft submits disclosed text, journals the send and clears state", async () => {
