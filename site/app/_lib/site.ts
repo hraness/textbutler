@@ -8,7 +8,7 @@ export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 export const GETTING_STARTED_URL = `${GITHUB_URL}/blob/main/docs/textbutler/getting-started.md`;
 // The immutable legacy release coordinate; not a Textbutler app version.
-export const SOFTWARE_VERSION = '0.8.14';
+export const SOFTWARE_VERSION = '0.8.15';
 export const RELEASE_URL = `${GITHUB_URL}/releases/tag/v${SOFTWARE_VERSION}`;
 
 export const CANONICAL_PAGE_PATHS = [

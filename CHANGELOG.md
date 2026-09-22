@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.15 (2026-09-21)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.15` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Keep an admitted automatic reply alive while it is drafted: the post-composition recheck measures event age from admission instead of the live clock, so a slow provider call can no longer cancel a live reply as stale, while owner activity, superseded events, sync, and settings still cancel it.
+- Treat the butler's own echoed messages as loop traffic only: they no longer cancel an in-flight reply or clear a newer pending inbound, and echo-only traffic cannot supersede a live reply.
+
 ## 0.8.14 (2026-09-21)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.14` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
