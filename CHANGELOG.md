@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.16 (2026-09-22)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.16` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Treat an owner text naming the butler in an enrolled contact conversation as a deliberate invocation: it now queues a disclosed reply through the same grant, rate-limit, capability, and freshness checks instead of marking the thread answered. Only a strictly newer owner message suppresses it as a takeover, and invocations no longer count as owner presence, so they cannot cool the butler down or swallow the next inbound. `inbox` and `replies suggest` report the same owner run the loop sees.
+
 ## 0.8.15 (2026-09-21)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.15` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
