@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.21 (2026-09-24)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.21` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Complete the LaunchAgent contract fix: receipts written before schema 4 recorded an artifact now verify the installed service definition against every exact render a shipped template produced (the template changed `ProcessType` within the same receipt schema), so a service installed by the previous release verifies and uninstalls under this binary. When advancing an absent service's older receipt, the rewritten plist lands before the receipt so an interruption still verifies against the older contract's historical renders.
+
 ## 0.8.20 (2026-09-24)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.20` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.

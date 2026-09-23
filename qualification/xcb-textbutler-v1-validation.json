@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "c0961ddcd831f4a15969a7f00ca72ccb64795af25735deed6e0d411678d038ed",
+  "sourceDigest": "6d23bad81a921144d4e3de6b5c22aa0b46205f51d83d0f6c5e094c868179ec02",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "e1fca08739ad84e765e41cf7764d2a7b79151ba5d26e446d4f7093c19d165653",
-  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun over the 0.8.20 release sources; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "c4f42868951d5749a49195a7f18f9187e18f40b4568d45bf58f4ae2693c96fd7",
+  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun over the 0.8.21 release sources; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal for the 0.8.20 release over reviewed main: package.json and site package versions advance to 0.8.20 with the changelog entry, carrying the LaunchAgent schema-4 recorded-artifact receipt so launch-template changes cannot strand an installed service. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
+    "method": "Integration-owner reseal for the 0.8.21 release over reviewed main: package.json and site package versions advance to 0.8.21 with the changelog entry, carrying the LaunchAgent historical-render verification set completing the LaunchAgent contract fix. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -153,7 +153,7 @@
   },
   "inputSnapshot": {
     "count": 247,
-    "sha256": "3b81091c858aa1a0f8d5aea124b548771999cdd50708a210960b8030d11e35d8",
+    "sha256": "2a90779324daf88e2c849439afca48239f53732973cc2d5ebf400d6db21dcf0d",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -165,7 +165,7 @@
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
-      "package.json": "e38c30d7a7ad7ce4a93fbf68afa5e700a53fe6ea6cf8bd860868119c57a3a1f9",
+      "package.json": "e377ec6da60859986a371bc133df163d1491d9d193dc80d50a0b0e43ad84e97a",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
       "packages/control/src/index.ts": "582369440a0e5af38bf418b446480b43e8bf35a5676aabd2b4e5f7d907a656ac",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
@@ -198,8 +198,8 @@
       "packages/textbutler/src/index.ts": "9af45ca0dc8aeef57fc00c414a9c7bf0e1257ed57f93f26bdf1e735205d6b3ce",
       "packages/textbutler/src/journal.test.ts": "22438a43cf9f655c840fcec1f0e7c63ed993e89d5c3f8373dcd7c34300b33920",
       "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
-      "packages/textbutler/src/launch-agent.test.ts": "1dd08cb69b3fc596abc0131b0f67c8c6070405c271f5013868e5bc7bf6f7cfa9",
-      "packages/textbutler/src/launch-agent.ts": "c3fb79ad4b335a5bab6d474841cfbb2b370229f314acde6c8eef297b580e4358",
+      "packages/textbutler/src/launch-agent.test.ts": "ffc7548158f69f48b25b64077ed263cd8cacab7caeeeeeda58904bfb1b1b4ee6",
+      "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
       "packages/textbutler/src/macos-app.test.ts": "1725fc220eb1aabe727b0cb1ebfd5cef9b8ae2c80c02e6e8044918f3e4d8f1f5",
       "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
       "packages/textbutler/src/managed-codex-owner.test.ts": "848db23b6843d8c7473a5f476e3d0adfe57349a3e6ad4f40620f1cd6125ae32d",
@@ -391,7 +391,7 @@
       "src/test-fixtures.ts": "3ac9802051d38c6d3ef92a842eb35ef1dedf8c9dd6424107b5054e4933d5e6bc",
       "src/test-x-archive-fixture.ts": "3461032a8c8bd2765c1c74c8616f442cbefd356b8f24401bb32241d4a967fa00",
       "src/types.ts": "fb3c0ffecae6900505b1bec8824ff0e24b12c8e12d742cb17250600a29d85aff",
-      "src/version.ts": "68db2c1c52ded00c5606628d1e5d9e1268bbc0fc7ec90849958268cb9ad32766",
+      "src/version.ts": "0a2e467239671fbebd986cdd96d14d60b8298ee903c02f0e8c5e55962da58ebe",
       "src/whatsapp-source.test.ts": "c07fdbee0ea8b5b4f1b57f3c7101ff1a5ed62ed8d97f98597d26c1d9999aa1f4",
       "src/whatsapp-source.ts": "fd6daff5185ee81b3585c003eb1d0c07b4b4e788aa55c7b4bef0edca46f732f4",
       "src/x-archive-zip-rust.test.ts": "7fd66cb10f08a2102da3f6ca187b030ecd350580f37224d8c6b4aba7ff3093f7",
@@ -410,9 +410,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "7e07ab92fb474f7ee9ea9a6e3ea3311a9d568e05e605d62e6936697ebcc098c4",
-    "evidenceSha256": "dcb42e1b0f77a572f8a056c6611eba4ac00d5104766b3656562efdfa28c36d23",
-    "logSha256": "e1fca08739ad84e765e41cf7764d2a7b79151ba5d26e446d4f7093c19d165653",
+    "validationSha256": "a565425e4495ada5854edda4425e4b72a1e85124784ef0a881f6ac9c21b45afd",
+    "evidenceSha256": "46fd4ac43bb32f5e95495b001a31e18a51dda78e3833a75f10fdbc52577d1cc3",
+    "logSha256": "c4f42868951d5749a49195a7f18f9187e18f40b4568d45bf58f4ae2693c96fd7",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }
