@@ -13,14 +13,14 @@ export const parseHabitatPlan = (value: unknown): HabitatPlan => Object.freeze(p
 export const habitatDigest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const observationSchema = z.strictObject({ id, at: timestamp, author: z.enum(["owner", "contact"]), kind: z.enum(["message", "reaction"]), text: text(2048), relatedMessageId: id.nullable() });
 export type HabitatObservation = z.infer<typeof observationSchema>;
-const replySchema = z.strictObject({ runId: id, at: timestamp, intent: text(1024), trigger: observationSchema, context: z.array(observationSchema).max(12), messageIds: z.array(id).max(8), text: text(8192), planDigest: z.string().regex(/^[a-f0-9]{64}$/u).nullable() });
+const replySchema = z.strictObject({ runId: id, at: timestamp, intent: text(1024), trigger: observationSchema, context: z.array(observationSchema).max(32), messageIds: z.array(id).max(8), text: text(8192), planDigest: z.string().regex(/^[a-f0-9]{64}$/u).nullable() });
 export type HabitatReply = z.infer<typeof replySchema>;
 const reflectionSchema = z.strictObject({ candidate: planSchema.nullable(), reason: text(1024), evidenceIds: z.array(id).max(40) });
 const episodeSchema = z.strictObject({ reply: replySchema, followups: z.array(observationSchema).max(HABITAT_LIMITS.followups), initialClaimed: z.boolean(), followupClaimed: z.boolean(), reflection: reflectionSchema.nullable().default(null) });
 export type HabitatEpisode = z.infer<typeof episodeSchema>;
 const evaluationSchema = z.strictObject({ key: id, at: timestamp, phase: z.enum(["initial", "followup"]), status: z.enum(["pending", "retained", "promoted"]), reason: text(1024), receipts: z.array(z.string().regex(/^sha256:[a-f0-9]{64}$/u)).max(8).default([]), evidenceIds: z.array(id).max(40).default([]) });
 const lineageSchema = z.strictObject({ key: id, kind: z.enum(["promotion", "rollback"]), from: planSchema, to: planSchema, reason: text(1024) });
-const stateSchema = z.strictObject({ version: z.literal(1), revision: timestamp, champion: planSchema, episodes: z.array(episodeSchema).max(HABITAT_LIMITS.episodes), evaluations: z.array(evaluationSchema).max(64), lineage: z.array(lineageSchema).max(16), ancestors: z.array(planSchema).max(16).default([]) });
+const stateSchema = z.strictObject({ version: z.literal(1), revision: timestamp, champion: planSchema, episodes: z.array(episodeSchema).max(HABITAT_LIMITS.episodes), evaluations: z.array(evaluationSchema).max(64), lineage: z.array(lineageSchema).max(16), ancestors: z.array(planSchema).max(16).default([]), denied: z.array(z.string().regex(/^[a-f0-9]{64}$/u)).max(16).default([]) });
 export type HabitatState = z.infer<typeof stateSchema>;
 export type HabitatCheckpoint = Readonly<{ key: string; phase: "initial" | "followup"; baseDigest: string; evidenceDigest: string; episode: HabitatEpisode; cases: readonly HabitatEpisode[]; plan: HabitatPlan }>;
 const assessmentSchema = z.strictObject({ candidate: planSchema.nullable(), reason: text(1024), evidenceIds: z.array(id).max(40), scores: z.array(z.strictObject({ runId: id, incumbent: z.number().min(0).max(1), candidate: z.number().min(0).max(1), safe: z.boolean() })).max(4) });
@@ -36,7 +36,7 @@ export class ContactHabitat {
   }
   snapshot(): HabitatState {
     const stored = this.journal.habitatState(this.contactId);
-    if (stored === null) return { version: 1, revision: 0, champion: { ...DEFAULT_HABITAT_PLAN }, episodes: [], evaluations: [], lineage: [], ancestors: [] };
+    if (stored === null) return { version: 1, revision: 0, champion: { ...DEFAULT_HABITAT_PLAN }, episodes: [], evaluations: [], lineage: [], ancestors: [], denied: [] };
     const state = stateSchema.parse(JSON.parse(stored.value));
     if (state.revision !== stored.revision) throw Error("Habitat revision mismatch");
     return state;
@@ -96,7 +96,9 @@ export class ContactHabitat {
     const cited = new Set(assessment.evidenceIds), scores = new Map(assessment.scores.map(score => [score.runId, score]));
     const promoted = checkpoint.phase === "followup" && assessment.candidate !== null && checkpoint.episode.followups.length > 0 && cases.length >= 2
       && habitatDigest(state.champion) === checkpoint.baseDigest && habitatDigest(evidence(cases)) === checkpoint.evidenceDigest
-      && habitatDigest(assessment.candidate) !== checkpoint.baseDigest && assessment.scores.length === cases.length && scores.size === cases.length
+      && habitatDigest(assessment.candidate) !== checkpoint.baseDigest && !state.denied.includes(habitatDigest(assessment.candidate))
+      && assessment.candidate.webSearch === state.champion.webSearch && assessment.candidate.memeSearch === state.champion.memeSearch
+      && assessment.scores.length === cases.length && scores.size === cases.length
       && cited.size > 0 && [...cited].every(id => cases.some(value => value.followups.some(message => message.id === id)))
       && cases.every(value => value.followups.some(message => cited.has(message.id)) && scores.get(value.reply.runId)?.safe === true
         && scores.get(value.reply.runId)!.candidate >= scores.get(value.reply.runId)!.incumbent)
@@ -115,6 +117,7 @@ export class ContactHabitat {
   rollback(expectedRevision: number): void {
     const state = this.snapshot(), previous = state.ancestors.pop();
     if (state.revision !== expectedRevision || !previous) throw Error("Habitat rollback conflict");
+    state.denied = [...state.denied, habitatDigest(state.champion)].slice(-16);
     state.lineage.push({ key: `rollback-${expectedRevision}`, kind: "rollback", from: state.champion, to: previous, reason: "Explicit owner rollback" });
     state.lineage = state.lineage.slice(-16); state.champion = previous; this.save(state);
   }

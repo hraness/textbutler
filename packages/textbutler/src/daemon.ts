@@ -15,7 +15,7 @@ import { createProviderHost, type ManagedCodexAccountFactory } from "./provider-
 import type { NativeSubscriptionHost } from "./native-subscription.ts";
 import { createXcbSubscriptionHost } from "./xcb-host.ts";
 import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
-import { createGhostgetAutomationProcess } from "./ghostget-automation-process.ts";
+import { createSupervisedGhostgetAutomation } from "./ghostget-automation-process.ts";
 import { createAutomationOwnerPort } from "./automation-owner.ts";
 import { createDaemonReplyLoop } from "./reply-loop.ts";
 import { createFastDriver } from "./fast-driver.ts";
@@ -46,7 +46,7 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
   const custody = await DaemonCustody.acquire(dataDir, path);
   let service: TextbutlerControlService | undefined;
   let extensions: LoadedExtensions | undefined;
-  let messaging: Awaited<ReturnType<typeof createGhostgetAutomationProcess>> | undefined;
+  let messaging: Awaited<ReturnType<typeof createSupervisedGhostgetAutomation>> | undefined;
   let replyLoop: Awaited<ReturnType<typeof createDaemonReplyLoop>> | undefined;
   let nativeSubscriptions: NativeSubscriptionHost | undefined;
   const server = createServer();
@@ -76,7 +76,9 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
     nativeSubscriptions = options.nativeSubscriptions ?? (host.xcb === undefined ? undefined : await createXcbSubscriptionHost(host.xcb));
     let messagingUnavailable = false;
     if (host.ghostget?.automationAccounts) {
-      try { messaging = await createGhostgetAutomationProcess({ executable: host.ghostget.executable, providers: host.ghostget.automationAccounts, custodyDirectory: join(dataDir, "state"),
+      // The supervised client stays valid across child respawns; a custody
+      // claim that cannot be proven dead still fails startup as before.
+      try { messaging = await createSupervisedGhostgetAutomation({ executable: host.ghostget.executable, providers: host.ghostget.automationAccounts, custodyDirectory: join(dataDir, "state"),
         ...(host.ghostget.runtimeExecutable === undefined ? {} : { runtimeExecutable: host.ghostget.runtimeExecutable }), ...(host.ghostget.stateHome === undefined ? {} : { stateHome: host.ghostget.stateHome }) }); }
       catch { messagingUnavailable = true; }
     }
@@ -101,8 +103,13 @@ export async function startDaemon(options: { dataDir?: string; initialSettings?:
       habitat = { config, driver };
       service.setHabitatConfig(config);
     }
-    if (messaging) replyLoop = await createDaemonReplyLoop({ service, client: messaging.client, hooks: extensions.hooks,
-      ...(habitat === undefined ? {} : { habitat }), onStatus: value => service!.setRuntimeStatus(value) });
+    if (messaging) {
+      const supervised = messaging;
+      // Recovery state rides the existing messaging detail so status surfaces
+      // distinguish "recovering" from "running" and "needs attention".
+      replyLoop = await createDaemonReplyLoop({ service, client: supervised.client, hooks: extensions.hooks,
+        ...(habitat === undefined ? {} : { habitat }), onStatus: value => service!.setRuntimeStatus(supervised.recovery() ?? value) });
+    }
     else if (messagingUnavailable) service.setRuntimeStatus({ state: "unavailable", detail: "Ghostget automation setup or previous process custody needs owner attention. No automatic replies are running." });
   } catch (error) {
     const failures: unknown[] = [error];

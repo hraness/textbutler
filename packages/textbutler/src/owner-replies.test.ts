@@ -474,3 +474,51 @@ test("composition rejects missing contacts, incomplete catchup, excess actions a
   await expect(f.replies.compose("contact-1", "Review", [{ kind: "text", text: "Hello" }], AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "unavailable" });
   expect(f.replies.view(f.state).drafts).toEqual([]); expect(f.sent).toEqual([]);
 });
+
+test("reconcile resolves an uncertain send by observing the butler reply in history", async () => {
+  const fixture = await setup();
+  const journal = fixture.journal;
+  journal.claim("uncertain-1", "contact-1", "event-1", NOW);
+  journal.transition("uncertain-1", "running", "dispatching", "intent-recorded", NOW);
+  journal.transition("uncertain-1", "dispatching", "indeterminate", "outcome unknown", NOW);
+  // The reply actually landed: history carries the disclosed outgoing message
+  // inside the dispatch window, unjournaled because the receipt was lost.
+  fixture.messages.push({ ...fixture.messages[0]!, id: "landed-1", direction: "outgoing", text: "🤖{ Yes, 7 works. }", occurredAt: new Date(NOW + 60_000).toISOString() });
+  const result = await fixture.replies.reconcile("contact-1", undefined, AbortSignal.timeout(5000));
+  expect(result).toMatchObject({ contactId: "contact-1", runId: "uncertain-1", resolved: true, state: "submitted" });
+  expect(journal.hasUncertainSend("contact-1")).toBe(false);
+  // The observed message gains journal provenance for later history attribution.
+  expect(journal.isButlerMessage("contact-1", "landed-1")).toBe(true);
+  expect(journal.recent("contact-1")[0]?.reason).toContain("observed in conversation history");
+});
+
+test("reconcile without evidence leaves the run uncertain and reports it", async () => {
+  const fixture = await setup();
+  const journal = fixture.journal;
+  journal.claim("uncertain-1", "contact-1", "event-1", NOW);
+  journal.transition("uncertain-1", "running", "dispatching", "intent-recorded", NOW);
+  journal.transition("uncertain-1", "dispatching", "indeterminate", "outcome unknown", NOW);
+  const result = await fixture.replies.reconcile("contact-1", undefined, AbortSignal.timeout(5000));
+  expect(result).toMatchObject({ contactId: "contact-1", runId: "uncertain-1", resolved: false });
+  expect(result.detail).toContain("--failed");
+  expect(journal.hasUncertainSend("contact-1")).toBe(true);
+});
+
+test("owner attestation reconciles and unblocks the next send", async () => {
+  const fixture = await setup({ standingGrant: true });
+  const journal = fixture.journal;
+  journal.claim("uncertain-1", "contact-1", "event-1", NOW);
+  journal.transition("uncertain-1", "running", "dispatching", "intent-recorded", NOW);
+  journal.transition("uncertain-1", "dispatching", "indeterminate", "outcome unknown", NOW);
+  expect((await fixture.replies.reconcile("contact-1", "failed", AbortSignal.timeout(5000)))).toMatchObject({ resolved: true, state: "failed" });
+  expect(journal.hasUncertainSend("contact-1")).toBe(false);
+  const sent = await fixture.replies.send({ contactId: "contact-1", text: "Sendable again" }, AbortSignal.timeout(5000));
+  expect(sent.state).toBe("submitted");
+  expect(fixture.sent).toEqual([[{ kind: "text", text: "🤖{ Sendable again }" }]]);
+});
+
+test("reconcile refuses unconfigured contacts and reports clean contacts", async () => {
+  const fixture = await setup();
+  await expect(fixture.replies.reconcile("missing", "sent", AbortSignal.timeout(5000))).rejects.toMatchObject({ code: "invalid-request" });
+  expect((await fixture.replies.reconcile("contact-1", "sent", AbortSignal.timeout(5000)))).toMatchObject({ resolved: true, detail: "No send is awaiting reconciliation." });
+});

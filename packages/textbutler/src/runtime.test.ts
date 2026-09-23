@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { TRANSPORT_PROTOCOL, type ActionIntent, type PrepareRequest, type TextbutlerTransport } from "../../transport/src/index.ts";
 import { newContact, parseSettings, type Settings } from "./config.ts";
 import { Hooks } from "./hooks.ts";
+import { DriverFault } from "./fast-driver.ts";
 import { RunJournal } from "./journal.ts";
 import { ButlerRuntime, type ConversationSnapshot, type RuntimePorts } from "./runtime.ts";
 import type { MessageEvent } from "./decision.ts";
@@ -207,4 +208,33 @@ test("accepted message ids attribute disclosure-free sends to the butler", async
   expect((await fixture.runtime.process(event)).status).toBe("submitted");
   // History classifies this outgoing bare text through journal provenance, not the visible wrap.
   expect(fixture.journal.knownSentMessage("accepted:p1:0")).toBe(true);
+});
+
+test("a late cancel cannot abort a send already in dispatch", async () => {
+  const fixture = setup();
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  fixture.transport.submit = async (plan, _options, signal) => {
+    entered.resolve(); await release.promise;
+    // A real transport races this signal and would report the send as unknown;
+    // the dispatch guard must keep it from firing after the intent is journaled.
+    if (signal?.aborted) throw new Error("synthetic mid-dispatch abort");
+    return { ok: true, value: { planId: plan.id, runId: "receipt1", state: "submitted", submittedCount: plan.actions.length, totalCount: plan.actions.length, acceptedMessageIds: [], recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
+  };
+  const pending = fixture.runtime.process(event);
+  await entered.promise;
+  fixture.runtime.cancelContact("c1");
+  release.resolve();
+  expect((await pending).status).toBe("submitted");
+  expect(fixture.journal.recent("c1")[0]?.state).toBe("submitted");
+});
+
+test("driver faults surface a stable failure class instead of an opaque run-failed", async () => {
+  const fixture = setup();
+  fixture.ports.agent.compose = async () => { throw new DriverFault("budget", "Daily API budget exhausted"); };
+  const result = await fixture.runtime.process(event);
+  expect(result.status).toBe("failed");
+  expect(result.reason).toBe("run-failed:driver-budget");
+  expect(fixture.journal.recent("c1")[0]?.reason).toBe("run-failed:driver-budget");
+  fixture.ports.agent.compose = async () => { throw new DriverFault("output", "Driver output exceeded the contract"); };
+  expect((await fixture.runtime.process({ ...event, id: "m2" })).reason).toBe("run-failed:driver-output");
 });
