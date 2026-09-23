@@ -18,7 +18,7 @@ startup and the local installer do not supply its trusted runtime attestation.
 See [provider setup](PROVIDERS.md) before enabling a contact. Source and synthetic
 tests do not attest live delivery on a particular account. A minimal native
 TextButler.app hosts the verified runtime for app-specific macOS permissions.
-Local builds use an ad-hoc signature; they are not notarized public releases.
+Local builds use an ad-hoc or persistent owner certificate signature; they are not notarized public releases.
 
 ## First use
 

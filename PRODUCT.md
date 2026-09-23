@@ -65,7 +65,7 @@ profiles, and frozen shared message contracts. New source packages contain the
 Textbutler runtime, provider-independent transport and external xcb connection.
 Automated fixtures are synthetic. They are not evidence of live provider
 qualification or actual message delivery. The optional native app is built and
-ad-hoc signed on the owner's Mac; it is not a notarized public distribution.
+ad-hoc or owner-certificate signed on the owner's Mac; it is not a notarized public distribution.
 The CLI and menu-bar companion remain the user interfaces.
 
 ## Open Decisions and Working Defaults

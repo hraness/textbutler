@@ -31,6 +31,11 @@ test("app receipt cannot add fields, redirect executable identity, or change own
   await expect(readInstalledMacosApp({ ...f.expected, entrypoint: join(f.root, "other-entrypoint") })).rejects.toThrow();
   await expect(readInstalledMacosApp({ ...f.expected, dataDir: join(f.root, "other-data") })).resolves.toBeNull();
 });
+test("app receipt admits only the two known signing classes", async () => {
+  const f = await fixture();
+  expect(parseMacosAppIdentity({ ...f.identity, signing: "certificate" }).signing).toBe("certificate");
+  expect(() => parseMacosAppIdentity({ ...f.identity, signing: "developer-id" })).toThrow();
+});
 test("app verification rejects added code, linked receipts and shared writable artifacts", async () => {
   const f = await fixture(), contents = await readFile(f.receipt);
   await writeFile(join(f.identity.appPath, "Contents", "MacOS", "extra"), "unknown code", { mode: 0o700 });

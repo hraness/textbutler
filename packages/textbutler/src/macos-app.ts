@@ -7,7 +7,7 @@ export const MACOS_APP_BUNDLE_ID = "app.textbutler.desktop";
 export interface MacosAppIdentity {
   schemaVersion: 1;
   bundleId: typeof MACOS_APP_BUNDLE_ID;
-  signing: "ad-hoc";
+  signing: "ad-hoc" | "certificate";
   messagesBundleId: "com.apple.MobileSMS" | "com.apple.iChat";
   automationConsent: "native-api" | "synthetic";
   appPath: string;
@@ -33,7 +33,7 @@ export function macosAppPath(value: unknown): string {
 export function parseMacosAppIdentity(value: unknown): MacosAppIdentity {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail();
   const row = value as Record<string, unknown>;
-  if (Object.keys(row).sort().join(",") !== KEYS || row.schemaVersion !== 1 || row.bundleId !== MACOS_APP_BUNDLE_ID || row.signing !== "ad-hoc" || !["com.apple.MobileSMS", "com.apple.iChat"].includes(String(row.messagesBundleId)) || !["native-api", "synthetic"].includes(String(row.automationConsent))) fail();
+  if (Object.keys(row).sort().join(",") !== KEYS || row.schemaVersion !== 1 || row.bundleId !== MACOS_APP_BUNDLE_ID || !["ad-hoc", "certificate"].includes(String(row.signing)) || !["com.apple.MobileSMS", "com.apple.iChat"].includes(String(row.messagesBundleId)) || !["native-api", "synthetic"].includes(String(row.automationConsent))) fail();
   for (const key of PATH_KEYS) macosAppPath(row[key]);
   for (const key of HASH_KEYS) if (typeof row[key] !== "string" || !/^[a-f0-9]{64}$/u.test(row[key])) fail();
   if (row.appPath !== join(String(row.home), "Applications", "TextButler.app")) fail();
