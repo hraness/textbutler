@@ -5,9 +5,9 @@
   "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
   "result": {
     "exitCode": 0,
-    "passed": 259,
+    "passed": 262,
     "failed": 0,
-    "assertions": 2026,
+    "assertions": 2032,
     "files": 18
   },
   "additionalChecks": [
@@ -25,11 +25,11 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "06feaddde51abcb771b267f4fd02ad4e52eb942a0b098afc8019fb5dd7282438",
+  "sourceDigest": "43b1c090ff0252d1888ad7f10d6646ab25f7d5b1903653cb04de63b71afd3c28",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
-    "packages/textbutler/src/ghostget-automation-process.test.ts": "dec42d63445bd7cad94d4812c6376fbb01449968eb8f946b0691fc3648145a82",
+    "packages/textbutler/src/ghostget-automation-process.test.ts": "245d7e4ba4ae973ac217f84d41ccfeb9381411b66d042169521dfc1e0aa06937",
     "packages/textbutler/src/imessage-setup.test.ts": "2246b341b5bee2714dc58065cd534bc69e4a04a464b3e94f397a50342783dad5",
     "packages/textbutler/src/message-summary.test.ts": "286cd717f0741fd40ac8caa47df14c436e66697834446fdaaa3add283b387419",
     "packages/textbutler/src/messages-cli.test.ts": "c0c2db682378924bbaddfa81db831b652b92e9867dc037c1d4c78099df60a49e",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "be6e6c2485089649186876f0df2c04912ce1089a49e2b18c1a1e8e948b6dda85",
-  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun over the 0.8.18 release sources; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "9eb81937cd2fe8b993a5794effe18499c0f040568f7ccbe35020dd4ae4d7a87b",
+  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun over the 0.8.19 release sources; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal for the 0.8.18 release over reviewed main: package.json and site package versions advance to 0.8.18 with the changelog entry, generated dist and readme artifacts regenerated, carrying the certificate-signing app identity change merged in #161. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
+    "method": "Integration-owner reseal for the 0.8.19 release over reviewed main: package.json and site package versions advance to 0.8.19 with the changelog entry, generated dist and readme artifacts regenerated, carrying the launchd ProcessType correction and the progress-aware initialize watchdog plus group-scoped SIGKILL escalation. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -153,7 +153,7 @@
   },
   "inputSnapshot": {
     "count": 247,
-    "sha256": "f1ee8b1a46c2e7f97cd3d9596c181901fd73993dac34519680b96f8f3807037f",
+    "sha256": "e75f8571eea892b491d52cc33e08882029c687075f7dfde6357075cdbd14f75d",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -165,7 +165,7 @@
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
-      "package.json": "f4b15a7d70b1d1606232bdc9234085ccb456abe8f3748f1c5be4daab704b111d",
+      "package.json": "03cca0373fe56b0595fc52d1824bf3bb2ba9234b702ac127ea155f4c872ff08c",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
       "packages/control/src/index.ts": "582369440a0e5af38bf418b446480b43e8bf35a5676aabd2b4e5f7d907a656ac",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
@@ -186,8 +186,8 @@
       "packages/textbutler/src/decision.ts": "af8cd0bd8b196d14263242697ea8f426c068a7e6cf329b49077878ec2c910e01",
       "packages/textbutler/src/enrollment.test.ts": "4f8d83b6ea5a281a30423eb12ab7d41fac89ed2d9f7178e4b949d5e1168b4ff6",
       "packages/textbutler/src/enrollment.ts": "0a553c4364842a1643b2041302dba0635d7f56e8ee2afae3adc5a70113792e05",
-      "packages/textbutler/src/ghostget-automation-process.test.ts": "dec42d63445bd7cad94d4812c6376fbb01449968eb8f946b0691fc3648145a82",
-      "packages/textbutler/src/ghostget-automation-process.ts": "194c1af5d408e28736f9ab40276b1d59352796cbd8d89936126e6d68f0258e18",
+      "packages/textbutler/src/ghostget-automation-process.test.ts": "245d7e4ba4ae973ac217f84d41ccfeb9381411b66d042169521dfc1e0aa06937",
+      "packages/textbutler/src/ghostget-automation-process.ts": "5739aab2f79c508707422b43ebcd5404623ff38c710ec736173a12b25fb1735d",
       "packages/textbutler/src/ghostget-owner-read.test.ts": "7aea9da06f4095a6020060ee3719f6b31b083cbd8d0de2ee560443fe82beefbf",
       "packages/textbutler/src/ghostget-owner-read.ts": "d9b81d6e1ebb79b247bb8c967def7b4d4d922654ebd157dff065e2f06cb1ea19",
       "packages/textbutler/src/hooks.ts": "87603496f0454d1acd73393b8167bc421eec6e31067398dcfc2f3e28dd08f16f",
@@ -199,7 +199,7 @@
       "packages/textbutler/src/journal.test.ts": "22438a43cf9f655c840fcec1f0e7c63ed993e89d5c3f8373dcd7c34300b33920",
       "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
       "packages/textbutler/src/launch-agent.test.ts": "3120cbdbc362a87cef45059b5d07bff3de6306c323b5c7a7759cfd8eff80b0a3",
-      "packages/textbutler/src/launch-agent.ts": "16d63e713691a236071da04a77b348106ee2d822a586d0519d07a988bb59b589",
+      "packages/textbutler/src/launch-agent.ts": "ab2db5d4eb64b41ae4f95f9c624d68a6fac900826db5e9aa7f1fbe652fe30478",
       "packages/textbutler/src/macos-app.test.ts": "1725fc220eb1aabe727b0cb1ebfd5cef9b8ae2c80c02e6e8044918f3e4d8f1f5",
       "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
       "packages/textbutler/src/managed-codex-owner.test.ts": "848db23b6843d8c7473a5f476e3d0adfe57349a3e6ad4f40620f1cd6125ae32d",
@@ -253,7 +253,7 @@
       "packages/textbutler/src/xcb-host.test.ts": "2b0a5a41236edf44b4a1ee049c5245bd53df1f708d966113726daee9175969c6",
       "packages/textbutler/src/xcb-host.ts": "52d91bfd7ee6e970540f85de98e8669fcec66191e8b1e073934fea7fc180f87c",
       "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
-      "packages/textbutler/test-fixtures/ghostget-automation.ts": "fed39cfcaf9afce3d3d193a9ead14ba600186eda97749fa00938d272bb0987f4",
+      "packages/textbutler/test-fixtures/ghostget-automation.ts": "88d7a4f487e55d1f2a6d469efbe4f4bdad0a69cceb0f4ad4473baf5ce4584aa2",
       "packages/textbutler/test-fixtures/ghostget-owner.ts": "9e3134cce06ece726edac9758d5b3b3b562a848c97ba69ec7a3b4b46316a67b7",
       "packages/textbutler/tsconfig.json": "639cd9738fe64eb0f069f295a3ca5d6a9ec123aff8d8e1c63d288d128865c87b",
       "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
@@ -391,7 +391,7 @@
       "src/test-fixtures.ts": "3ac9802051d38c6d3ef92a842eb35ef1dedf8c9dd6424107b5054e4933d5e6bc",
       "src/test-x-archive-fixture.ts": "3461032a8c8bd2765c1c74c8616f442cbefd356b8f24401bb32241d4a967fa00",
       "src/types.ts": "fb3c0ffecae6900505b1bec8824ff0e24b12c8e12d742cb17250600a29d85aff",
-      "src/version.ts": "1c8410915493d6a715a8c4a468796c908aa83e017f8ccb2c2d961debd1413513",
+      "src/version.ts": "cba61d823c8b1654a1ddc1da2b570892ae633e46f9df5fb02fa45800b376995f",
       "src/whatsapp-source.test.ts": "c07fdbee0ea8b5b4f1b57f3c7101ff1a5ed62ed8d97f98597d26c1d9999aa1f4",
       "src/whatsapp-source.ts": "fd6daff5185ee81b3585c003eb1d0c07b4b4e788aa55c7b4bef0edca46f732f4",
       "src/x-archive-zip-rust.test.ts": "7fd66cb10f08a2102da3f6ca187b030ecd350580f37224d8c6b4aba7ff3093f7",
@@ -410,9 +410,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "de0bb4351e0b45c3114bff665870172ae216c3d6a0fe358f789635438e91ca61",
-    "evidenceSha256": "d7194c51747a4c62f3e7d17d8ffe0bd3a28e72db1c058f94627654c38cd9fb1c",
-    "logSha256": "be6e6c2485089649186876f0df2c04912ce1089a49e2b18c1a1e8e948b6dda85",
+    "validationSha256": "f052a7bfef3cbb8b520b60df37e827403d8574545e4a1140496e4b28a5d6658d",
+    "evidenceSha256": "2a256f977c37ca0aca513f9b75895f6b50e6a0376c3d0ad7edf78818c57edcb2",
+    "logSha256": "7d14454536febb5bb80ef2f35235028376fa551f614d774db22d535cde29db8d",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }

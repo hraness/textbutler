@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, open, readdir, readFile, realpath, rename, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
@@ -16,6 +16,9 @@ const MAX_FRAME = 24 * 1024 * 1024;
 const MAX_RESPONSE = 32 * 1024 * 1024;
 const MAX_ERROR = 65536;
 const CLEANUP_GRACE = 36000;
+const REQUEST_WATCHDOG_MS = 180_000;
+const INITIALIZE_PROGRESS_SAMPLE_MS = 10_000;
+const INITIALIZE_HARD_CAP_MS = 15 * 60_000;
 const RECOVERY_DELAYS_MS = [2_000, 10_000, 60_000, 300_000] as const;
 const RECOVERED_CUSTODY_LIMIT = 8;
 export const AUTOMATION_CUSTODY_FILE = "ghostget-automation-custody.json";
@@ -89,12 +92,48 @@ async function reclaimCustody(directory: string): Promise<CustodyReclaim> {
   return "reclaimed";
 }
 
+/** Cumulative CPU milliseconds across the recorded child's whole process
+ * group, so spawn-synchronous helper children count toward startup progress.
+ * A probe failure is unknown, never evidence of a stall or of process death. */
+export function probeGroupCpuMs(processGroup: number): number | undefined {
+  const bounded = (argv: readonly string[]): string | undefined => {
+    try {
+      const run = spawnSync(argv[0]!, argv.slice(1), { encoding: "utf8", timeout: 5_000 });
+      return run.status === 0 && typeof run.stdout === "string" ? run.stdout : undefined;
+    } catch { return undefined; }
+  };
+  const table = bounded(["/bin/ps", "-ax", "-o", "pgid=", "-o", "time="]);
+  if (table === undefined) return undefined;
+  let total = 0, members = 0;
+  for (const line of table.split("\n")) {
+    const match = /^\s*(\d+)\s+(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)(?:\.(\d+))?\s*$/u.exec(line);
+    if (match === null) continue;
+    if (Number(match[1]) !== processGroup) continue;
+    members += 1;
+    const fraction = match[6] === undefined ? 0 : Number(match[6]) * 1000 / 10 ** match[6].length;
+    total += (((Number(match[2] ?? 0) * 24 + Number(match[3] ?? 0)) * 60 + Number(match[4])) * 60 + Number(match[5])) * 1000 + fraction;
+  }
+  return members === 0 ? undefined : total;
+}
+
 /** Starts only a trusted owner-installed Ghostget CLI. Model requests cannot
  * choose executables, argv, providers, auth IDs, state paths or credentials.
  * A failed/forced shutdown preserves custody, including separately grouped
  * provider children. Exit of this immediate child alone is never sufficient. */
-export async function createGhostgetAutomationProcess(input: GhostgetAutomationProcessOptions) {
+export async function createGhostgetAutomationProcess(input: GhostgetAutomationProcessOptions, dependencies: {
+  /** Synthetic tests only: bounded timing and the group-CPU probe. */
+  requestWatchdogMs?: number;
+  initializeProgressSampleMs?: number;
+  initializeHardCapMs?: number;
+  cleanupGraceMs?: number;
+  probeGroupCpuMs?: (processGroup: number) => number | undefined;
+} = {}) {
   const options = structuredClone(input);
+  const requestWatchdogMs = dependencies.requestWatchdogMs ?? REQUEST_WATCHDOG_MS;
+  const initializeProgressSampleMs = dependencies.initializeProgressSampleMs ?? INITIALIZE_PROGRESS_SAMPLE_MS;
+  const initializeHardCapMs = dependencies.initializeHardCapMs ?? INITIALIZE_HARD_CAP_MS;
+  const cleanupGraceMs = dependencies.cleanupGraceMs ?? CLEANUP_GRACE;
+  const probeCpu = dependencies.probeGroupCpuMs ?? probeGroupCpuMs;
   for (const path of [options.executable, options.custodyDirectory, options.runtimeExecutable, options.stateHome]) if (path !== undefined && !isAbsolute(path)) throw new Error("Ghostget host paths must be absolute");
   if (!options.providers.length || options.providers.length > 3 || new Set(options.providers.map(row => row.provider)).size !== options.providers.length) throw new Error("One explicit account per messaging network is required");
   for (const row of options.providers) { automationProvider(row.provider); automationId(row.authId); }
@@ -133,11 +172,20 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   let rejectSettlement: ((reason: Error) => void) | undefined, resolveClosed: (() => void) | undefined, rejectClosed: ((reason: Error) => void) | undefined;
   const groupExists = () => { if (child.pid === undefined) return false; return groupAlive(child.pid); };
   const kill = (signal: NodeJS.Signals) => { if (child.pid !== undefined) { try { process.kill(-child.pid, signal); } catch { /* close owns the result */ } } };
-  const clear = (id: string, entry: Pending) => { pending.delete(id); clearTimeout(entry.timer); if (entry.abort) entry.signal?.removeEventListener("abort", entry.abort); };
+  const progress = new Map<string, ReturnType<typeof setInterval>>();
+  const clear = (id: string, entry: Pending) => {
+    pending.delete(id); clearTimeout(entry.timer);
+    const monitor = progress.get(id);
+    if (monitor !== undefined) { clearInterval(monitor); progress.delete(id); }
+    if (entry.abort) entry.signal?.removeEventListener("abort", entry.abort);
+  };
   const stop = () => {
     if (fault) return; fault = true;
     for (const [id, entry] of pending) { clear(id, entry); entry.reject(new AutomationOperationError("transport-unavailable")); }
-    kill("SIGTERM"); if (!exited) forceTimer = setTimeout(() => {
+    kill("SIGTERM");
+    // Escalation must not depend on the close event: a child whose stdio or
+    // process entry vanished can still leave a live recorded group behind.
+    if (groupExists()) forceTimer = setTimeout(() => {
       kill("SIGKILL");
       finalTimer = setTimeout(() => {
         // An inherited pipe or an unjoinable child must not trap the owner
@@ -147,7 +195,7 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
         rejectClosed?.(reason);
         rejectSettlement?.(reason);
       }, 5000);
-    }, CLEANUP_GRACE);
+    }, cleanupGraceMs);
   };
   const settled = new Promise<void>((resolve, reject) => {
     rejectSettlement = reject;
@@ -221,8 +269,25 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
     const id = randomUUID(), frame = JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id, method, params }) + "\n";
     if (Buffer.byteLength(frame) > MAX_FRAME) return Promise.reject(new Error("Ghostget request exceeds its frame bound"));
     return new Promise((resolve, reject) => {
-      const entry: Pending = { resolve, reject, timer: setTimeout(stop, 180000) };
+      const entry: Pending = { resolve, reject, timer: setTimeout(stop, requestWatchdogMs) };
       pending.set(id, entry);
+      // Startup is legitimately slow on a loaded host: the watchdog re-arms
+      // only while the recorded group proves CPU progress, so a frozen child
+      // still dies on the original deadline and a working one is never cut
+      // off mid-initialize. Nothing about progress weakens the hard cap.
+      if (method === "initialize" && child.pid !== undefined) {
+        const dispatchedAt = Date.now(), pgid = child.pid;
+        let observed: number | undefined;
+        const monitor = setInterval(() => {
+          const current = probeCpu(pgid);
+          if (current === undefined) return;
+          if (observed !== undefined && current > observed && Date.now() - dispatchedAt < initializeHardCapMs) {
+            clearTimeout(entry.timer); entry.timer = setTimeout(stop, requestWatchdogMs);
+          }
+          observed = current;
+        }, initializeProgressSampleMs);
+        monitor.unref?.(); progress.set(id, monitor);
+      }
       child.stdin.write(frame, error => { if (error) stop(); });
     });
   };

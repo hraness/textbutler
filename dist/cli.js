@@ -25088,7 +25088,7 @@ function commandPlatformLive(io, cleanupFailure) {
 import { isAbsolute as isAbsolute7, resolve as resolve8 } from "path";
 
 // src/version.ts
-var MESSAGE_LIKE_ME_VERSION = "0.8.18";
+var MESSAGE_LIKE_ME_VERSION = "0.8.19";
 
 // src/command-input.ts
 var HELP = `Message Like Me ${MESSAGE_LIKE_ME_VERSION}
