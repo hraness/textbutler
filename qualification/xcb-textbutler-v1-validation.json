@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "a6ea089ea6b753d0d822df02a67c279ccee793b70df5a4972691eb26d07e466b",
+  "sourceDigest": "06feaddde51abcb771b267f4fd02ad4e52eb942a0b098afc8019fb5dd7282438",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "aee0fc2dfd425935448b77ec259775d81507b59e0aaa95caaa93d888ebabff48",
-  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun with the certificate-signing inputs; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "be6e6c2485089649186876f0df2c04912ce1089a49e2b18c1a1e8e948b6dda85",
+  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun over the 0.8.18 release sources; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal of the app-signing identity change on the reviewed main head: MacosAppIdentity.signing now admits 'ad-hoc' or 'certificate', and scripts/macos-textbutler-app.ts accepts an explicit --signing-identity for build so a persistent owner certificate keeps macOS permission grants bound across app rebuilds while ad-hoc remains the default. The managed-upgrade permission-target check still refuses signing-class changes, so ad-hoc-to-certificate transition uses the supported fresh-install path. The coupled 18-file synthetic suite and both package typechecks were rerun with the new inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
+    "method": "Integration-owner reseal for the 0.8.18 release over reviewed main: package.json and site package versions advance to 0.8.18 with the changelog entry, generated dist and readme artifacts regenerated, carrying the certificate-signing app identity change merged in #161. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -153,7 +153,7 @@
   },
   "inputSnapshot": {
     "count": 247,
-    "sha256": "49ae4030dcb8e29abbcd118d0c253e865d06abb7d67eccac3c78b5fd14a29e9d",
+    "sha256": "f1ee8b1a46c2e7f97cd3d9596c181901fd73993dac34519680b96f8f3807037f",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
@@ -165,7 +165,7 @@
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
-      "package.json": "43a438002949281d86a8569955c3bb1054040955f0ac10472ffbd3ac3bb9f761",
+      "package.json": "f4b15a7d70b1d1606232bdc9234085ccb456abe8f3748f1c5be4daab704b111d",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
       "packages/control/src/index.ts": "582369440a0e5af38bf418b446480b43e8bf35a5676aabd2b4e5f7d907a656ac",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
@@ -391,7 +391,7 @@
       "src/test-fixtures.ts": "3ac9802051d38c6d3ef92a842eb35ef1dedf8c9dd6424107b5054e4933d5e6bc",
       "src/test-x-archive-fixture.ts": "3461032a8c8bd2765c1c74c8616f442cbefd356b8f24401bb32241d4a967fa00",
       "src/types.ts": "fb3c0ffecae6900505b1bec8824ff0e24b12c8e12d742cb17250600a29d85aff",
-      "src/version.ts": "09f9ccb311c8b737a6346ce4df7083b6f307e2c09c7051082ae0139528858b72",
+      "src/version.ts": "1c8410915493d6a715a8c4a468796c908aa83e017f8ccb2c2d961debd1413513",
       "src/whatsapp-source.test.ts": "c07fdbee0ea8b5b4f1b57f3c7101ff1a5ed62ed8d97f98597d26c1d9999aa1f4",
       "src/whatsapp-source.ts": "fd6daff5185ee81b3585c003eb1d0c07b4b4e788aa55c7b4bef0edca46f732f4",
       "src/x-archive-zip-rust.test.ts": "7fd66cb10f08a2102da3f6ca187b030ecd350580f37224d8c6b4aba7ff3093f7",
@@ -410,9 +410,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "218387cd677e092d63d1729d661038f918ae98077b0faee9ad2b45032f6fb031",
-    "evidenceSha256": "ac9e61078f2bb6ca0a3307bcd02e6b36a977b17a32df444456e8f7077c9b8dc9",
-    "logSha256": "aee0fc2dfd425935448b77ec259775d81507b59e0aaa95caaa93d888ebabff48",
+    "validationSha256": "de0bb4351e0b45c3114bff665870172ae216c3d6a0fe358f789635438e91ca61",
+    "evidenceSha256": "d7194c51747a4c62f3e7d17d8ffe0bd3a28e72db1c058f94627654c38cd9fb1c",
+    "logSha256": "be6e6c2485089649186876f0df2c04912ce1089a49e2b18c1a1e8e948b6dda85",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }
