@@ -13,7 +13,9 @@ export const LAUNCH_AGENT_LABEL = "app.textbutler.daemon";
 type LaunchAgentLabel = typeof LAUNCH_AGENT_LABEL;
 const MAX_BYTES = 65_536;
 type Phase = "prepared" | "installing" | "installed" | "removing" | "uncertain-install" | "uncertain-remove";
-type Receipt = { label: LaunchAgentLabel; uid: number; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string; phase: Phase; servicePid: number | null } & ({ schemaVersion: 1 | 2 } | { schemaVersion: 3; application: MacosAppIdentity });
+type Receipt = { label: LaunchAgentLabel; uid: number; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string; phase: Phase; servicePid: number | null } & ({ schemaVersion: 1 | 2 } | { schemaVersion: 3; application: MacosAppIdentity } | { schemaVersion: 4; application: MacosAppIdentity | null; plistText: string });
+/** Everything render needs; a version-4 receipt also records the result. */
+type RenderableReceipt = { label: LaunchAgentLabel; schemaVersion: number; application?: MacosAppIdentity | null; home: string; dataDir: string; runtime: string; entrypoint: string; generation: string };
 type FileSnapshot = { text: string; dev: number; ino: number };
 export type LaunchctlResult = { outcome: "completed" | "indeterminate"; exitCode: number | null; stdout: string; stderr: string };
 export interface LaunchAgentHost {
@@ -58,8 +60,8 @@ export function isolatedBunInvocation(options: { home: string; runtime: string; 
     ...(options.generation === undefined ? [] : [`TEXTBUTLER_LAUNCH_AGENT_GENERATION=${options.generation}`]),
     options.runtime, "--config=/dev/null", "--cwd=/", "--no-env-file", options.entrypoint, ...options.args] };
 }
-function argsFor(receipt: Receipt): readonly string[] {
-  if (receipt.schemaVersion === 3) return [macosAppExecutable(receipt.application), "--daemon"];
+function argsFor(receipt: RenderableReceipt): readonly string[] {
+  if (receipt.application != null) return [macosAppExecutable(receipt.application), "--daemon"];
   // Keep the old bytes recognizable so an existing service can be removed
   // safely before replacing its startup contract.
   if (receipt.schemaVersion === 1) return ["/usr/bin/env", "-i", `HOME=${receipt.home}`, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", `TEXTBUTLER_LAUNCH_AGENT_GENERATION=${receipt.generation}`, receipt.runtime, "--no-env-file", receipt.entrypoint, "daemon", "run", "--data-dir", receipt.dataDir];
@@ -67,20 +69,28 @@ function argsFor(receipt: Receipt): readonly string[] {
   return [invocation.executable, ...invocation.args];
 }
 function plistPath(home: string, label: LaunchAgentLabel = LAUNCH_AGENT_LABEL): string { return join(home, "Library", "LaunchAgents", `${label}.plist`); }
-function render(receipt: Receipt): string {
-  const application = receipt.schemaVersion === 3 ? `<key>AssociatedBundleIdentifiers</key><array><string>${xml(receipt.application.bundleId)}</string></array>\n<key>EnvironmentVariables</key><dict><key>TEXTBUTLER_LAUNCH_AGENT_GENERATION</key><string>${receipt.generation}</string></dict>\n` : "";
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n${application}<key>WorkingDirectory</key><string>${xml(receipt.schemaVersion === 1 ? receipt.dataDir : "/")}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>${receipt.schemaVersion === 3 ? 60 : 15}</integer>\n<key>ProcessType</key><string>Standard</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
+function render(receipt: RenderableReceipt): string {
+  // Earlier schemas must keep their historical bytes so a newer binary still
+  // recognizes, reports and removes the artifact it recorded then. Only the
+  // current schema renders the current contract.
+  const application = receipt.application != null ? `<key>AssociatedBundleIdentifiers</key><array><string>${xml(receipt.application.bundleId)}</string></array>\n<key>EnvironmentVariables</key><dict><key>TEXTBUTLER_LAUNCH_AGENT_GENERATION</key><string>${receipt.generation}</string></dict>\n` : "";
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n${application}<key>WorkingDirectory</key><string>${xml(receipt.schemaVersion === 1 ? receipt.dataDir : "/")}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>${receipt.application != null ? 60 : 15}</integer>\n<key>ProcessType</key><string>${receipt.schemaVersion === 4 ? "Standard" : "Background"}</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
 }
+/** The exact artifact a receipt binds: recorded bytes for schema 4, the
+ * historical render for older receipts. Verification never re-derives the
+ * current template, so contract changes cannot strand an installed service. */
+function expectedPlistText(receipt: Receipt): string { return receipt.schemaVersion === 4 ? receipt.plistText : render(receipt); }
 
 function parseReceipt(text: string, host: LaunchAgentHost, dataDir: string): Receipt {
   const item: unknown = JSON.parse(text);
   if (!item || typeof item !== "object" || Array.isArray(item)) fail("Invalid LaunchAgent receipt.");
   const r = item as Record<string, unknown>;
   const label = LAUNCH_AGENT_LABEL;
-  const keys = `${r.schemaVersion === 3 ? "application," : ""}dataDir,entrypoint,generation,home,label,phase,runtime,schemaVersion,servicePid,uid`;
-  if (Object.keys(r).sort().join(",") !== keys || r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 || r.label !== label || r.uid !== host.uid || r.home !== host.home || r.dataDir !== dataDir || typeof r.generation !== "string" || !/^[0-9a-f-]{36}$/u.test(r.generation) || !["prepared", "installing", "installed", "removing", "uncertain-install", "uncertain-remove"].includes(String(r.phase)) || r.servicePid !== null && (!Number.isSafeInteger(r.servicePid) || Number(r.servicePid) < 1 || Number(r.servicePid) > 2 ** 31 - 1)) fail("The LaunchAgent receipt does not match this owner and data directory.");
+  const keys = `${r.schemaVersion === 3 || r.schemaVersion === 4 ? "application," : ""}dataDir,entrypoint,generation,home,label,phase,${r.schemaVersion === 4 ? "plistText," : ""}runtime,schemaVersion,servicePid,uid`;
+  if (Object.keys(r).sort().join(",") !== keys || r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 || r.label !== label || r.uid !== host.uid || r.home !== host.home || r.dataDir !== dataDir || typeof r.generation !== "string" || !/^[0-9a-f-]{36}$/u.test(r.generation) || !["prepared", "installing", "installed", "removing", "uncertain-install", "uncertain-remove"].includes(String(r.phase)) || r.servicePid !== null && (!Number.isSafeInteger(r.servicePid) || Number(r.servicePid) < 1 || Number(r.servicePid) > 2 ** 31 - 1)) fail("The LaunchAgent receipt does not match this owner and data directory.");
   path(r.home); path(r.dataDir); path(r.runtime); path(r.entrypoint);
-  if (r.schemaVersion === 3) {
+  if (r.schemaVersion === 4 && (typeof r.plistText !== "string" || Buffer.byteLength(r.plistText) > MAX_BYTES || !r.plistText.startsWith('<?xml version="1.0" encoding="UTF-8"?>') || !r.plistText.includes(`<key>Label</key><string>${label}</string>`))) fail("The LaunchAgent receipt does not match this owner and data directory.");
+  if (r.schemaVersion === 3 || r.schemaVersion === 4 && r.application !== null) {
     const app = parseMacosAppIdentity(r.application);
     for (const key of ["home", "dataDir", "runtime", "entrypoint"] as const) if (app[key] !== r[key]) fail("The recorded TextButler app does not match its service.");
   }
@@ -142,7 +152,7 @@ function parseJob(result: LaunchctlResult, receipt: Receipt | null, host: Launch
   const field = (key: string): string | null => { const values = lines.filter(line => line.startsWith(`${key} = `)); return values.length === 1 ? values[0]!.slice(key.length + 3) : null; };
   const start = lines.indexOf("arguments = {"); const end = lines.indexOf("}", start + 1);
   if (field("path") !== plistPath(host.home, label) || field("program") !== argsFor(receipt)[0] || start === -1 || end === -1 || JSON.stringify(lines.slice(start + 1, end)) !== JSON.stringify(argsFor(receipt))) return unknown;
-  if (receipt.schemaVersion === 3 && macosLaunchGeneration(result.stdout) !== receipt.generation) return unknown;
+  if ("application" in receipt && receipt.application != null && macosLaunchGeneration(result.stdout) !== receipt.generation) return unknown;
   const pidText = field("pid"); const pid = pidText !== null && /^[1-9][0-9]*$/u.test(pidText) ? Number(pidText) : null;
   if (pid !== null && (!Number.isSafeInteger(pid) || pid > 2 ** 31 - 1)) return unknown;
   return { state: "owned", running: field("state") === "running" && pid !== null, pid };
@@ -173,6 +183,17 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
   const label = LAUNCH_AGENT_LABEL;
   const target = `gui/${host.uid}/${label}`, plist = plistPath(host.home, label);
   const view = (installation: LaunchAgentStatus["installation"], job: Job, detail: string): LaunchAgentStatus => ({ label, installation, service: job.state === "absent" ? "not-loaded" : job.state === "unknown" ? "unknown" : job.running ? "running" : "loaded", plistPath: plist, pid: job.pid, detail, automaticReplies: "unavailable" });
+  const newReceipt = (application: MacosAppIdentity | null, dataDir: string): Receipt => {
+    const base: RenderableReceipt & { schemaVersion: 4 } = { schemaVersion: 4, application, label, home: host.home, dataDir, runtime: host.runtime, entrypoint: host.entrypoint, generation: randomUUID() };
+    return { ...base, application, uid: host.uid, phase: "prepared", servicePid: null, plistText: render(base) };
+  };
+  // Advance a receipt whose service is not running to the current contract.
+  // Schema 4 records the rendered plist, so later contract changes verify
+  // against recorded bytes instead of whatever the current binary renders.
+  const migrateReceipt = (receipt: Receipt, application: MacosAppIdentity | null): Receipt => {
+    const base: RenderableReceipt & { schemaVersion: 4 } = { schemaVersion: 4, application, label, home: receipt.home, dataDir: receipt.dataDir, runtime: receipt.runtime, entrypoint: receipt.entrypoint, generation: receipt.generation };
+    return { ...base, application, uid: receipt.uid, phase: receipt.phase, servicePid: null, plistText: render(base) };
+  };
   const inspect = async (dataDir: string) => {
     path(host.home); path(dataDir); await directory(host.home, host.uid, false);
     for (const parent of [join(host.home, "Library"), dirname(plist), dataDir, join(dataDir, "state")]) {
@@ -181,7 +202,7 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
     const receiptFile = join(dataDir, "state", "launch-agent.json");
     const stored = await readOwned(receiptFile, host.uid); const receipt = stored ? parseReceipt(stored.text, host, dataDir) : null;
     const installed = await readOwned(plist, host.uid);
-    if (installed && (!receipt || installed.text !== render(receipt))) fail("The LaunchAgent plist is not the exact recorded Textbutler artifact.");
+    if (installed && (!receipt || installed.text !== expectedPlistText(receipt))) fail("The LaunchAgent plist is not the exact recorded Textbutler artifact.");
     const job = parseJob(await host.run(["print", target]), receipt, host);
     return { receiptFile, stored, receipt, installed, job };
   };
@@ -223,21 +244,28 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
       return await locked(dataDir, async () => {
         const state = await inspect(dataDir);
         if (state.job.state === "unknown") fail("Existing LaunchAgent service ownership cannot be verified.");
-        let receipt: Receipt = state.receipt ?? { ...(application ? { schemaVersion: 3 as const, application } : { schemaVersion: 2 as const }), label, uid: host.uid, home: host.home, dataDir, runtime: host.runtime, entrypoint: host.entrypoint, generation: randomUUID(), phase: "prepared", servicePid: null };
+        let receipt: Receipt = state.receipt ?? newReceipt(application, dataDir);
         if (receipt.schemaVersion === 1) fail("The recorded service uses the previous startup contract. Uninstall it, then install again to apply startup isolation; owner settings are retained.");
         if (receipt.runtime !== host.runtime || receipt.entrypoint !== host.entrypoint) fail("The installed LaunchAgent uses another runtime or entrypoint. Uninstall it before changing its launch identity.");
-        if (JSON.stringify(receipt.schemaVersion === 3 ? receipt.application : null) !== JSON.stringify(application)) fail("The installed LaunchAgent uses another app identity. Uninstall it before changing its launch identity; owner settings are retained.");
+        const recordedApp = "application" in receipt ? receipt.application : null;
+        if (JSON.stringify(recordedApp ?? null) !== JSON.stringify(application)) fail("The installed LaunchAgent uses another app identity. Uninstall it before changing its launch identity; owner settings are retained.");
         if (state.job.state === "owned") {
           if (!state.installed || !state.stored) fail("The loaded service is missing its exact installation artifacts.");
           if (["removing", "uncertain-remove"].includes(receipt.phase)) fail("A previous removal is still uncertain; do not race it with another operation.");
+          if (receipt.schemaVersion < 4) fail("The recorded service uses an earlier launch contract. Uninstall it, then install again to apply the current contract; owner settings are retained.");
           if (receipt.phase !== "installed" || receipt.servicePid !== state.job.pid) await updateFile(state.receiptFile, state.stored, `${JSON.stringify({ ...receipt, phase: "installed", servicePid: state.job.pid })}\n`, host.uid);
           return view("installed", state.job, "The exact owner LaunchAgent is already loaded; no duplicate bootstrap was requested.");
         }
         if (receipt.phase !== "prepared" && receipt.phase !== "installed") fail("A prior LaunchAgent operation is uncertain; do not repeat it blindly.");
+        // No service is running: an older recorded contract is advanced in
+        // place so its artifacts verify against the recorded plist bytes.
+        if (receipt.schemaVersion === 2 || receipt.schemaVersion === 3) receipt = migrateReceipt(receipt, application);
         try { await lstat(daemonSocketPath(dataDir)); fail("An existing daemon socket must be reconciled before bootstrapping a service."); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
         let stored = state.stored;
-        if (!stored) stored = await updateFile(state.receiptFile, null, `${JSON.stringify(receipt)}\n`, host.uid);
-        if (!state.installed) await updateFile(plist, null, render(receipt), host.uid);
+        const serialized = `${JSON.stringify(receipt)}\n`;
+        if (stored === null || stored.text !== serialized) stored = await updateFile(state.receiptFile, stored, serialized, host.uid);
+        const plistText = expectedPlistText(receipt);
+        if (state.installed === null || state.installed.text !== plistText) await updateFile(plist, state.installed, plistText, host.uid);
         receipt = { ...receipt, phase: "installing" }; stored = await updateFile(state.receiptFile, stored, `${JSON.stringify(receipt)}\n`, host.uid);
         const result = await host.run(["bootstrap", `gui/${host.uid}`, plist]);
         const job = parseJob(await host.run(["print", target]), receipt, host);
