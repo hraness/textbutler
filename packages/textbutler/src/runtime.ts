@@ -5,6 +5,7 @@ import { disclose, disclosureMarkers, parseSettings, type ContactSettings, type 
 import { decideReply, type ConversationState, type MessageEvent } from "./decision.ts";
 import { Hooks, type HookContext } from "./hooks.ts";
 import { RunJournal, type RunState } from "./journal.ts";
+import { DriverFault } from "./fast-driver.ts";
 
 export type ConversationSnapshot = Readonly<{ state: ConversationState; contextId: string; messageIds: readonly string[] }>;
 export type AgentRequest = Readonly<{ runId: string; contact: ContactSettings; event: MessageEvent; signal: AbortSignal; capabilities?: readonly string[] }>;
@@ -47,9 +48,13 @@ function composeResult(value: unknown, contact: ContactSettings): readonly Actio
 
 export class ButlerRuntime {
   private readonly active = new Map<string, AbortController>();
+  private readonly dispatching = new Set<string>();
   private readonly clock: () => number;
   constructor(private readonly ports: RuntimePorts) { this.clock = ports.clock ?? Date.now; }
-  cancelContact(id: string): void { this.active.get(id)?.abort(); }
+  /** A new event cancels only pre-dispatch work. Once send intent is recorded the
+   * transport's atomic context check arbitrate the send; aborting mid-dispatch
+   * would only manufacture an indeterminate outcome. */
+  cancelContact(id: string): void { if (!this.dispatching.has(id)) this.active.get(id)?.abort(); }
   pause(): void { for (const controller of this.active.values()) controller.abort(); }
   private async refresh(contact: ContactSettings, event: MessageEvent): Promise<ConversationSnapshot> {
     const snapshot = await this.ports.refresh(contact, event);
@@ -105,7 +110,12 @@ export class ButlerRuntime {
       if (!currentContact || currentContact.revision !== contact.revision || currentContact.routeId !== contact.routeId) return finish("cancelled", "settings-changed");
       const refreshed = await this.refresh(currentContact, event);
       const lastDecision = decideReply(current, currentContact, event, refreshed.state, this.clock(), admittedAt);
-      if (controller.signal.aborted || !["reply", "classify"].includes(lastDecision.outcome) || refreshed.state.latestRevision !== snapshot.state.latestRevision || refreshed.contextId !== snapshot.contextId) return finish("cancelled", "conversation-changed");
+      // A pinned run already absorbed a continuous stream to its cap: newer
+      // contact messages queue behind it instead of restarting it forever.
+      // Pause, settings, owner activity and stale context still cancel it.
+      const stillReply = ["reply", "classify"].includes(lastDecision.outcome) || (event.pinned === true && lastDecision.reason === "superseded");
+      if (controller.signal.aborted || !stillReply
+        || (event.pinned !== true && (refreshed.state.latestRevision !== snapshot.state.latestRevision || refreshed.contextId !== snapshot.contextId))) return finish("cancelled", "conversation-changed");
       const plan = await this.ports.transport.prepare({ intentId: runId, conversationId: contact.routeId, contextId: refreshed.contextId, actions });
       if (!plan.ok) return finish("failed", plan.error.code);
       if (controller.signal.aborted) return finish("cancelled", "cancelled");
@@ -118,6 +128,7 @@ export class ButlerRuntime {
       if (controller.signal.aborted || dispatchSettings.paused || !dispatchSettings.contacts.some(c => c.id === contact.id && c.enabled && c.revision === contact.revision && c.pausedUntil <= this.clock())) return finish("cancelled", "cancelled-at-dispatch");
       this.ports.journal.transition(runId, "running", "dispatching", "intent-recorded", this.clock(), plan.value.digest);
       state = "dispatching";
+      this.dispatching.add(contact.id);
       const receipt = await this.ports.transport.submit(plan.value, { mode: "delegated", grantId: grant }, controller.signal);
       if (!receipt.ok) return finish("indeterminate", "dispatch-result-unknown");
       if (receipt.value.acceptedMessageIds) this.ports.journal.recordSentMessages(contact.id, receipt.value.runId, receipt.value.acceptedMessageIds, this.clock());
@@ -129,13 +140,17 @@ export class ButlerRuntime {
       return result;
     } catch (error) {
       if (state === "running" && error instanceof NoReplyNeeded) return finish("ignored", "agent-silent");
-      const result = finish(state === "dispatching" ? "indeterminate" : controller.signal.aborted ? "cancelled" : "failed", state === "dispatching" ? "dispatch-result-unknown" : "run-failed");
+      const failureClass = error instanceof DriverFault ? `run-failed:driver-${error.kind}`
+        : error instanceof Error && error.message.startsWith("Hook timed out") ? "run-failed:hook" : "run-failed";
+      const result = finish(state === "dispatching" ? "indeterminate" : controller.signal.aborted ? "cancelled" : "failed",
+        state === "dispatching" ? "dispatch-result-unknown" : failureClass);
       try { await this.ports.hooks.emit("run.failed", hook); } catch { /* No retry caused by a hook. */ }
       return result;
     } finally {
       clearTimeout(timeout);
       controller.abort();
       this.active.delete(contact.id);
+      this.dispatching.delete(contact.id);
     }
   }
 }

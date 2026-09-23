@@ -1,10 +1,22 @@
 import { expect, test } from "bun:test";
 import { RunJournal } from "./journal.ts";
-import { ContactHabitat, DEFAULT_HABITAT_PLAN, parseHabitatPlan, type HabitatObservation, type HabitatReply } from "./contact-habitat.ts";
+import { ContactHabitat, DEFAULT_HABITAT_PLAN, habitatDigest, parseHabitatPlan, type HabitatObservation, type HabitatPlan, type HabitatReply } from "./contact-habitat.ts";
 
 const at = Date.parse("2026-09-20T12:00:00.000Z");
 const message = (id: string, time = at, author: HabitatObservation["author"] = "contact"): HabitatObservation => ({ id, at: time, author, kind: "message", text: "A synthetic question", relatedMessageId: null });
 const reply = (id = "run-1", time = at): HabitatReply => ({ runId: id, at: time, intent: "Explain the answer briefly", trigger: message(`trigger-${id}`, time - 1000), context: [], messageIds: [`sent-${id}`], text: "A synthetic answer", planDigest: null });
+const improved = (runIds: [string, string], evidenceIds: string[], candidate: HabitatPlan | null) => ({ candidate, reason: "Both examples improved", evidenceIds,
+  scores: runIds.map((runId, index) => ({ runId, incumbent: 0.6, candidate: 0.8 + index * 0.1, safe: true })) });
+const followupCheckpoint = (habitat: ContactHabitat) => {
+  habitat.record(reply()); habitat.observe(message("feedback-1", at + 1, "owner"), at + 1);
+  habitat.observe(message("more-1", at + 2), at + 2); habitat.observe(message("more-2", at + 3), at + 3);
+  habitat.finish(habitat.claim(at + 1)!, { reason: "Initial", candidate: null, scores: [], evidenceIds: [] });
+  habitat.finish(habitat.claim(at + 31_001)!, { reason: "Need more evidence", candidate: null, scores: [], evidenceIds: [] });
+  habitat.record(reply("run-2", at + 60_000)); habitat.observe(message("feedback-2", at + 60_001), at + 60_001);
+  habitat.observe(message("more-3", at + 60_002), at + 60_002); habitat.observe(message("more-4", at + 60_003), at + 60_003);
+  habitat.finish(habitat.claim(at + 60_001)!, { reason: "Initial", candidate: null, scores: [], evidenceIds: [] });
+  return habitat.claim(at + 91_003)!;
+};
 
 test("habitats are isolated, reads are inert, and replayed reply observations are idempotent", () => {
   const journal = RunJournal.memory();
@@ -87,6 +99,50 @@ test("only evidence-bound improvement with no case regressions promotes; rollbac
     expect(() => habitat.rollback(revision)).toThrow();
     expect(() => habitat.rollback(habitat.snapshot().revision)).toThrow();
     expect(habitat.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN);
+  } finally { journal.close(); }
+});
+
+test("evolution cannot flip egress flags; identical flags still promote", () => {
+  const plan = { ...DEFAULT_HABITAT_PLAN, guidance: "Prefer concise explanations." };
+  for (const flip of [{ webSearch: true }, { memeSearch: false }]) {
+    const journal = RunJournal.memory();
+    try {
+      const habitat = new ContactHabitat(journal, "contact-a");
+      expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], { ...plan, ...flip }))).toBe(false);
+      expect(habitat.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN);
+      expect(habitat.snapshot().evaluations.at(-1)?.status).toBe("retained");
+    } finally { journal.close(); }
+  }
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a");
+    expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], plan))).toBe(true);
+    expect(habitat.snapshot().champion).toEqual(plan);
+  } finally { journal.close(); }
+});
+
+test("a rolled-back plan is denied re-promotion by a later evaluation", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), plan = { ...DEFAULT_HABITAT_PLAN, guidance: "Prefer concise explanations with one example." };
+    expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], plan))).toBe(true);
+    habitat.rollback(habitat.snapshot().revision);
+    expect(habitat.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN);
+    expect(habitat.snapshot().denied).toEqual([habitatDigest(plan)]);
+    habitat.record(reply("run-3", at + 120_000)); habitat.observe(message("feedback-3", at + 120_001), at + 120_001);
+    habitat.observe(message("more-5", at + 120_002), at + 120_002); habitat.observe(message("more-6", at + 120_003), at + 120_003);
+    habitat.finish(habitat.claim(at + 120_001)!, { reason: "Initial", candidate: null, scores: [], evidenceIds: [] });
+    expect(habitat.finish(habitat.claim(at + 151_003)!, improved(["run-2", "run-3"], ["feedback-2", "feedback-3"], plan))).toBe(false);
+    expect(habitat.snapshot().evaluations.at(-1)?.status).toBe("retained");
+    expect(habitat.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN);
+  } finally { journal.close(); }
+});
+
+test("states stored before rollback tombstones still parse", () => {
+  const journal = RunJournal.memory();
+  try {
+    journal.writeHabitatState("contact-a", 0, JSON.stringify({ version: 1, revision: 1, champion: DEFAULT_HABITAT_PLAN, episodes: [], evaluations: [], lineage: [], ancestors: [] }));
+    expect(new ContactHabitat(journal, "contact-a").snapshot().denied).toEqual([]);
   } finally { journal.close(); }
 });
 

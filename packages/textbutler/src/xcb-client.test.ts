@@ -90,6 +90,17 @@ test("capabilities distinguish unsafe, changed and unavailable executables befor
   await rm(f.config.executable);
   await expect(f.client.capabilities(new AbortController().signal)).rejects.toMatchObject({ code: "executable-unavailable" });
 });
+test("the verified-executable cache still enforces permissions, identity and later changes", async () => {
+  const f = await fixture(`if(process.argv.at(-1)!=="--capabilities" || await Bun.stdin.text()!=="")process.exit(2);console.log(${JSON.stringify(JSON.stringify(wireCapabilities))});`);
+  expect(await f.client.capabilities(new AbortController().signal)).toMatchObject({ supported: true });
+  expect(await f.client.capabilities(new AbortController().signal)).toMatchObject({ supported: true });
+  // A permission change does not alter the cached identity tuple yet must
+  // still fail closed before spawn.
+  await chmod(f.config.executable, 0o777);
+  await expect(f.client.capabilities(new AbortController().signal)).rejects.toMatchObject({ code: "executable-unsafe" });
+  await chmod(f.config.executable, 0o700); await writeFile(f.config.executable, "changed");
+  await expect(f.client.capabilities(new AbortController().signal)).rejects.toMatchObject({ code: "executable-changed" });
+});
 test("capabilities distinguish spawn, exit, JSON and schema failures without exposing output", async () => {
   const cases = [
     { source: "", interpreter: "/synthetic/nonexistent-xcb-interpreter", code: "not-started" },

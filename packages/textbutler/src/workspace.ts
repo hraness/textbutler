@@ -30,8 +30,25 @@ export class ContactWorkspace {
       try { await mkdir(path, { mode: 0o700 }); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
       await workspace.checkParent(join(path, "entry"));
     }
+    // A crashed write leaves its staged bytes behind. Only stale entries are
+    // swept: a fresh one may belong to an in-flight publisher, which unlinks
+    // its own stage, so an ENOENT there must not mask real results.
+    try {
+      const orphans = (await readdir(join(absolute, ".staging"))).slice(0, 1000);
+      for (const orphan of orphans) {
+        const staged = join(absolute, ".staging", orphan);
+        try {
+          const info = await lstat(staged);
+          if (!info.isDirectory() && Date.now() - info.mtimeMs > 60_000) await unlink(staged);
+        } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      }
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    // The trusted bootstrap publishes each onboarding file once through the
+    // internal stage path. AGENTS.md is the agent's standing instructions, so
+    // the brokered write/edit surface rejects it to keep instruction changes
+    // out of the model's persistent-injection reach.
     for (const [name, text] of Object.entries({ "AGENTS.md": CONTACT_GUIDANCE, "ABOUT.md": "# Contact context\n\nAdd owner-approved context for this relationship.\n", "MEMORY.md": "# Memory\n\nKeep dated notes with source message IDs, authorship, and uncertainty.\n", "STYLE.md": "# Response style\n\nBe helpful, concise, and clearly an assistant. Learn tone from owner-authored history only.\n" })) {
-      try { await workspace.write(name, text, true); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+      try { await workspace.publish(name, text, null); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
     }
     return workspace;
   }
@@ -148,6 +165,16 @@ export class ContactWorkspace {
   }
 
   async writeVersioned(path: string, text: string, expectedRevision: string | null | undefined, assertActive?: () => void): Promise<{ revision: string }> {
+    // AGENTS.md carries the agent's standing instructions. Every public write
+    // path reaches this method (write, edit and the brokered files.write), so
+    // rejecting it here keeps the model from turning its file tools into a
+    // persistent-injection channel. Trusted bootstrap and owner flows use the
+    // internal publish path below and are unaffected.
+    if (path === "AGENTS.md") throw new Error("AGENTS.md is read-only in this workspace");
+    return this.publish(path, text, expectedRevision, assertActive);
+  }
+
+  private async publish(path: string, text: string, expectedRevision: string | null | undefined, assertActive?: () => void): Promise<{ revision: string }> {
     if (typeof text !== "string" || Buffer.byteLength(text) > MAX_FILE_BYTES || text.includes("\0")) throw new Error("Invalid contact text");
     const destination = this.path(path);
     if (expectedRevision !== undefined && expectedRevision !== null && !/^[a-f0-9]{64}$/u.test(expectedRevision)) throw new Error("Invalid expected revision");
@@ -176,6 +203,10 @@ export class ContactWorkspace {
         // before the atomic publication. Revocation discards only our stage.
         assertActive?.();
         await rename(staged, destination);
+        // Like publishAsset, the rename is durable only once the parent
+        // directory is synced; a crash must not lose a committed write.
+        const directory = await open(dirname(destination), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+        try { await directory.sync(); } finally { await directory.close(); }
       } catch (error) {
         await handle.close().catch(() => {});
         await unlink(staged).catch(() => {});

@@ -13,6 +13,13 @@ export const parseFastDriverConfig = (value: unknown): FastDriverConfig => confi
 export const FAST_DRIVER_LIMITS = Object.freeze({ inputBytes: 131_072, responseBytes: 65_536, maxTokens: 1024, timeoutMs: 20_000, reservationMicroUsd: 25_000 });
 export type FastFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
+/** Stable failure classes so the reply loop can surface the real cause instead
+ * of an opaque run-failed. Kinds are the safe public diagnostic; detail stays
+ * in the journal reason or evidence store. */
+export class DriverFault extends Error {
+  constructor(readonly kind: "budget" | "unavailable" | "output", message: string) { super(message); this.name = "DriverFault"; }
+}
+
 export async function boundedHttpBytes(response: Response, maximum: number, signal: AbortSignal): Promise<Uint8Array> {
   if (!response.ok || response.status >= 300 || Number(response.headers.get("content-length") ?? 0) > maximum) { await response.body?.cancel(); throw Error("Bounded HTTP request rejected"); }
   if (!response.body) throw Error("Missing HTTP body");
@@ -47,20 +54,29 @@ export function createFastDriver(input: FastDriverConfig, ports: { journal: Pick
       response_format: { type: "json_object" } });
     if (Buffer.byteLength(body) > FAST_DRIVER_LIMITS.inputBytes) throw Error("Fast driver input budget exceeded");
     signal.throwIfAborted();
-    if (config.kind === "gateway") ports.journal.reserveApiUsage(operationId, now(), FAST_DRIVER_LIMITS.reservationMicroUsd, Math.floor(config.dailyBudgetUsd * 1_000_000));
+    if (config.kind === "gateway") {
+      try { ports.journal.reserveApiUsage(operationId, now(), FAST_DRIVER_LIMITS.reservationMicroUsd, Math.floor(config.dailyBudgetUsd * 1_000_000)); }
+      catch (error) { throw new DriverFault("budget", error instanceof Error ? error.message : "Daily API budget exhausted"); }
+    }
     let response: Response;
     try { response = await fetcher(`${config.kind === "gateway" ? "https://ai-gateway.vercel.sh/v1" : config.baseUrl}/chat/completions`, {
       method: "POST", redirect: "error", signal, headers: { "content-type": "application/json", ...(credential === undefined ? {} : { authorization: `Bearer ${credential}` }) }, body,
-    }); } catch { throw Error("Fast driver request failed; no automatic retry"); }
-    const bytes = await boundedHttpBytes(response, FAST_DRIVER_LIMITS.responseBytes, signal);
-    const result = responseSchema.parse(parseXcbJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+    }); } catch { throw new DriverFault("unavailable", "Fast driver request failed; no automatic retry"); }
+    let bytes: Uint8Array, result: z.infer<typeof responseSchema>;
+    try {
+      bytes = await boundedHttpBytes(response, FAST_DRIVER_LIMITS.responseBytes, signal);
+      result = responseSchema.parse(parseXcbJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+    } catch (error) {
+      if (signal.aborted || error instanceof DriverFault) throw error;
+      throw new DriverFault("unavailable", "Fast driver response was unusable; no automatic retry");
+    }
     signal.throwIfAborted();
     if (config.kind === "gateway" && result.generationId !== undefined && result.usage?.cost !== undefined)
       ports.journal.settleApiUsage(operationId, result.generationId, Math.max(1, Math.ceil(result.usage.cost * 1_000_000)));
     const content = result.choices[0]!.message.content;
-    if (Buffer.byteLength(content) > outputBytes) throw Error("Fast driver output budget exceeded");
+    if (Buffer.byteLength(content) > outputBytes) throw new DriverFault("output", "Fast driver output budget exceeded");
     const parsed = parseXcbJson(content);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("Invalid fast driver output");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new DriverFault("output", "Invalid fast driver output");
     const output = Object.keys(parsed).join(",") === "value" ? (parsed as { value: JsonValue }).value : parsed as JsonValue;
     return { output, metadata: { executor: `textbutler-${config.kind}`, retryable: false,
       usage: { model: config.model, ...(result.usage === undefined ? {} : { tokensIn: result.usage.prompt_tokens, tokensOut: result.usage.completion_tokens }) } } };
@@ -73,7 +89,7 @@ export function createFastDriver(input: FastDriverConfig, ports: { journal: Pick
         if (started || request.kind !== "agent" && request.kind !== "classifier") throw Error("Fast driver operation already used or unsupported");
         started = true;
         const result = await completion(operationId, JSON.stringify({ instructions: request.prompt, context: request.context, output: request.output }), request.budget.maxOutputBytes, signal);
-        if (request.output.kind === "json" && request.output.schema?.type === "object" && (typeof result.output !== "object" || result.output === null || Array.isArray(result.output))) throw Error("Invalid fast driver output");
+        if (request.output.kind === "json" && request.output.schema?.type === "object" && (typeof result.output !== "object" || result.output === null || Array.isArray(result.output))) throw new DriverFault("output", "Invalid fast driver output");
         return result;
       };
       return { id: `textbutler-${config.kind}`, capabilities: { effects: ["agent", "classifier"] }, cacheable: false, retryable: false,

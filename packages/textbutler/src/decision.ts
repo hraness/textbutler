@@ -13,6 +13,9 @@ export type MessageEvent = Readonly<{
   text: string;
   historical: boolean;
   group: boolean;
+  /** Set when a bounded debounce already absorbed a continuous inbound stream:
+   * the run replies to the context at the cap instead of restarting forever. */
+  pinned?: boolean;
 }>;
 export type ConversationState = Readonly<{
   latestRevision: string;
@@ -40,7 +43,7 @@ export function keywordPresent(text: string, keyword: string): boolean {
   return false;
 }
 export function decideReply(settings: Settings, contact: ContactSettings, event: MessageEvent, state: ConversationState, now: number, admittedAt?: number): ReplyDecision {
-  if (!event.id || event.id.length > 256 || !event.revision || event.revision.length > 256 || typeof event.text !== "string" || Buffer.byteLength(event.text) > 16_384 || typeof event.historical !== "boolean" || typeof event.group !== "boolean" || ![true, false, "unknown"].includes(state.ownerTyping) || !Number.isSafeInteger(state.repliesInLastHour) || state.repliesInLastHour < 0 || (state.lastOwnerAt !== null && (!Number.isSafeInteger(state.lastOwnerAt) || state.lastOwnerAt < 0 || state.lastOwnerAt > now + 30_000))) return { outcome: "ignore", reason: "invalid-event-or-state" };
+  if (!event.id || event.id.length > 256 || !event.revision || event.revision.length > 256 || typeof event.text !== "string" || Buffer.byteLength(event.text) > 16_384 || typeof event.historical !== "boolean" || typeof event.group !== "boolean" || (event.pinned !== undefined && typeof event.pinned !== "boolean") || ![true, false, "unknown"].includes(state.ownerTyping) || !Number.isSafeInteger(state.repliesInLastHour) || state.repliesInLastHour < 0 || (state.lastOwnerAt !== null && (!Number.isSafeInteger(state.lastOwnerAt) || state.lastOwnerAt < 0 || state.lastOwnerAt > now + 30_000))) return { outcome: "ignore", reason: "invalid-event-or-state" };
   if (!settings.contacts.some(c => c.id === contact.id && c.revision === contact.revision)) return { outcome: "ignore", reason: "settings-changed" };
   if (settings.paused || !contact.enabled || contact.pausedUntil > now) return { outcome: "ignore", reason: "paused" };
   if (event.contactId !== contact.id || event.routeId !== contact.routeId) return { outcome: "ignore", reason: "route-mismatch" };

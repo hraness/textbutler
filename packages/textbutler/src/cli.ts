@@ -47,6 +47,8 @@ Review and reply:
   replies send DRAFT DIGEST           Send the exact reviewed suggestion
   replies send CONTACT TEXT...       Send your literal reply
   replies discard DRAFT              Discard a suggestion
+  replies reconcile CONTACT          Resolve an uncertain send after checking Messages
+                                      (--sent marks it delivered, --failed not delivered)
 
 Background service:
   daemon run                         Run in this terminal
@@ -104,7 +106,9 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
     ? { id: args[2]!, digest: args[3]! } : undefined;
   const repliesSendText = args[0] === "replies" && args[1] === "send" && args.length >= 4 && !args[2]!.startsWith("draft:") ? { contact: args[2]!, text: args.slice(3).join(" ") } : undefined;
   const repliesDiscard = args[0] === "replies" && args[1] === "discard" && args.length === 3 ? args[2]! : undefined;
-  const replies = inbox || repliesSuggest !== undefined || repliesShow !== undefined || repliesSendDraft !== undefined || repliesSendText !== undefined || repliesDiscard !== undefined;
+  const repliesReconcile = args[0] === "replies" && args[1] === "reconcile" && (args.length === 3 || args.length === 4 && ["--sent", "--failed"].includes(args[3]!))
+    ? { contact: args[2]!, resolution: args[3] === "--sent" ? "sent" as const : args[3] === "--failed" ? "failed" as const : undefined } : undefined;
+  const replies = inbox || repliesSuggest !== undefined || repliesShow !== undefined || repliesSendDraft !== undefined || repliesSendText !== undefined || repliesDiscard !== undefined || repliesReconcile !== undefined;
   if (args[0] === "replies" && !replies) throw new Error(CLI_USAGE);
   if (!["init", "doctor", "providers list", "daemon run", "daemon install", "daemon uninstall", "daemon status"].includes(command) && !menuBar && !checkAccount && !replies) throw new Error(CLI_USAGE);
   /** Job-backed control call: poll until the stored result arrives. */
@@ -137,6 +141,12 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
       const response = await requestDaemon({ dataDir, request: { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: "replies.discard", draftId: repliesDiscard } });
       print(response.ok && response.kind === "reply-discarded" ? { ok: true, discarded: response.discarded } : response);
       return response.ok ? 0 : 1;
+    }
+    if (repliesReconcile !== undefined) {
+      const response = await job({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: "replies.reconcile", contactId: await resolveContact(repliesReconcile.contact),
+        ...(repliesReconcile.resolution === undefined ? {} : { resolution: repliesReconcile.resolution }) });
+      if (response.ok && response.kind === "reply-reconciled") { print({ ok: response.resolved, contactId: response.contactId, runId: response.runId ?? null, resolved: response.resolved, state: response.state ?? null, detail: response.detail }); return response.resolved ? 0 : 1; }
+      unresolved(response); return 1;
     }
     if (repliesSuggest !== undefined) {
       const response = await job({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: "replies.suggest", contactId: await resolveContact(repliesSuggest) });

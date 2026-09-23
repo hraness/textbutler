@@ -23,11 +23,13 @@ async function fixture(fast = false) {
   const conversation = { coordinate: { provider: "imessage" as const, chatGuid: "iMessage;-;fixture@example.test", service: "iMessage" as const, observedChatRowId: 1 }, title: "Synthetic", kind: "single" as const, participants: ["fixture@example.test"] };
   const enrolled = () => ({ id: "enrollment:fixture", identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision, ready: true, reason: null });
   const binding = automationBinding(enrolled()), events: AutomationEvent[] = [], messages: AutomationMessage[] = [], sent: readonly unknown[][] = [];
-  const mutableSent = sent as unknown[][], plans = new Map<string, AutomationPlan>();
+  const mutableSent = sent as unknown[][], plans = new Map<string, AutomationPlan>(), statuses: { state: string; detail: string }[] = [];
+  let failEvents = 0, eventsCalls = 0;
   const client = createGhostgetAutomationClient(async (method, params) => {
     if (method === "poll") return enrolled();
     if (method === "history") return { enrollment: enrolled(), messages: messages.slice(-Number(params.limit)) };
-    if (method === "events") return { events: events.slice(Number(params.cursor ?? 0)), nextCursor: String(events.length), caughtUp: true };
+    if (method === "events") { eventsCalls++; if (failEvents > 0) { failEvents--; throw new Error("Synthetic events stream failure"); }
+      return { events: events.slice(Number(params.cursor ?? 0)), nextCursor: String(events.length), caughtUp: true }; }
     if (method === "status") return { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"].map(kind => [kind, { available: true, reason: null }])) };
     if (method === "prepare") { const body = { ...params, bindingDigest: binding.bindingDigest, expiresAt: new Date(time + 120000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` } as AutomationPlan; plans.set(plan.id, plan); return plan; }
     if (method === "submit") { const plan = plans.get(String(params.planId))!; mutableSent.push([...plan.actions]); return { id: `run:${sent.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
@@ -41,7 +43,7 @@ async function fixture(fast = false) {
     compositions++;
     return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ value: { respond: true, confidence: 0.99, reason: "requested", summary: "Explain briefly", actions: [{ kind: "text", text: "Synthetic answer" }], tool: null } }) } }] });
   } });
-  const loop = await createDaemonReplyLoop({ client, automatic: false, now: () => time, hooks: new Hooks(),
+  const loop = await createDaemonReplyLoop({ client, automatic: false, now: () => time, hooks: new Hooks(), onStatus: value => { statuses.push({ state: value.state, detail: value.detail }); },
     ...(fast ? { habitat: { config: { enabled: true, driver: driver.config, evolutionModel: null, debounceMs: 1000 }, driver } }
       : { agent: { qualified: (contact: Parameters<ButlerAgent["qualified"]>[0]) => agent.qualified(contact), classify: (request: Parameters<ButlerAgent["classify"]>[0]) => agent.classify(request), compose: (request: Parameters<ButlerAgent["compose"]>[0]) => agent.compose(request) } }), service: {
     dataDir: root, providers: undefined, runtimeState: async () => ({ settings, bindings: { "contact-1": binding }, grants: {} }), runJournal: () => journal,
@@ -50,8 +52,10 @@ async function fixture(fast = false) {
     notePending() {},
   } });
   cleanup.push(async () => { await loop.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
-  return { loop, journal, sent, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },
+  return { loop, journal, sent, statuses, coordinate: conversation.coordinate, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },
     change(next: Settings) { settings = next; for (const listener of listeners) listener(next); }, settings: () => settings,
+    failNextEvents(count: number) { failEvents = count; }, eventsCalls: () => eventsCalls,
+    push(message: AutomationMessage) { revision++; messages.push(message); events.push({ sequence: revision, enrollmentId: binding.enrollmentId, revision, message }); },
     add(text: string, direction: AutomationMessage["direction"] = "incoming", ageMs = 0) { revision++; const message: AutomationMessage = { id: `message:${revision}`, coordinate: conversation.coordinate, direction, occurredAt: new Date(time - ageMs).toISOString(), text, kind: "message", relatedMessageId: null, attachments: [] }; messages.push(message); events.push({ sequence: revision, enrollmentId: binding.enrollmentId, revision, message }); },
   };
 }
@@ -115,4 +119,53 @@ test("self-chat echoes never answer the pending inbound or erase a newer one", a
   f.add("butler one more", "incoming"); f.add("🤖{ Hello }", "incoming"); f.add("🤖{ Hello }", "outgoing");
   await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
   expect(f.sent).toHaveLength(2);
+});
+
+test("a tapback between texts never answers or drops the pending reply", async () => {
+  const f = await fixture(); await f.loop.tick();
+  f.add("butler could you explain?"); await f.loop.tick();
+  // A reaction lands mid-debounce: it advances the conversation revision but is
+  // not an answer, so the pending inbound must still produce its reply.
+  f.push({ id: "reaction:1", coordinate: f.coordinate, direction: "incoming", occurredAt: new Date(Date.parse("2026-09-11T12:00:01.000Z")).toISOString(),
+    text: null, kind: "reaction", relatedMessageId: "message:1", attachments: [] });
+  f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(1);
+  // And a contact message still supersedes the pending one normally.
+  f.add("butler first question"); f.push({ id: "reaction:2", coordinate: f.coordinate, direction: "incoming", occurredAt: new Date(Date.parse("2026-09-11T12:00:11.000Z")).toISOString(),
+    text: null, kind: "reaction", relatedMessageId: "message:3", attachments: [] });
+  f.add("butler the real latest question"); f.advance(9000); await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  expect(f.sent).toHaveLength(2);
+  expect(f.journal.recent("contact-1")[0]?.eventId).toBe("message:5");
+});
+
+test("a continuous inbound stream resolves within the bounded debounce cap", async () => {
+  const f = await fixture(); await f.loop.tick();
+  // Every message refreshes the pending event; without a cap the debounce would
+  // starve forever. The cap resolves at firstAt + max(2*debounce, 30s).
+  for (let index = 0; index < 20; index++) { f.add(`butler still typing ${index}`); f.advance(2_000); await f.loop.tick(); }
+  await f.loop.idle();
+  // The cap fires 30s after the stream began — message:16 — instead of starving
+  // until the flood pauses.
+  expect(f.sent).toHaveLength(1);
+  expect(f.sent[0]?.[0]).toMatchObject({ kind: "text", text: "🤖{ Hello }" });
+  expect(f.journal.recent("contact-1")[0]?.eventId).toBe("message:16");
+});
+
+test("a degraded events drain keeps pending work and only flags attention after repeated failure", async () => {
+  const f = await fixture(); await f.loop.tick();
+  f.add("butler could you explain?"); await f.loop.tick();
+  f.failNextEvents(1); await f.loop.tick();
+  expect(f.statuses.at(-1)?.state).toBe("running");
+  f.advance(9_000); await f.loop.tick(); await f.loop.idle();
+  // The pending inbound survived the failed drain and still produced its reply.
+  expect(f.sent).toHaveLength(1);
+  // Three consecutive drain failures surface the attention state.
+  f.failNextEvents(10); await f.loop.tick(); await f.loop.tick();
+  expect(f.statuses.at(-1)?.state).toBe("running");
+  await f.loop.tick();
+  expect(f.statuses.at(-1)?.state).toBe("unavailable");
+  expect(f.statuses.at(-1)?.detail).toContain("Synthetic");
+  // Recovery clears it.
+  f.failNextEvents(0); await f.loop.tick();
+  expect(f.statuses.at(-1)?.state).toBe("running");
 });
