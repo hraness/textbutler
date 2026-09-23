@@ -27,7 +27,7 @@ const HERO_VOCABULARY_TO_AVOID = [
 test('renders Textbutler with the shared grammar and honest development status', () => {
   const html = renderToStaticMarkup(<Home />);
   expect(html.match(/<h1\b/gu)).toHaveLength(1);
-  expect(html).toContain('>A little help in your conversations</h1>');
+  expect(html).toContain('>Your agent in your messaging apps</h1>');
   for (const role of ['header', 'hero', 'proof-frame', 'section', 'flow', 'trust', 'questions', 'cta', 'footer']) {
     expect(html).toContain(`data-hraness-marketing="${role}"`);
   }

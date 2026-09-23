@@ -2,13 +2,18 @@
 
 [![skills.sh](https://skills.sh/b/hraness/message-like-me)](https://skills.sh/hraness/message-like-me)
 
-Textbutler is a local message assistant for macOS. Its guided terminal and menu
-bar help you connect selected iMessage, WhatsApp and Beeper conversations, see
-what needs an answer, and review replies before sending them.
+Textbutler is a personal message butler for macOS. Connect your coding agent —
+a Claude Code or Codex subscription through
+[xcb](https://github.com/hraness/xcb) — and it reads selected iMessage,
+WhatsApp and Beeper conversations, keeps each contact's context in files you
+can read and edit, and answers when you let it: clearly disclosed and under
+your pause. A guided terminal and menu-bar companion keep setup, review and
+control on your Mac.
 
 **Current status: source pilot.** Messaging setup, conversation selection,
 private contact memory, inbox review and replies you write yourself are
-implemented. AI replies require a verified Textbutler bundle with reviewed
+implemented, and automatic replies are verified working end-to-end on iMessage
+on the reference install. AI replies require a verified Textbutler bundle with reviewed
 composition admission and connect to a separately installed
 [xcb](https://github.com/hraness/xcb) native runtime with an explicit subscription
 account and model. Textbutler is an MIT-licensed reference application for xcb's
@@ -24,9 +29,10 @@ automation adapter. Its linked apps and account permissions determine what is
 available. The [architecture](docs/textbutler/architecture.md) records the
 runtime boundaries and remaining qualification work.
 
-Agents can use the [JSON CLI](docs/textbutler/agent-cli.md) to read and summarize
-one conversation, prepare text or media drafts, and send an explicitly
-authorized message. Each connection reports its available actions.
+Agents can use the [JSON CLI](docs/textbutler/agent-cli.md) to list
+conversations, read and summarize history, prepare text or media drafts, and
+send an explicitly authorized message — the same staged actions the butler uses
+on its own. Each connection reports its available actions.
 
 ## Open the guided terminal
 

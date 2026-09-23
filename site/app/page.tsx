@@ -41,11 +41,15 @@ const HERO_FOOTNOTE = 'Source pilot · macOS · iMessage + WhatsApp + Beeper';
 const HOME_QUESTIONS = [
   {
     question: 'Can I use Textbutler today?',
-    answer: 'You can try the source pilot on your Mac. The guided terminal helps you configure messaging, add a conversation, review your inbox and send replies you write yourself. That path needs a ready Ghostget connection but no AI account. New installations start paused. The native menu companion uses a verified prebuilt runner; no local Rust build is needed. No windowed app download is provided.',
+    answer: 'You can try the source pilot on your Mac. The guided terminal helps you configure messaging, add a conversation, review your inbox and send replies you write yourself. That path needs a ready Ghostget connection but no AI account. A verified installed bundle adds the agent: it reads enabled conversations, drafts replies, and can send them on its own. New installations start paused. The native menu companion uses a verified prebuilt runner; no local Rust build is needed. No windowed app download is provided.',
   },
   {
-    question: 'Can Textbutler draft a message for me?',
-    answer: 'You draft replies yourself in the guided inbox, review the complete text, and choose when to send; that path needs no AI account. A verified installed bundle with an admitted Claude Code or Codex subscription can let the butler compose disclosed replies on its own once you enable the contact and resume globally. The source daemon keeps AI replies unavailable.',
+    question: 'Can it answer messages for me?',
+    answer: 'On a verified installed bundle with an admitted Claude Code or Codex subscription through xcb, yes — the butler composes and sends visibly disclosed replies to contacts you enable, once you resume globally. You can also draft replies yourself in the guided inbox, review the complete text, and choose when to send; that path needs no AI account. The source daemon has no composition admission and keeps AI replies unavailable.',
+  },
+  {
+    question: 'Can my agent use it directly?',
+    answer: 'The JSON CLI is built for agents. It can list conversations, read and summarize history, compose drafts, and send only explicitly authorized messages — the same staged actions the butler uses, always inside an enabled contact’s allowed capabilities.',
   },
   {
     question: 'Will it interrupt my conversations?',
@@ -122,24 +126,34 @@ export default function Home() {
             className="mlm-marketing-hero"
             eyebrow=""
             frame={<ButlerFrame />}
-            heading="A little help in your conversations"
+            heading="Your agent in your messaging apps"
             headingId="textbutler-title"
             name="Textbutler"
-            summary="Bring selected iMessage, WhatsApp and Beeper conversations into a local inbox. Draft a reply, review it, and stay in control from your Mac."
+            summary="Connect your coding agent to iMessage, WhatsApp and Beeper. It reads each selected conversation, keeps a folder of context you can open and edit, and answers when you let it — clearly disclosed, always yours to pause."
           />
           </div>
 
-          <MarketingSection heading="A butler for each relationship" headingId="contacts-title" id="how-it-works" label="" summary="Choose the contacts it can help. Keep their context separate. Pause one conversation or every conversation whenever you need.">
+          <MarketingSection heading="A butler for each relationship" headingId="contacts-title" id="how-it-works" label="" summary="Choose the contacts your agent can help. Keep their context separate. Pause one conversation or every conversation whenever you need.">
             <TopicIcon slug="butler" />
             <MarketingFlow ariaLabel="How contact-based assistance is designed to work" steps={[
               { label: 'Choose a contact', detail: 'Choose one direct conversation from a configured connection. New contacts start disabled; the default active limit is five.' },
               { label: 'Give it context', detail: 'Optionally import recent history as context. Guidance, preferences, and dated memories live in an ordinary folder you can read and edit.' },
-              { label: 'Draft your reply', detail: 'Use the inbox to find unanswered messages. Draft a reply and review the complete text before sending. No AI account is needed.' },
-              { label: 'Keep the conversation yours', detail: 'Automatic replies remain a separate choice, requiring a qualified agent, an enabled contact and global resume. The source CLI has no ready AI engine.' },
+              { label: 'Let your agent work', detail: 'It reads new messages, summarizes what needs an answer, and drafts or stages replies through that contact’s allowed actions. Review everything in the inbox.' },
+              { label: 'Keep the conversation yours', detail: 'Automatic replies remain a separate choice, requiring a qualified agent, an enabled contact and global resume. Replies you write yourself need no AI account.' },
             ]} />
           </MarketingSection>
 
-          <MarketingSection heading="Memory you can read and change" headingId="memory-title" id="memory" label="" layout="split" summary="The butler’s context belongs in ordinary files. Add what it should know, correct an assumption, or remove a stale note. It is designed to learn from conversation without turning its guesses into facts.">
+          <MarketingSection heading="It answers when you let it" headingId="replies-title" id="replies" label="" summary="A verified installed bundle with an admitted subscription can let the butler answer enabled contacts on its own — disclosed, paced, and inside limits you set.">
+            <TopicIcon slug="control" />
+            <dl className="architecture-rows">
+              <div><dt>Identified by default</dt><dd>Every automatic reply is wrapped in the contact’s disclosure symbols, rendered 🤖{'{ … }'}. Each symbol can be changed or cleared per contact.</dd></div>
+              <div><dt>Paced, not instant</dt><dd>Replies wait through message bursts, yield after a recent message from you, and recheck the conversation immediately before sending.</dd></div>
+              <div><dt>Limits it cannot raise</dt><dd>Per-contact activation, an active-contact cap, hourly reply limits and a confidence threshold. The deciding layer can choose silence; it cannot expand its own authority.</dd></div>
+              <div><dt>A pause that is always yours</dt><dd>Pause one conversation or the whole butler at any time. New installations and new contacts start paused.</dd></div>
+            </dl>
+          </MarketingSection>
+
+          <MarketingSection heading="It learns each relationship" headingId="memory-title" id="memory" label="" layout="split" summary="The butler’s context belongs in ordinary files it maintains itself — guidance it can read and revise, dated memories with sources, and your corrections folded back in. It is designed to learn from conversation without turning its guesses into facts.">
             <TopicIcon slug="memory" />
             <div className="workspace-example"><pre aria-label="Example contact workspace"><code>{`contact/\n├── AGENTS.md\n├── ABOUT.md\n├── MEMORY.md\n├── STYLE.md\n├── history/\n├── notes/\n├── attachments/\n└── outbox/`}</code></pre><p>One contact workspace. Settings, credentials, and permission grants stay outside the agent’s files.</p><Link href="/methodology">Read the legacy evidence methodology</Link></div>
           </MarketingSection>
@@ -147,7 +161,7 @@ export default function Home() {
           <MarketingSection heading="Small parts with clear jobs" headingId="architecture-title" id="architecture" label="" summary="A local daemon handles the work while the menu companion gives you the controls. Hooks and adapters provide room to extend the experience without handing an agent unrestricted access.">
             <TopicIcon slug="architecture" />
             <dl className="architecture-rows">
-              <div><dt>Textbutler</dt><dd>Contacts, response timing, visible disclosure, scoped memory, pause, and action policy.</dd></div>
+              <div><dt>Textbutler</dt><dd>Contacts, response timing, visible disclosure, evolving memory, pause, action policy, and the send journal.</dd></div>
               <div><dt>Ghostget</dt><dd>iMessage, WhatsApp and Beeper connections, account permissions, conversation identity, and available message actions.</dd></div>
               <div><dt><a href="https://github.com/hraness/xcb">xcb</a></dt><dd>Subscription inference with no provider tools, separate credential storage and provider custody. Textbutler is an MIT-licensed reference application; both installations require current admission evidence.</dd></div>
               <div><dt>Your hooks</dt><dd>Developer-authored extensions for context and response decisions. Trusted executable hooks stay separate from the agent’s editable memory.</dd></div>
@@ -157,13 +171,14 @@ export default function Home() {
 
           <MarketingTrustBoundary className="mlm-marketing-trust" heading="Keep the useful boundaries visible" headingId="boundaries-title" id="boundaries" label="" summary="The contact folder is local. Your selected AI provider still receives the context needed for its work. Textbutler’s website has no access to that information." items={[
             { label: 'Review what gets sent', detail: 'The default disclosure is 🤖{ hello this is my response }. Its three symbols can be changed or cleared. You review the complete outgoing text.' },
-            { label: 'One conversation at a time', detail: 'The agent boundary is one contact workspace, public web requests, and that conversation’s supported message actions. No shell tools.' },
+            { label: 'One conversation at a time', detail: 'The agent boundary is one contact workspace, public web requests, and that conversation’s supported message actions. No shell tools; credentials and permission grants live outside its files.' },
+            { label: 'Every send is journaled', detail: 'The daemon records each send with its provider receipt. A send with an uncertain outcome stays blocked until reconciled — it never silently retries.' },
             { label: 'Capabilities, not promises', detail: 'Rich actions depend on the selected connection and its permissions. Unsupported features, including mini apps, stay visible as unavailable.' },
           ]} />
 
-          <MarketingSection heading="Start with a reply you review" headingId="development-title" id="development" label="" summary="Try the source pilot for messaging setup, inbox review and replies you write. AI replies require a verified installed bundle and a separately configured xcb subscription connection.">
+          <MarketingSection heading="Start with a reply you review" headingId="development-title" id="development" label="" summary="Try the source pilot for messaging setup, inbox review and replies you write. A verified installed bundle adds agent-drafted and automatic replies through a separately configured xcb subscription connection — that path is verified end-to-end on iMessage.">
             <TopicIcon slug="control" />
-            <div className="development-status"><div><h3>Start in the guided terminal</h3><p>Run <code>bun run textbutler tui</code> from your checkout. Set up Ghostget, add one conversation and try a reply you write yourself. The optional native menu uses a prebuilt runner. New installations start paused.</p><a href={GETTING_STARTED_URL}>Follow the setup guide</a></div><div><h3>Connect AI through xcb</h3><p>Install a verified Textbutler bundle with reviewed composition evidence, then connect an admitted xcb runtime and an explicit Claude Code or Codex account. The source daemon remains unadmitted. A successful setup alone does not prove live inference. Live delivery and rich actions still need verification on your account.</p><a href={`${GITHUB_URL}/blob/main/docs/textbutler/native-subscription.md`}>Read the subscription connection guide</a></div></div>
+            <div className="development-status"><div><h3>Start in the guided terminal</h3><p>Run <code>bun run textbutler tui</code> from your checkout. Set up Ghostget, add one conversation and try a reply you write yourself. The optional native menu uses a prebuilt runner. New installations start paused.</p><a href={GETTING_STARTED_URL}>Follow the setup guide</a></div><div><h3>Connect AI through xcb</h3><p>Install a verified Textbutler bundle with reviewed composition evidence, then connect an admitted xcb runtime and an explicit Claude Code or Codex account. Automatic replies are working on the verified reference install; the source daemon remains unadmitted. A successful setup alone does not prove live inference. Live delivery and rich actions still need verification on your account.</p><a href={`${GITHUB_URL}/blob/main/docs/textbutler/native-subscription.md`}>Read the subscription connection guide</a></div></div>
             <p className="legacy-note">Looking for the original history tools? <a href={RELEASE_URL}>Message Like Me v{SOFTWARE_VERSION}</a> remains available as a legacy release. It does not install Textbutler or enable automatic replies. <Link href="/sources">View legacy history sources.</Link></p>
           </MarketingSection>
 
@@ -225,7 +240,7 @@ export default function Home() {
               ],
             },
           ]} />
-          <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation and review a reply. Enable automatic replies only after account checks and a live test with your chosen recipient." />
+          <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation and watch your agent work. Enable automatic replies only after account checks and a live test with your chosen recipient." />
         </MarketingPage>
       </main>
       <SiteFooter path="/" />
