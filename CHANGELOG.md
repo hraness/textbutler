@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.17 (2026-09-23)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.17` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Add isolated per-contact habitats: each enrolled contact gets a private workspace whose bounded evolution loop proposes, evaluates and promotes reply-guidance updates through the admitted subscription driver, with journaled budgets and reservations.
+- Harden the reply steel thread: an uncertain send is quarantined until the owner resolves it with `replies reconcile CONTACT [--sent|--failed]`, which can also prove delivery from bounded conversation history. Runs are retained for 90 days, restart recovery abandons pre-dispatch work and marks dispatched work indeterminate, and grant intent is recorded before any upstream request.
+- Make dispatch cancellation exact: a reply that has crossed the dispatch boundary is never aborted into a false failure, transport receipts stay authoritative over hook errors, and gateway driver failures report stable budget, unavailable, and output fault classes.
+- Keep the automatic loop honest under load: inbound events drain in batches, a degraded transport keeps pending work and only reports attention after repeated failures, reactions and echoes can no longer erase or trigger pending replies, and a continuous inbound stream is answered within a bounded debounce instead of starving.
+- Accept bare-object driver output, map silent suggestions to an explicit outcome, supervise the messaging transport child with custody-verified recovery, keep injected contact-workspace guidance out of trusted policy, and reseal the reviewed XCB composition receipt over the current sources.
+
 ## 0.8.16 (2026-09-22)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.16` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
