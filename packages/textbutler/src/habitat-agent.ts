@@ -45,7 +45,8 @@ export function createHabitatAgent(ports: { journal: RunJournal; driver: FastDri
   const now = ports.now ?? Date.now, memes = ports.memes ?? createMemeSearch(), shutdown = new AbortController();
   const cached = new Map<string, { result: z.infer<typeof outputSchema>; context: HabitatObservation[]; plan: HabitatPlan }>();
   let evolving: Promise<void> | undefined, evolutionController: AbortController | undefined, evolutionContact: ContactSettings | undefined;
-  const backoff = new Map<string, { attempts: number; after: number }>();
+  const backoff = new Map<string, { attempts: number; after: number; firstAt: number }>();
+  const evalChecked = new Map<string, number>();
   async function answer(request: AgentRequest) {
     const existing = cached.get(request.runId); if (existing) return existing.result;
     request.signal.throwIfAborted(); shutdown.signal.throwIfAborted();
@@ -67,10 +68,9 @@ export function createHabitatAgent(ports: { journal: RunJournal; driver: FastDri
         rules: `Return strict JSON with all output fields. If no reply is wanted, set respond=false and actions=[]. Otherwise use the proposed reply actions OR one tool request with actions=[]. Never both. Total text must be at most ${plan.maxReplyCharacters} characters. Humor preference: ${plan.humor}. Tools are optional; ordinary replies should finish immediately. Meme search matches popular template names locally, not the whole web; meme-image takes only an ID returned by meme-search. Template images have no new caption rendered into them. Never request tools when respond=false or confidence<0.85. Do not use search queries containing personal identifiers or copied private messages.` };
       const run = await executeHabitatProgram({ phase: "respond", plan, context: context as JsonValue, executor: ports.driver.executor(`${request.runId}-driver-${step}`), signal });
       ports.journal.recordHabitatEvidence(request.contact.id, run.receipt.digest, JSON.stringify(run), now());
-      const result = outputSchema.parse(run.output);
-      if (!result.respond || result.confidence < 0.85) {
-        if (result.actions.length || result.tool) throw Error("Silent reply cannot propose actions or tools");
-      } else if (result.tool) {
+      let result = outputSchema.parse(run.output);
+      if (!result.respond || result.confidence < 0.85) result = { ...result, respond: false, actions: [], tool: null };
+      if (result.tool) {
         if (step >= 2 || result.actions.length) throw Error("Fast driver tool budget exceeded");
         const tool = result.tool;
         if (tool.kind === "web-search") {
@@ -89,11 +89,11 @@ export function createHabitatAgent(ports: { journal: RunJournal; driver: FastDri
           }
         }
         continue;
-      } else {
+      } else if (result.respond) {
         const actions = result.actions.map(parseActionIntent);
         if (!actions.length || actions.some(action => !capabilities.includes(action.kind)) || actions.filter(action => action.kind === "text").reduce((sum, action) => sum + action.text.length, 0) > plan.maxReplyCharacters) throw Error("Fast driver response violates its action budget");
       }
-      const contextMessages = history.filter(message => message.author !== "butler").slice(-12).map(message => ({ ...message, author: message.author as "owner" | "contact", kind: "message" as const, relatedMessageId: null }));
+      const contextMessages = history.filter(message => message.author !== "butler").slice(-plan.contextMessages).map(message => ({ ...message, author: message.author as "owner" | "contact", kind: "message" as const, relatedMessageId: null }));
       cached.set(request.runId, { result, context: contextMessages, plan });
       signal.addEventListener("abort", () => cached.delete(request.runId), { once: true });
       return result;
@@ -162,18 +162,23 @@ export function createHabitatAgent(ports: { journal: RunJournal; driver: FastDri
     reconcile() { if (evolutionContact && !ports.active(evolutionContact)) evolutionController?.abort(); },
     settingsChanged() { backoff.clear(); },
     schedule(contact: ContactSettings) {
-      const failed = backoff.get(contact.id);
+      let failed = backoff.get(contact.id);
+      if (failed && now() - failed.firstAt >= 21_600_000) { backoff.delete(contact.id); failed = undefined; }
       if (evolving || shutdown.signal.aborted || !ports.evolution || !ports.active(contact) || (failed?.attempts ?? 0) >= 3 || (failed?.after ?? 0) > now()
-        || !new ContactHabitat(ports.journal, contact.id).needsEvaluation(now())) return;
+        || (evalChecked.get(contact.id) ?? 0) > now() - 15_000) return;
+      if (evalChecked.size >= 200 && !evalChecked.has(contact.id)) evalChecked.delete(evalChecked.keys().next().value!);
+      evalChecked.set(contact.id, now());
+      if (!new ContactHabitat(ports.journal, contact.id).needsEvaluation(now())) return;
       evolutionController = new AbortController(); evolutionContact = contact;
       evolving = evolve(contact, AbortSignal.any([shutdown.signal, evolutionController.signal])).catch(() => {
+        evalChecked.delete(contact.id);
         if (backoff.size >= 200 && !backoff.has(contact.id)) backoff.delete(backoff.keys().next().value!);
         const attempts = (failed?.attempts ?? 0) + 1;
-        backoff.set(contact.id, { attempts, after: now() + 60_000 * 5 ** (attempts - 1) });
+        backoff.set(contact.id, { attempts, after: now() + 60_000 * 5 ** (attempts - 1), firstAt: failed?.firstAt ?? now() });
       }).finally(() => { evolving = undefined; evolutionController = undefined; evolutionContact = undefined; });
     },
     async idle() { await evolving; },
-    async close() { shutdown.abort(); await evolving; cached.clear(); backoff.clear(); },
+    async close() { shutdown.abort(); await evolving; cached.clear(); backoff.clear(); evalChecked.clear(); },
   };
 }
 export type HabitatAgent = ReturnType<typeof createHabitatAgent>;

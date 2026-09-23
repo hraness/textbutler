@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { connect } from "node:net";
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { daemonSocketPath, MAX_CONTROL_FRAME_BYTES, requestDaemon, startDaemon, type RunningDaemon } from "./daemon.ts";
 import { TEXTBUTLER_CONTROL_PROTOCOL as protocol } from "./control-service.ts";
 import { runTextbutlerCli } from "./cli.ts";
@@ -72,6 +73,25 @@ describe("foreground owner-only control socket", () => {
     await start(dataDir);
     expect(await runTextbutlerCli(["doctor", "--data-dir", dataDir], output)).toBe(process.platform === "darwin" ? 0 : 1);
     expect(JSON.parse(lines.pop()!)).toMatchObject({ ok: process.platform === "darwin", daemonConnected: true, automaticReplies: "unavailable" });
+  });
+  test("configured Ghostget automation runs supervised and reports its messaging detail", async () => {
+    const dataDir = await root();
+    await mkdir(join(dataDir, "state"), { mode: 0o700 });
+    await writeFile(join(dataDir, "state/host.json"), JSON.stringify({ schemaVersion: 1, ghostget: {
+      executable: fileURLToPath(new URL("../test-fixtures/ghostget-automation.ts", import.meta.url)),
+      runtimeExecutable: process.execPath, authId: "fixture", stateHome: join(dataDir, "ghostget-state"),
+      automationAccounts: [{ provider: "imessage", authId: "fixture" }] } }), { mode: 0o600 });
+    const daemon = await startDaemon({ dataDir }); daemons.push(daemon);
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const snapshot = await daemon.service.snapshot();
+      if (snapshot.automation?.state !== "unavailable") break;
+      await new Promise<void>(resolve => setTimeout(resolve, 200));
+    }
+    // Fresh settings are paused; the supervised messaging client must still
+    // connect, claim custody and drive the reply loop's status surface.
+    expect((await daemon.service.snapshot()).automation).toMatchObject({ state: "paused" });
+    expect((await daemon.service.snapshot()).automation?.detail).not.toContain("attention");
+    expect((await readdir(join(dataDir, "state"))).includes("ghostget-automation-custody.json")).toBe(true);
   });
   test("explicit native hosts override XCB configuration and close with daemon custody", async () => {
     const dataDir = await root(); let closed = 0, checks = 0;

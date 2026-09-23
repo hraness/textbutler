@@ -125,7 +125,8 @@ export type XcbCapabilityFailure = "executable-changed" | "executable-unsafe" | 
 export class XcbCapabilitiesError extends Error {
   constructor(readonly code: XcbCapabilityFailure) { super(`XCB_CAPABILITIES_${code.toUpperCase().replaceAll("-", "_")}`); }
 }
-export async function verifyXcbExecutable(config: XcbHostConfig): Promise<void> {
+interface VerifiedExecutable { dev: number; ino: number; size: number; mtimeMs: number }
+export async function verifyXcbExecutable(config: XcbHostConfig): Promise<VerifiedExecutable> {
   if (await realpath(config.executable) !== config.executable) throw Error("XCB_EXECUTABLE_CHANGED");
   const file = await open(config.executable, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
@@ -138,19 +139,43 @@ export async function verifyXcbExecutable(config: XcbHostConfig): Promise<void> 
     const after = await file.stat(), path = await lstat(config.executable);
     if (hash.digest("hex") !== config.sha256 || before.ino !== path.ino || before.dev !== path.dev || path.isSymbolicLink()
       || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw Error("XCB_EXECUTABLE_CHANGED");
+    return { dev: before.dev, ino: before.ino, size: before.size, mtimeMs: before.mtimeMs };
   } finally { await file.close(); }
+}
+
+/** The byte hash of a <=256MB binary is skipped only while the exact file
+ * identity proven by the last full verification is unchanged. Every cheap
+ * re-check still resolves the real path, opens O_NOFOLLOW and enforces the
+ * owner/permission/size safety invariants; any tuple drift falls back to a
+ * complete re-verification before spawn. */
+async function verifyXcbExecutableCached(config: XcbHostConfig, verified: VerifiedExecutable | undefined): Promise<VerifiedExecutable> {
+  if (verified !== undefined) {
+    try {
+      if (await realpath(config.executable) === config.executable) {
+        const file = await open(config.executable, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        try {
+          const stat = await file.stat();
+          if (stat.isFile() && [process.getuid?.(), 0].includes(stat.uid) && (stat.mode & 0o022) === 0 && (stat.mode & 0o111) !== 0
+            && stat.size >= 1 && stat.size <= 256 * 1024 * 1024
+            && stat.dev === verified.dev && stat.ino === verified.ino && stat.size === verified.size && stat.mtimeMs === verified.mtimeMs) return verified;
+        } finally { await file.close(); }
+      }
+    } catch { /* An indeterminate probe falls back to complete verification. */ }
+  }
+  return await verifyXcbExecutable(config);
 }
 
 export function createXcbClient(config: XcbHostConfig, dependencies: {
   /** Trusted test scheduler only; never configured by a host file or request. */
   capabilityTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
 } = {}): XcbClient {
+  let verified: VerifiedExecutable | undefined;
   async function invoke(capabilities: boolean, request: XcbGenerateRequest | undefined, signal: AbortSignal): Promise<{ value: unknown; code: number | null }> {
     let input: string;
     try {
       signal.throwIfAborted(); input = request === undefined ? "" : JSON.stringify(request);
       if (Buffer.byteLength(input) > XCB_LIMITS.request) throw Error("XCB_REQUEST_LIMIT");
-      await verifyXcbExecutable(config); signal.throwIfAborted();
+      verified = await verifyXcbExecutableCached(config, verified); signal.throwIfAborted();
     } catch (cause) {
       if (capabilities && !signal.aborted) throw new XcbCapabilitiesError(cause instanceof Error && cause.message === "XCB_EXECUTABLE_CHANGED" ? "executable-changed"
         : cause instanceof Error && cause.message === "XCB_EXECUTABLE_UNSAFE" ? "executable-unsafe" : "executable-unavailable");

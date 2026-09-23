@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { lstat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createPrivateFileOnce, publishPrivateFile } from "@hraness/local-custody/atomic-publish";
 import { ensurePrivateDirectory, readPrivateFile } from "@hraness/local-custody/private-paths";
@@ -93,6 +94,12 @@ export function parseControlRequest(value: unknown): ControlRequest {
   if (item.command === "replies.suggest") {
     exact(item, ["protocol", "command", "contactId"]);
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId) };
+  }
+  if (item.command === "replies.reconcile") {
+    exact(item, ["protocol", "command", "contactId", ...(Object.hasOwn(item, "resolution") ? ["resolution"] : [])]);
+    if (item.resolution !== undefined && item.resolution !== "sent" && item.resolution !== "failed") fail("invalid-request", "Resolution must be sent or failed.");
+    return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId),
+      ...(item.resolution === undefined ? {} : { resolution: item.resolution }) };
   }
   if (item.command === "messages.history" || item.command === "messages.summarize") {
     exact(item, ["protocol", "command", "contactId", "limit"]);
@@ -248,11 +255,17 @@ export class TextbutlerControlService {
       return new TextbutlerControlService(state.dataDir, state.settingsPath, journal, options.enrollment, options.providers?.(journal.accountLeases()), options.automation, options.client, options.hooks);
     } catch (error) { journal.close(); throw error; }
   }
+  private currentCache: { dev: number; ino: number; mtimeMs: number; size: number; state: OwnerState; bytes: string } | undefined;
   private async current(): Promise<{ state: OwnerState; bytes: string }> {
     await ensurePrivateDirectory(this.dataDir);
     await ensurePrivateDirectory(dirname(this.settingsPath));
+    const info = await lstat(this.settingsPath);
+    const cached = this.currentCache;
+    if (cached && cached.dev === info.dev && cached.ino === info.ino && cached.mtimeMs === info.mtimeMs && cached.size === info.size) return { state: cached.state, bytes: cached.bytes };
     const bytes = await privateText(this.settingsPath);
-    return { state: parseOwnerState(JSON.parse(bytes)), bytes };
+    const state = parseOwnerState(JSON.parse(bytes));
+    this.currentCache = { dev: info.dev, ino: info.ino, mtimeMs: info.mtimeMs, size: info.size, state, bytes };
+    return { state, bytes };
   }
   async settings(): Promise<Settings> { return (await this.current()).state.settings; }
   async runtimeState(): Promise<OwnerRuntimeState> { const { settings, bindings, grants, revision } = (await this.current()).state; return { settings, bindings, grants, revision }; }
@@ -267,7 +280,7 @@ export class TextbutlerControlService {
   onSettingsChanged(listener: (settings: Settings) => void): () => void { this.settingsListeners.add(listener); return () => this.settingsListeners.delete(listener); }
   private notifySettings(settings: Settings): void { for (const listener of this.settingsListeners) { try { listener(settings); } catch { /* Owner state is authoritative; observers cannot roll it back. */ } } }
   private pendingGrant(contactId: string): boolean {
-    return this.journal.pendingGrants().some(value => value.contactId === contactId) || this.journal.grantIntents().some(value => value.contactId === contactId);
+    return this.journal.pendingGrants(contactId).length !== 0 || this.journal.grantIntents(contactId).length !== 0;
   }
   /** Standing contact enablement may renew a bounded grant; it never changes the recipient. */
   async delegatedGrant(contact: ContactSettings): Promise<string | null> {
@@ -626,6 +639,11 @@ export class TextbutlerControlService {
     if (request.command === "replies.discard") {
       const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
       return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-discarded", discarded: replies.discard(request.draftId) };
+    }
+    if (request.command === "replies.reconcile") {
+      const replies = this.replies ?? fail("unavailable", "Messaging automation is not configured. Replies need an exact Ghostget enrollment.");
+      return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "reply-reconciled",
+        ...await replies.reconcile(request.contactId, request.resolution, signal) }));
     }
     if (request.command === "messaging.start") {
       if (!this.automation) fail("unavailable", "Messaging automation is not configured.");

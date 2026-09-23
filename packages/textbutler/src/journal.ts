@@ -8,6 +8,7 @@ import { automationId, parseAutomationGrant, type AutomationGrant } from "../../
 export type RunState = "running" | "dispatching" | "submitted" | "failed" | "partial" | "indeterminate" | "cancelled" | "ignored" | "abandoned";
 export type RunRecord = Readonly<{ id: string; contactId: string; eventId: string; state: RunState; reason: string; planDigest: string | null; startedAt: number; updatedAt: number }>;
 export type GrantIntent = Readonly<{ id: string; contactId: string; enrollmentId: string; bindingDigest: string }>;
+const RUN_RETENTION_MS = 90 * 86_400_000;
 function grantIntent(value: GrantIntent): GrantIntent {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(value.contactId) || !/^[a-f0-9]{64}$/u.test(value.bindingDigest)) throw new Error("Invalid grant intent scope");
   return { id: automationId(value.id), contactId: value.contactId, enrollmentId: automationId(value.enrollmentId), bindingDigest: value.bindingDigest };
@@ -23,6 +24,7 @@ export class RunJournal {
         UNIQUE(contactId, eventId)
       );
       CREATE UNIQUE INDEX IF NOT EXISTS one_active_contact ON runs(contactId) WHERE state IN ('running','dispatching');
+      CREATE INDEX IF NOT EXISTS runs_updated ON runs(updatedAt);
       CREATE TABLE IF NOT EXISTS pending_grants (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS grant_intents (id TEXT PRIMARY KEY, contactId TEXT NOT NULL, enrollmentId TEXT NOT NULL, bindingDigest TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sent_messages (messageId TEXT PRIMARY KEY, contactId TEXT NOT NULL, runId TEXT NOT NULL, sentAt INTEGER NOT NULL);
@@ -119,7 +121,11 @@ export class RunJournal {
     if (!existing && (this.database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM grant_intents").get()?.count ?? 0) >= 1000) throw new Error("Grant intent recovery capacity reached");
     this.database.query("INSERT OR IGNORE INTO grant_intents VALUES(?,?,?,?)").run(intent.id, intent.contactId, intent.enrollmentId, intent.bindingDigest);
   }
-  grantIntents(): readonly GrantIntent[] { return this.database.query<GrantIntent, []>("SELECT * FROM grant_intents ORDER BY id LIMIT 1001").all().map(grantIntent); }
+  grantIntents(contactId?: string): readonly GrantIntent[] {
+    return (contactId === undefined
+      ? this.database.query<GrantIntent, []>("SELECT * FROM grant_intents ORDER BY id LIMIT 1001").all()
+      : this.database.query<GrantIntent, [string]>("SELECT * FROM grant_intents WHERE contactId = ? ORDER BY id LIMIT 1001").all(contactId)).map(grantIntent);
+  }
   /** Only after authoritative absence or durable conversion to a returned grant. */
   clearGrantIntent(intentId: string): void { this.database.query("DELETE FROM grant_intents WHERE id=?").run(intentId); }
   /** Persist a returned capability before any cancellation check or owner-state publication. */
@@ -138,8 +144,10 @@ export class RunJournal {
       if (intentId !== undefined) this.clearGrantIntent(intentId);
     })();
   }
-  pendingGrants(): readonly { contactId: string; grant: AutomationGrant }[] {
-    return this.database.query<{ id: string; contactId: string; value: string }, []>("SELECT id,contactId,value FROM pending_grants ORDER BY id LIMIT 1001").all().map(row => {
+  pendingGrants(contactId?: string): readonly { contactId: string; grant: AutomationGrant }[] {
+    return (contactId === undefined
+      ? this.database.query<{ id: string; contactId: string; value: string }, []>("SELECT id,contactId,value FROM pending_grants ORDER BY id LIMIT 1001").all()
+      : this.database.query<{ id: string; contactId: string; value: string }, [string]>("SELECT id,contactId,value FROM pending_grants WHERE contactId = ? ORDER BY id LIMIT 1001").all(contactId)).map(row => {
       const grant = parseAutomationGrant(JSON.parse(row.value)); if (grant.id !== row.id) throw new Error("Pending grant identity changed");
       return { contactId: row.contactId, grant };
     });
@@ -149,10 +157,15 @@ export class RunJournal {
   claim(id: string, contactId: string, eventId: string, now: number): boolean {
     // Check uncertainty in the same statement that claims the contact. Another run
     // may settle while this caller awaits provider readiness or account admission.
-    return this.database.query(`INSERT OR IGNORE INTO runs
-      SELECT ?, ?, ?, 'running', 'claimed', NULL, ?, ?
-      WHERE NOT EXISTS (SELECT 1 FROM runs WHERE contactId = ? AND state IN ('partial','indeterminate'))`)
-      .run(id, contactId, eventId, now, now, contactId).changes === 1;
+    let claimed = false;
+    this.database.transaction(() => {
+      this.database.query("DELETE FROM runs WHERE state NOT IN ('partial','indeterminate') AND updatedAt < ?").run(now - RUN_RETENTION_MS);
+      claimed = this.database.query(`INSERT OR IGNORE INTO runs
+        SELECT ?, ?, ?, 'running', 'claimed', NULL, ?, ?
+        WHERE NOT EXISTS (SELECT 1 FROM runs WHERE contactId = ? AND state IN ('partial','indeterminate'))`)
+        .run(id, contactId, eventId, now, now, contactId).changes === 1;
+    })();
+    return claimed;
   }
   transition(id: string, expected: RunState, state: RunState, reason: string, now: number, planDigest: string | null = null): void {
     if (reason.length > 400 || (planDigest !== null && !/^[a-f0-9]{64}$/u.test(planDigest))) throw new Error("Invalid journal transition");
@@ -167,6 +180,16 @@ export class RunJournal {
   }
   hasUncertainSend(contactId: string): boolean {
     return this.database.query("SELECT 1 FROM runs WHERE contactId = ? AND state IN ('partial','indeterminate') LIMIT 1").get(contactId) !== null;
+  }
+  /** Every open send intent blocks this contact until an owner-attested or
+   * observed-history resolution. Never auto-resolve on age alone. */
+  uncertainRuns(contactId: string): readonly RunRecord[] {
+    return this.database.query<RunRecord, [string]>("SELECT * FROM runs WHERE contactId = ? AND state IN ('partial','indeterminate') ORDER BY startedAt DESC LIMIT 8").all(contactId);
+  }
+  reconcile(runId: string, state: "submitted" | "failed" | "abandoned", reason: string, now: number): void {
+    if (reason.length > 400 || !Number.isSafeInteger(now) || now < 0) throw new Error("Invalid journal reconciliation");
+    const result = this.database.query("UPDATE runs SET state = ?, reason = ?, updatedAt = ? WHERE id = ? AND state IN ('partial','indeterminate')").run(state, reason, now, runId);
+    if (result.changes !== 1) throw new Error("Run state changed");
   }
   /** Trusted provenance for disclosure-free sends: which upstream message IDs this
    * daemon dispatched. Cleared markers never leave butler output indistinguishable. */

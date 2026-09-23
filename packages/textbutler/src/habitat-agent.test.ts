@@ -23,7 +23,7 @@ async function fixture(output: unknown, evolution?: Parameters<typeof createHabi
   cleanups.push(async () => { await habitat.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
   const controller = new AbortController();
   const request: AgentRequest = { runId: "synthetic-run", contact, signal: controller.signal, event: { id: "message", contactId: contact.id, routeId: contact.routeId, revision: "1", occurredAt: now - 1000, observedAt: now - 1000, author: "contact", kind: "message", text: "butler help", historical: false, group: false } };
-  return { habitat, journal, request, now, controller, calls: () => calls, advance(ms: number) { clock += ms; } };
+  return { habitat, journal, workspace, request, now, controller, calls: () => calls, advance(ms: number) { clock += ms; } };
 }
 
 test("classification and composition share one model call; only an actual receipt creates learning evidence", async () => {
@@ -94,6 +94,40 @@ test("a web-search request under the default plan is refused before any provider
   const f = await fixture({ respond: true, confidence: 0.95, reason: "helpful", summary: "Search", actions: [], tool: { kind: "web-search", query: "public news" } });
   await expect(f.habitat.agent.compose(f.request)).rejects.toThrow();
   expect(f.calls()).toBe(1);
+});
+
+test("evolution backoff resets its attempt cycle once firstAt ages past six hours", async () => {
+  let attempts = 0;
+  const f = await fixture({}, async () => { attempts++; throw Error("Unavailable"); });
+  new ContactHabitat(f.journal, f.request.contact.id).record({ runId: "recorded", at: f.now, intent: "Explain", trigger: { id: "trigger", at: f.now - 1000, author: "contact", kind: "message", text: "Synthetic request", relatedMessageId: null }, context: [], text: "Answer", messageIds: ["sent"], planDigest: null });
+  for (let i = 0; i < 11; i++) { f.habitat.schedule(f.request.contact); await f.habitat.idle(); f.advance(2_000_000); }
+  expect(attempts).toBe(3);
+  f.habitat.schedule(f.request.contact); await f.habitat.idle();
+  expect(attempts).toBe(4);
+  f.advance(30_000); f.habitat.schedule(f.request.contact); await f.habitat.idle();
+  expect(attempts).toBe(4);
+});
+
+test("recorded episode context follows the champion plan's context window", async () => {
+  const f = await fixture({ respond: true, confidence: 0.95, reason: "requested", summary: "Explain briefly", actions: [{ kind: "text", text: "A useful answer" }], tool: null });
+  await f.workspace.write("history/recent.json", JSON.stringify({ messages: Array.from({ length: 25 }, (_, index) => ({ id: `history-${index}`, at: f.now - 25_000 + index * 1000, author: index % 2 ? "owner" : "contact", text: `message ${index}` })) }));
+  f.journal.writeHabitatState(f.request.contact.id, 0, JSON.stringify({ version: 1, revision: 1, champion: { ...DEFAULT_HABITAT_PLAN, contextMessages: 20 }, episodes: [], evaluations: [], lineage: [], ancestors: [], denied: [] }));
+  await f.habitat.agent.compose(f.request);
+  f.habitat.submitted({ ...f.request, actions: [{ kind: "text", text: "A useful answer" }], messageIds: ["accepted"], at: f.now });
+  const episode = new ContactHabitat(f.journal, f.request.contact.id).snapshot().episodes[0];
+  expect(episode?.reply.context).toHaveLength(20);
+  expect(episode?.reply.context[0]?.id).toBe("history-5");
+});
+
+test("low-confidence outputs carrying actions or tools are clamped to silence", async () => {
+  const sloppy = await fixture({ respond: true, confidence: 0.8, reason: "helpful", summary: "Tentative", actions: [{ kind: "text", text: "Sloppy" }], tool: null });
+  expect((await sloppy.habitat.agent.classify(sloppy.request) as { respond: boolean }).respond).toBe(false);
+  await expect(sloppy.habitat.agent.compose(sloppy.request)).rejects.toThrow();
+  expect(sloppy.calls()).toBe(1);
+  const tooled = await fixture({ respond: false, confidence: 0.95, reason: "not_needed", summary: "Nothing needed", actions: [], tool: { kind: "meme-search", query: "shrug" } });
+  expect((await tooled.habitat.agent.classify(tooled.request) as { respond: boolean }).respond).toBe(false);
+  await expect(tooled.habitat.agent.compose(tooled.request)).rejects.toThrow();
+  expect(tooled.calls()).toBe(1);
 });
 
 test("low confidence stays silent and unsupported rich actions cannot be proposed as text", async () => {

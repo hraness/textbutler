@@ -105,6 +105,7 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; draftId: string; expectedDigest: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.send"; contactId: string; text: string; expectedRevision?: number }
   | { protocol: typeof CONTROL_PROTOCOL; command: "replies.discard"; draftId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "replies.reconcile"; contactId: string; resolution?: "sent" | "failed" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "activity.list" };
 export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "provider-login"; accountId: string; challenge: ProviderLoginChallenge; snapshot: DesktopSnapshot }
@@ -122,6 +123,7 @@ export type ControlResponse =
   | ({ protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "message-capabilities" } & MessageCapabilitiesResult)
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-sent"; contactId: string; runId: string; state: "submitted" | "failed" | "partial" | "indeterminate" | "cancelled"; detail: string }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-discarded"; discarded: boolean }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-reconciled"; contactId: string; runId?: string; resolved: boolean; state?: "submitted" | "failed"; detail: string }
   | { protocol: typeof CONTROL_PROTOCOL; ok: false; code: "disconnected" | "invalid-request" | "conflict" | "capacity" | "unavailable"; message: string };
 export interface DesktopControlPort { request(request: ControlRequest): Promise<ControlResponse> }
 
@@ -329,6 +331,11 @@ export function parseControlResponse(value: unknown): ControlResponse {
       state: oneOf(row.state, ["submitted", "failed", "partial", "indeterminate", "cancelled"]), detail: text(row.detail, 512) };
   }
   if (row.kind === "reply-discarded") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-discarded", discarded: bool(row.discarded) };
+  if (row.kind === "reply-reconciled") {
+    return { protocol: CONTROL_PROTOCOL, ok: true, kind: "reply-reconciled", contactId: text(row.contactId, 256), resolved: bool(row.resolved), detail: text(row.detail, 512),
+      ...(row.runId === undefined ? {} : { runId: text(row.runId, 120) }),
+      ...(row.state === undefined ? {} : { state: oneOf(row.state, ["submitted", "failed"]) }) };
+  }
   if (row.kind !== "snapshot") throw new Error("Unknown control response kind.");
   const source = record(row.snapshot); const global = record(source.settings);
   if (source.protocol !== CONTROL_PROTOCOL) throw new Error("Incompatible snapshot protocol.");

@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmod, link, lstat, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ContactWorkspace } from "./workspace.ts";
@@ -57,6 +57,34 @@ test("an interrupted atomic-write stage does not obstruct memory recovery", asyn
   expect((await workspace.list()).some(file => file.path.includes("staging"))).toBe(false);
   expect(await workspace.read("notes/recovery.md")).toBe("The original memory is available.");
   await expect(workspace.read(".staging/interrupted-write")).rejects.toThrow();
+});
+test("creation sweeps stale staging orphans but never an in-flight stage", async () => {
+  const { workspace } = await setup();
+  const staging = join(workspace.root, ".staging");
+  await writeFile(join(staging, "crash-orphan"), "stale staged bytes", { mode: 0o600 });
+  await writeFile(join(staging, "active-stage"), "younger staged bytes", { mode: 0o600 });
+  const stale = new Date(Date.now() - 120_000);
+  await utimes(join(staging, "crash-orphan"), stale, stale);
+  await ContactWorkspace.create(workspace.root);
+  await expect(lstat(join(staging, "crash-orphan"))).rejects.toMatchObject({ code: "ENOENT" });
+  expect((await lstat(join(staging, "active-stage"))).isFile()).toBe(true);
+});
+test("AGENTS.md is created once and stays read-only for every writable file path", async () => {
+  const { workspace } = await setup();
+  const original = await workspace.read("AGENTS.md");
+  expect(original).toContain("Textbutler");
+  const { revision } = await workspace.readVersioned("AGENTS.md");
+  for (const attempt of [
+    () => workspace.write("AGENTS.md", "injected instructions"),
+    () => workspace.writeVersioned("AGENTS.md", "injected instructions", null),
+    () => workspace.writeVersioned("AGENTS.md", "injected instructions", revision),
+    () => workspace.edit("AGENTS.md", "Your role", "replanted"),
+  ]) await expect(attempt()).rejects.toThrow();
+  expect(await workspace.read("AGENTS.md")).toBe(original);
+  await workspace.write("MEMORY.md", "Memory stays writable.");
+  await ContactWorkspace.create(workspace.root);
+  expect(await workspace.read("AGENTS.md")).toBe(original);
+  expect(await workspace.read("MEMORY.md")).toBe("Memory stays writable.");
 });
 
 test("binary attachments are admitted as owned snapshots without widening text tools", async () => {

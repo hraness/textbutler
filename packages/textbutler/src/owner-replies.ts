@@ -48,6 +48,13 @@ export interface ReplySendResult {
   readonly state: "submitted" | "failed" | "partial" | "indeterminate" | "cancelled";
   readonly detail: string;
 }
+export interface ReplyReconcileResult {
+  readonly contactId: string;
+  readonly runId?: string;
+  readonly resolved: boolean;
+  readonly state?: "submitted" | "failed";
+  readonly detail: string;
+}
 
 interface ReplyDraft {
   readonly id: string;
@@ -63,7 +70,7 @@ interface ReplyDraft {
   readonly bindingDigest: string;
   readonly review: ReplyDraftDetail;
 }
-export interface PendingObservation { readonly count: number; readonly lastAt: number; readonly preview: string | null; readonly ready: boolean }
+export interface PendingObservation { readonly count: number; readonly lastAt: number; readonly preview: string | null; readonly ready: boolean; readonly observedAt?: number }
 
 const DRAFT_TTL_MS = 15 * 60_000;
 const DRAFT_LIMIT = 64;
@@ -130,21 +137,21 @@ export class OwnerReplies {
   }
 
   private pendingGrantRecovery(contactId: string): boolean {
-    return this.ports.journal.grantIntents().some(intent => intent.contactId === contactId)
-      || this.ports.journal.pendingGrants().some(pending => pending.contactId === contactId);
+    return this.ports.journal.grantIntents(contactId).length !== 0 || this.ports.journal.pendingGrants(contactId).length !== 0;
   }
 
   private item(contact: ContactSettings, binding: OwnerBinding | null, observation: PendingObservation | null, reason: string | null): PendingReplyItem {
     const journal = this.ports.journal;
     const recovery = this.pendingGrantRecovery(contact.id);
-    const sendable = observation !== null && observation.ready && reason === null && !recovery && binding?.version === 2
+    const stale = observation !== null && observation.observedAt !== undefined && this.ports.now() - observation.observedAt > 900_000;
+    const sendable = observation !== null && observation.ready && !stale && reason === null && !recovery && binding?.version === 2
       && this.ports.automation() !== undefined && this.ports.client() !== undefined && !journal.hasUncertainSend(contact.id);
     return {
       contactId: contact.id, name: contact.label, provider: binding?.version === 2 ? binding.identity.provider : binding?.version === 1 ? "imessage" : "none",
       enabled: contact.enabled, pendingCount: observation?.count ?? 0,
       lastInboundAt: observation === null ? null : new Date(observation.lastAt).toISOString(),
       preview: preview(observation?.preview ?? null), sendable,
-      reason: reason ?? (recovery ? "A previous messaging grant needs reconciliation." : observation === null ? null : !observation.ready ? "Messaging catchup is incomplete." : binding?.version !== 2 ? "This selection cannot send; re-enroll it through messaging." : journal.hasUncertainSend(contact.id) ? "A previous send needs reconciliation." : null),
+      reason: reason ?? (recovery ? "A previous messaging grant needs reconciliation." : observation === null ? null : stale ? "The inbox view is stale; scan this conversation again before replying." : !observation.ready ? "Messaging catchup is incomplete." : binding?.version !== 2 ? "This selection cannot send; re-enroll it through messaging." : journal.hasUncertainSend(contact.id) ? "A previous send needs reconciliation." : null),
     };
   }
 
@@ -183,8 +190,8 @@ export class OwnerReplies {
           const page = await client.history(binding.enrollmentId, HISTORY_LIMIT, signal);
           assertAutomationBinding(binding, page.enrollment);
           const cluster = pendingCluster(page.messages, contact, this.ports.journal);
-          this.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: page.enrollment.ready });
-          if (cluster !== null) pending.push(this.item(contact, binding, { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: page.enrollment.ready }, null));
+          this.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: page.enrollment.ready, observedAt: this.ports.now() });
+          if (cluster !== null) pending.push(this.item(contact, binding, { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: page.enrollment.ready, observedAt: this.ports.now() }, null));
         } catch { this.notePending(contact.id, null); unreadable++; }
       } else if (enrollment) {
         try {
@@ -196,8 +203,8 @@ export class OwnerReplies {
             if (message.author !== "contact") break;
             count++; lastAt ??= message.at; lastText ??= message.text;
           }
-          this.notePending(contact.id, count === 0 ? null : { count, lastAt: lastAt!, preview: lastText, ready: true });
-          if (count > 0) pending.push(this.item(contact, binding, { count, lastAt: lastAt!, preview: lastText, ready: true }, "This Messages selection is read-only; re-enroll it through messaging to reply."));
+          this.notePending(contact.id, count === 0 ? null : { count, lastAt: lastAt!, preview: lastText, ready: true, observedAt: this.ports.now() });
+          if (count > 0) pending.push(this.item(contact, binding, { count, lastAt: lastAt!, preview: lastText, ready: true, observedAt: this.ports.now() }, "This Messages selection is read-only; re-enroll it through messaging to reply."));
         } catch { this.notePending(contact.id, null); unreadable++; }
       }
     }
@@ -229,8 +236,8 @@ export class OwnerReplies {
     const { enrollment, messages } = await client.history(binding.enrollmentId, HISTORY_LIMIT, signal);
     assertAutomationBinding(binding, enrollment);
     const cluster = pendingCluster(messages, contact, this.ports.journal);
-    this.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: enrollment.ready });
-    const item = this.item(contact, binding, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: enrollment.ready }, null);
+    this.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: enrollment.ready, observedAt: this.ports.now() });
+    const item = this.item(contact, binding, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: enrollment.ready, observedAt: this.ports.now() }, null);
     if (cluster === null) return { draft: null, pending: item };
     if (!enrollment.ready) fail("unavailable", "Messaging catchup is incomplete. Wait for a current conversation before requesting a suggestion.");
     const history = boundedHistory(messages.filter(message => message.kind === "message" && message.direction !== "unknown")
@@ -322,6 +329,41 @@ export class OwnerReplies {
   }
 
   discard(draftId: string): boolean { return this.drafts.delete(draftId); }
+
+  /** Resolve a journaled uncertain send. With no explicit resolution, observed
+   * history decides: exactly one unjournaled butler-authored outgoing message in
+   * the dispatch window means the send landed. Anything else needs the owner's
+   * attestation after checking Messages. This path never retries a send. */
+  async reconcile(contactId: string, resolution: "sent" | "failed" | undefined, signal: AbortSignal): Promise<ReplyReconcileResult> {
+    const state = await this.ports.state();
+    const contact = state.settings.contacts.find(value => value.id === contactId);
+    if (!contact) fail("invalid-request", "This contact is not configured by the owner.");
+    const uncertain = this.ports.journal.uncertainRuns(contact.id);
+    if (!uncertain.length) return { contactId: contact.id, resolved: true, detail: "No send is awaiting reconciliation." };
+    const run = uncertain[0]!;
+    const binding = state.bindings[contact.id], client = this.ports.client();
+    let outcome = resolution, observedId: string | null = null;
+    if (outcome === undefined) {
+      if (binding?.version !== 2 || !client) return { contactId: contact.id, runId: run.id, resolved: false,
+        detail: "Check Messages for this conversation, then reconcile with --sent or --failed." };
+      const page = await client.history(binding.enrollmentId, 200, signal); assertAutomationBinding(binding, page.enrollment);
+      const candidates = page.messages.filter(message => message.direction === "outgoing" && Date.parse(message.occurredAt) >= run.startedAt - 30_000
+        && Date.parse(message.occurredAt) <= run.startedAt + 900_000 && !this.ports.journal.isButlerMessage(contact.id, message.id)
+        && messageAuthor(message, contact, this.ports.journal) === "butler");
+      if (candidates.length === 1) { outcome = "sent"; observedId = candidates[0]!.id; }
+      else return { contactId: contact.id, runId: run.id, resolved: false,
+        detail: candidates.length === 0
+          ? "No matching outgoing message in this conversation. If the reply did not arrive, run `textbutler replies reconcile CONTACT --failed`; if it did, `--sent`."
+          : `${candidates.length} possible sends were observed. Check Messages, then reconcile with --sent or --failed.` };
+    }
+    if (outcome === "sent") {
+      if (observedId !== null) this.ports.journal.recordSentMessages(contact.id, run.id, [observedId], this.ports.now());
+      this.ports.journal.reconcile(run.id, "submitted", observedId === null ? "reconciled: owner-confirmed delivery" : "reconciled: delivery observed in conversation history", this.ports.now());
+      return { contactId: contact.id, runId: run.id, resolved: true, state: "submitted", detail: "Marked the send as delivered." };
+    }
+    this.ports.journal.reconcile(run.id, "failed", "reconciled: owner-confirmed not delivered", this.ports.now());
+    return { contactId: contact.id, runId: run.id, resolved: true, state: "failed", detail: "Marked the send as not delivered. New replies may proceed." };
+  }
 
   /** The bounded preview never authorizes a send. Return the complete ordered
    * batch and its recipient/content digest for explicit owner review. */
