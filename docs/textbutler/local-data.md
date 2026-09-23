@@ -2,7 +2,7 @@
 
 Textbutler keeps settings, contact memory, reply journals and setup records in
 `~/Library/Application Support/Textbutler`, unless you select another data
-directory. These files are private to the Mac user. XCB and Ghostget keep their
+directory. These files are private to the Mac user. xcb and Ghostget keep their
 own accounts and credentials in their separately configured state directories.
 
 Explicit CLI media imports live in the selected contact's private `outbox`.
@@ -47,7 +47,7 @@ needed to settle that operation first.
 To erase an installation, the owner can then delete its complete Textbutler
 data directory. This removes settings, contact memory, journals, setup results
 and the iMessage account binding. It does not delete Messages history, Ghostget
-or XCB accounts, or macOS permission grants. Removing individual binding or
+or xcb accounts, or macOS permission grants. Removing individual binding or
 custody records is not a supported way to replace an account or retry a failed
 operation. Reinstalling the command and uninstalling the background service
 both preserve data by default.

@@ -210,7 +210,7 @@ describe('supported source presentation', () => {
     expect(renderedHomePage).toContain('View legacy history sources.');
     expect(renderedHomePage).not.toContain('messagelikeme ingest');
     expect(renderedSourcesPage).toContain('Legacy history sources');
-    expect(renderedSourcesPage).toContain('separate from Textbutler’s planned live Messages transport');
+    expect(renderedSourcesPage).toContain('They only import old messages and are separate from Textbutler’s live iMessage, WhatsApp, and Beeper connections');
     expect(modelText).toContain('## Current Textbutler development status');
     expect(modelText).toContain('## Legacy Message Like Me history tools');
     expect(sourcesPage).toContain('Beeper via Ghostget');
@@ -391,7 +391,7 @@ describe('supported source presentation', () => {
       'Global pause and active contact limits',
     ]);
     expect(renderedRootLayout).not.toContain('downloadUrl');
-    expect(renderedRootLayout).toContain('In development; explicit messaging and agent setup required; CLI and menu companion');
+    expect(renderedRootLayout).toContain('"creativeWorkStatus":"In development"');
     for (const supportedSource of SUPPORTED_SOURCES) {
       expect(readme).toContain(`| ${supportedSource.name} |`);
       expect(llms).toContain(supportedSource.name);

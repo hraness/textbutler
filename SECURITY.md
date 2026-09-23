@@ -1,7 +1,7 @@
 # Security
 
 Report suspected vulnerabilities privately through
-[GitHub Security Advisories](https://github.com/hraness/message-like-me/security/advisories/new).
+[GitHub Security Advisories](https://github.com/hraness/textbutler/security/advisories/new).
 Do not open a public issue containing a message, handle, contact name, group
 title, attachment, local path, profile, study or Ensoul packet, installation key, or
 database detail that could identify a person.

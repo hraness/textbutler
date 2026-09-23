@@ -4,7 +4,10 @@ The owner authorized replacing the unused Message Like Me product with
 Textbutler at `textbutler.app`. The current rebrand overrides historical product
 name, description, and drafts-only marketing instructions below. Describe the
 new menu companion, daemon, contact-scoped memory, selected coding agent, and disclosed
-responses, with exact development/qualification status. Do not advertise live
+responses. State the development status once, near the top, by rendering
+`SITE_STATUS` from `app/_lib/site.ts`; put each other limit beside the feature it
+limits, in the reader's terms, and keep qualification, admission, composition and
+custody vocabulary off the pages. Do not advertise live
 autoresponses, rich transport support, or a signed download before verified.
 Retained Message Like Me source documentation describes the legacy history
 reader. Preserve immutable artifact versions and the production delivery gates
@@ -12,7 +15,8 @@ below until their reviewed publication-identity migration is complete.
 
 # Contents
 
-- `app/` – the public Message Like Me project page, metadata, and visual system.
+- `app/` – the public Textbutler project page, its legacy Message Like Me pages,
+  metadata, and visual system.
 - `public/` – finite site-wide images and browser assets.
 - `package.json`, `next.config.ts`, `postcss.config.mjs`, and `bun.lock` – the
   checked native Next.js build deployed from this directory to Vercel.
@@ -21,13 +25,14 @@ below until their reviewed publication-identity migration is complete.
 
 - Keep the page informational. It must never accept, upload, transmit, or
   request message history, contact data, study packets, profiles, or drafts.
-- Keep the canonical product description exact: “A local-first CLI and Agent
-  Skill for studying private messaging history and drafting messages that sound
-  like you.” Route installation to the exact public npm version and its
-  immutable GitHub artifact mirror.
-- Describe the CLI as local-first, bring-your-own-agent, source-aware, and
-  drafts-only. Never imply that the site analyzes data or that Message Like Me
-  sends messages.
+- Where the site describes the legacy Message Like Me package, keep its
+  description exact: “A local-first CLI and Agent Skill for studying private
+  messaging history and drafting messages that sound like you.” Route legacy
+  installation to the exact public npm version and its immutable GitHub
+  artifact mirror.
+- Describe the legacy Message Like Me CLI as local-first, bring-your-own-agent,
+  source-aware, and drafts-only. Never imply that the site analyzes data or that
+  Message Like Me sends messages.
 - Use synthetic examples only. Do not publish real counts, labels, handles,
   excerpts, identities, private paths, or derived personal profiles.
 - Use Bun 1.3.14 for installation and scripts and Node 24 for Next.js. Run

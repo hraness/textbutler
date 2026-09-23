@@ -8,7 +8,7 @@ import About from '../app/about/page.tsx';
 import Preview from '../app/preview/page.tsx';
 import { GET as getDiscoveryText } from '../app/llms.txt/route.ts';
 import { checkMarketingSnapshot } from '../styles/vendor/hraness-marketing/check.mjs';
-import { GETTING_STARTED_URL, GITHUB_URL, SOFTWARE_VERSION } from '../app/_lib/site.ts';
+import { GETTING_STARTED_URL, GITHUB_URL, SITE_STATUS, SITE_STATUS_LABEL, SOFTWARE_VERSION } from '../app/_lib/site.ts';
 
 const siteRoot = resolve(import.meta.dir, '..');
 
@@ -24,10 +24,31 @@ const HERO_VOCABULARY_TO_AVOID = [
   'receipt',
 ] as const;
 
-test('renders Textbutler with the shared grammar and honest development status', () => {
+// Delivery vocabulary from AGENTS.md and the XCB receipt. Pages say what the
+// reader gets instead; the one status statement lives in SITE_STATUS.
+const PAGE_VOCABULARY_TO_AVOID = [
+  'admission',
+  'admitted',
+  'qualification',
+  'qualified',
+  'custody',
+  'composition',
+  'source pilot',
+  'source daemon',
+  'compiled runtime',
+  'receipt',
+] as const;
+
+// The shared Related block is portfolio copy owned outside this repository.
+function textBeforeRelated(html: string): string {
+  const related = html.indexOf('data-hraness-marketing="related"');
+  return (related === -1 ? html : html.slice(0, related)).replace(/<[^>]+>/gu, ' ').toLowerCase();
+}
+
+test('renders Textbutler with the shared grammar and one development status', () => {
   const html = renderToStaticMarkup(<Home />);
   expect(html.match(/<h1\b/gu)).toHaveLength(1);
-  expect(html).toContain('>A little help in your conversations</h1>');
+  expect(/<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1]).toMatch(/butler/iu);
   for (const role of ['header', 'hero', 'proof-frame', 'section', 'flow', 'trust', 'questions', 'cta', 'footer']) {
     expect(html).toContain(`data-hraness-marketing="${role}"`);
   }
@@ -40,16 +61,18 @@ test('renders Textbutler with the shared grammar and honest development status',
   expect(html).toContain('data-foil=""');
   expect(html).toContain('Textbutler');
   expect(html).toContain('See what’s ready');
+  expect(html.split(SITE_STATUS)).toHaveLength(2);
   expect(html).toContain('New installations start paused');
   expect(html).toContain('iMessage and WhatsApp');
-  expect(html).toContain('can connect Claude Code or Codex subscriptions through xcb');
-  expect(html).toContain('It is billed separately from a Claude Code subscription');
+  expect(html).toContain('Claude Code or Codex, through your own subscription and xcb');
+  expect(html).toContain('billed separately from a Claude Code subscription');
+  expect(html).toContain('Vercel AI Gateway');
   expect(html).toContain('no AI account');
-  expect(html).toContain('The source daemon has no composition admission and keeps AI replies unavailable');
-  expect(html).toContain('no provider tools');
-  expect(html).toContain('MIT-licensed reference application');
-  expect(html).toContain('Live delivery and rich actions still need verification on your account.');
-  expect(html).toContain('No windowed app download is provided');
+  expect(html).toContain('Running from source never writes AI replies.');
+  expect(html).toContain('no tools of its own');
+  expect(html).toContain('MIT-licensed');
+  expect(html).toContain('test delivery and rich actions on your own account');
+  expect(html).toContain('no app to download');
   expect(html).toContain(`Message Like Me v${SOFTWARE_VERSION}`);
   expect(html).toContain('It does not install Textbutler or enable automatic replies.');
   expect(html).toContain('No. textbutler.app is informational');
@@ -69,20 +92,35 @@ test('keeps the hero outcome-led and free of contract vocabulary', () => {
   expect(heading).not.toMatch(/\.$/u);
   expect(heroCopy).toContain('your');
   const boundary = /<p\b[^>]*class="[^"]*\bhraness-marketing-hero__boundary\b[^"]*"[^>]*>([^<]+)<\/p>/u.exec(hero?.[0] ?? '')?.[1] ?? '';
-  expect(boundary).toBe('Source pilot · macOS · iMessage + WhatsApp + Beeper');
+  expect(boundary).toStartWith(`${SITE_STATUS_LABEL} · macOS`);
+  for (const app of ['iMessage', 'WhatsApp', 'Beeper']) expect(boundary).toContain(app);
   expect(boundary).not.toContain(SOFTWARE_VERSION);
   for (const word of HERO_VOCABULARY_TO_AVOID) expect(heroCopy).not.toMatch(new RegExp(`\\b${word}\\b`, 'u'));
 });
 
+test('keeps delivery vocabulary off the product pages', async () => {
+  const discovery = await getDiscoveryText().text();
+  const pages = {
+    home: textBeforeRelated(renderToStaticMarkup(<Home />)),
+    about: textBeforeRelated(renderToStaticMarkup(<About />)),
+    preview: textBeforeRelated(renderToStaticMarkup(<Preview />)),
+    discovery: discovery.slice(0, discovery.indexOf('## Legacy Message Like Me history tools')).toLowerCase(),
+  };
+  for (const [name, copy] of Object.entries(pages)) {
+    expect(copy.length, name).toBeGreaterThan(0);
+    for (const word of PAGE_VOCABULARY_TO_AVOID) expect(copy, `${name}: ${word}`).not.toMatch(new RegExp(`\\b${word}\\b`, 'u'));
+  }
+});
+
 test('shows synthetic contact context and disclosure without claiming transport support', () => {
   const html = renderToStaticMarkup(<Home />);
-  expect(html).toContain('Synthetic illustration of the intended experience.');
-  expect(html).toContain('No real messages, live agent run, or sent reply is shown.');
-  expect(html).toContain('🤖{ Happy to help. Where are you headed, and for how long? }');
+  expect(html).toContain('Illustration only.');
+  expect(html).toContain('The contact, messages, and reply are made up, and nothing was sent.');
+  expect(html).toContain('🤖{ Where are you headed, and for how long? }');
+  expect(html).not.toContain('Happy to help');
   expect(html).toContain('MEMORY.md');
   expect(html).toContain('AGENTS.md');
-  expect(html).toContain('App Clips and mini apps remain unavailable.');
-  expect(html).toContain('No Linq integration is included.');
+  expect(html).toContain('App Clips, mini apps, and Linq aren’t supported.');
   expect(html).toContain('System Integrity Protection disabled');
   expect(html).toContain('Textbutler never changes that setting.');
   expect(html).toContain('under its own data policies');
@@ -138,12 +176,14 @@ test('admits the released finite marketing snapshot and scopes it to the landing
 test('keeps machine-readable setup and conditional subscription admission consistent with the landing', async () => {
   const discovery = await getDiscoveryText().text();
   expect(discovery).toContain('New installations start paused and new contacts start disabled.');
-  expect(discovery).toContain('can connect Claude Code or Codex through xcb only from a verified installed Textbutler bundle');
-  expect(discovery).toContain('independent Textbutler contact-profile evidence must be current');
-  expect(discovery).toContain('The source daemon remains unadmitted');
-  expect(discovery).toContain('Textbutler CLI and menu companion source is available; there is no published Textbutler package or windowed app download.');
-  expect(discovery).toContain('App Clips, mini apps, and Linq integration remain unavailable.');
-  expect(discovery).toContain('Live delivery still needs verification on the selected account.');
+  expect(discovery).toContain('only from the local install that bun run textbutler:install builds');
+  expect(discovery).toContain('both contact permission profiles match the last reviewed version');
+  expect(discovery).toContain('Running from source never writes AI replies.');
+  expect(discovery).toContain('the account must pass providers check');
+  expect(discovery).toContain('no app to download and no published Textbutler package');
+  expect(discovery).toContain('Vercel AI Gateway');
+  expect(discovery).toContain('App Clips, mini apps, and Linq integration are not supported.');
+  expect(discovery).toContain('Test inference and delivery on your own account');
 });
 
 test('offers guided source setup without implying a released AI engine or menu send approval', async () => {
@@ -152,9 +192,11 @@ test('offers guided source setup without implying a released AI engine or menu s
   const discovery = await getDiscoveryText().text();
   for (const content of [home, about, discovery]) {
     expect(content).toContain(GETTING_STARTED_URL);
-    expect(content).toContain('compiled runtime');
-    expect(content).toContain('reviewed composition evidence');
-    expect(content).toContain('source daemon');
+    expect(content).toContain(SITE_STATUS);
+    expect(content).toContain('bun run textbutler:install');
+    expect(content).toMatch(/last reviewed version/u);
+    expect(content).toMatch(/running from source never writes AI replies/iu);
+    expect(content).toMatch(/Claude API route (?:isn’t|is not) available in any build of this repository/u);
     expect(content).toContain('https://github.com/hraness/xcb');
     expect(content).toContain('prebuilt');
     expect(content).not.toContain('Claude API is available after setup');

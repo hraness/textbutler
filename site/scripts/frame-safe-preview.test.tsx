@@ -3,16 +3,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import nextConfig, { frameSafePreviewHeaders } from '../next.config.ts';
 import PreviewPage, { metadata } from '../app/preview/page.tsx';
+import { SITE_STATUS } from '../app/_lib/site.ts';
 
-test('server-renders an honest script-independent preview with no navigation', () => {
+test('server-renders a script-independent preview with the site status and no navigation', () => {
   const html = renderToStaticMarkup(<PreviewPage />);
 
-  expect(html).toContain('A little help in your conversations');
-  expect(html).toContain('Source pilot. Start with replies you write yourself.');
-  expect(html).toContain('AI replies remain unavailable in the source CLI.');
-  expect(html).toContain('The native menu uses a prebuilt runner.');
-  expect(html).toContain('no windowed app download');
+  expect(html.match(/<h1\b/gu)).toHaveLength(1);
+  expect(html).toContain(SITE_STATUS);
+  expect(html).toContain('replies you write yourself');
+  expect(html).toContain('AI replies also need a local build');
+  expect(html).toContain('uses a prebuilt runner');
+  expect(html).toContain('no app to download');
   expect(html).toContain('Synthetic example · no message sent');
+  expect(html).not.toContain('Happy to help');
   expect(html).not.toMatch(/<(?:a|button|form|script)\b/u);
   expect(metadata.robots).toEqual({ follow: false, index: false });
 });

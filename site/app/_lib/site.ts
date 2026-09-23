@@ -2,8 +2,15 @@ import type { Metadata } from 'next';
 
 export const SITE_NAME = 'Textbutler';
 export const SITE_ORIGIN = 'https://textbutler.app';
+export const SITE_TITLE = 'Textbutler | Your personal message butler for Mac';
 export const SITE_DESCRIPTION =
-  'A local message assistant for Mac. Draft replies in a guided inbox, review every word, and connect iMessage, WhatsApp and Beeper. Source pilot; AI replies remain unavailable.';
+  'A message assistant for your Mac, in development. Draft replies to iMessage, WhatsApp, and Beeper chats in one inbox and review every word before you send.';
+// The one development-status statement. Pages render it where they state the
+// status; README.md repeats it word for word and a site test keeps them equal.
+export const SITE_STATUS_LABEL = 'In development';
+export const SITE_STATUS =
+  `${SITE_STATUS_LABEL}. Textbutler runs from source on a Mac; there is no app to download and no published Textbutler package. Without an AI account you can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox, and send replies you write yourself. AI replies also need a local build of Textbutler and a Claude Code or Codex subscription connected through xcb.`;
+export const SOCIAL_IMAGE_ALT = 'The Textbutler mark and the words “Your personal message butler for Mac” on a light card.';
 export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 export const GETTING_STARTED_URL = `${GITHUB_URL}/blob/main/docs/textbutler/getting-started.md`;
@@ -43,6 +50,7 @@ export function pageMetadata({
 }): Metadata {
   const url = absoluteUrl(path);
   const resolvedTitle = path === '/' ? { absolute: title } : title;
+  const socialTitle = path === '/' ? title : `${title} | ${SITE_NAME}`;
   return {
     title: resolvedTitle,
     description,
@@ -51,23 +59,23 @@ export function pageMetadata({
       type: 'website',
       url,
       siteName: SITE_NAME,
-      title,
+      title: socialTitle,
       description,
       images: [{
         url: absoluteUrl('/opengraph-image'),
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: `${SITE_NAME} — your personal message butler for Mac.`,
+        alt: SOCIAL_IMAGE_ALT,
       }],
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: socialTitle,
       description,
       images: [{
         url: absoluteUrl('/opengraph-image'),
-        alt: `${SITE_NAME} — your personal message butler for Mac.`,
+        alt: SOCIAL_IMAGE_ALT,
       }],
     },
   };

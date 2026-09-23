@@ -55,7 +55,7 @@ provider seam; Textbutler's supported surface is the CLI and status item.
 1. Make it obvious when the butler speaks.
 2. Keep each relationship's memory inspectable and isolated.
 3. Yield to the owner before composing and immediately before dispatch.
-4. Expose proven transport capabilities with honest limitations.
+4. Expose only proven transport capabilities, and state each limit beside the capability it limits.
 5. Keep reusable agent execution separate from messaging policy.
 
 ## Evidence on Hand

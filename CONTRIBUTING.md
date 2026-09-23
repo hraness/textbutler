@@ -20,7 +20,8 @@ attachment, profile, study or Ensoul packet, private path, or installation key i
 snapshot, issue, commit, example, or diagnostic. Build SQLite fixtures from
 synthetic conversations whose people and content never existed.
 
-Preserve these boundaries:
+Preserve these boundaries in the legacy Message Like Me history tools under
+`src/`:
 
 - `chat.db` is opened read-only and query-only; ingestion never changes
   Messages or its source files.
@@ -36,6 +37,10 @@ Preserve these boundaries:
   context.
 - Local IDs remain HMAC-derived, and owned data paths remain physical and
   private.
+
+The Textbutler runtime under `packages/` sends messages and calls AI providers.
+[`docs/textbutler/architecture.md`](docs/textbutler/architecture.md) describes
+those paths and their limits, and `AGENTS.md` lists the rules that govern them.
 
 ## Tests and contracts
 

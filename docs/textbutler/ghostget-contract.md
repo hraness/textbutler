@@ -8,7 +8,7 @@ menu companion's private helper or open provider databases.
 
 The automation contract was first admitted with
 [Ghostget 0.18.2](https://github.com/hraness/ghostget/releases/tag/v0.18.2).
-This development version of native TextButler iMessage setup pins Ghostget
+This development version of the native `TextButler.app` iMessage setup pins Ghostget
 0.18.21. Its matching artifact and live conversation checks remain pending.
 The required contract preserves the native helper's resource bundle, avoids
 opening unrelated protected folders during state validation, and exposes bounded

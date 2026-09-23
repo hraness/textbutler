@@ -14,9 +14,9 @@ export default function NotFound() {
       <SiteHeader />
       <main className="not-found" id="main-content" tabIndex={-1}>
         <p className="eyebrow">404</p>
-        <h1>That page is not here.</h1>
-        <p>The checked documentation and project pages are still available.</p>
-        <Link className="button button-primary" href="/">Return home →</Link>
+        <h1>That page is not here</h1>
+        <p>The docs and project pages are still here.</p>
+        <Link className="button button-primary" href="/">Go to the home page</Link>
       </main>
       <SiteFooter />
     </>
