@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 export const SITE_NAME = 'Textbutler';
 export const SITE_ORIGIN = 'https://textbutler.app';
 export const SITE_DESCRIPTION =
-  'A local message assistant for Mac. Draft replies in a guided inbox, review every word, and connect iMessage, WhatsApp and Beeper. Source pilot; AI replies remain unavailable.';
+  'A local message butler for Mac. Your coding agent reads, triages and answers selected iMessage, WhatsApp and Beeper conversations — each contact in its own editable folder, every reply disclosed and yours to pause.';
 export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 export const GETTING_STARTED_URL = `${GITHUB_URL}/blob/main/docs/textbutler/getting-started.md`;
@@ -58,7 +58,7 @@ export function pageMetadata({
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: `${SITE_NAME} — your personal message butler for Mac.`,
+        alt: `${SITE_NAME} — your agent in your messaging apps, on your Mac.`,
       }],
     },
     twitter: {
@@ -67,7 +67,7 @@ export function pageMetadata({
       description,
       images: [{
         url: absoluteUrl('/opengraph-image'),
-        alt: `${SITE_NAME} — your personal message butler for Mac.`,
+        alt: `${SITE_NAME} — your agent in your messaging apps, on your Mac.`,
       }],
     },
   };

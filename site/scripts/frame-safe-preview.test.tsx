@@ -7,7 +7,7 @@ import PreviewPage, { metadata } from '../app/preview/page.tsx';
 test('server-renders an honest script-independent preview with no navigation', () => {
   const html = renderToStaticMarkup(<PreviewPage />);
 
-  expect(html).toContain('A little help in your conversations');
+  expect(html).toContain('Your agent in your messaging apps');
   expect(html).toContain('Source pilot. Start with replies you write yourself.');
   expect(html).toContain('AI replies remain unavailable in the source CLI.');
   expect(html).toContain('The native menu uses a prebuilt runner.');
