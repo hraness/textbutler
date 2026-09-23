@@ -51,6 +51,9 @@ test("installation creates a fixed private LaunchAgent, preserves data, and neve
   const settings = JSON.parse(await readFile(join(f.dataDir, "state", "settings.json"), "utf8")); expect(settings.settings).toMatchObject({ paused: true, contacts: [] });
   expect((await lstat(f.plistPath)).mode & 0o777).toBe(0o600);
   const plist = await readFile(f.plistPath, "utf8"); expect(plist).toContain("owner &amp; home"); expect(plist).toContain("<key>RunAtLoad</key><true/>");
+  expect(plist).toContain("<key>ProcessType</key><string>Standard</string>");
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  expect(receipt).toMatchObject({ schemaVersion: 4, application: null }); expect(receipt.plistText).toBe(plist);
   const args = f.state.job!.args;
   expect(args.slice(0, 4)).toEqual(["/usr/bin/env", "-i", `HOME=${f.home}`, "PATH=/usr/bin:/bin:/usr/sbin:/sbin"]);
   expect(args[4]).toBe("BUN_RUNTIME_TRANSPILER_CACHE_PATH=0");
@@ -183,11 +186,12 @@ test("daemon login arguments ignore planted startup configuration and inherited 
 test("the previous startup contract remains removable without silent replacement", async () => {
   const f = await fixture(); await f.lifecycle.install(f.dataDir);
   const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
-  receipt.schemaVersion = 1;
+  receipt.schemaVersion = 1; delete receipt.application; delete receipt.plistText;
   await writeFile(f.receiptPath, `${JSON.stringify(receipt)}\n`);
   const current = await readFile(f.plistPath, "utf8");
   const previous = current.replace("<string>--config=/dev/null</string><string>--cwd=/</string>", "")
     .replace("<string>BUN_RUNTIME_TRANSPILER_CACHE_PATH=0</string>", "")
+    .replace("<key>ProcessType</key><string>Standard</string>", "<key>ProcessType</key><string>Background</string>")
     .replace("<key>WorkingDirectory</key><string>/</string>", `<key>WorkingDirectory</key><string>${f.dataDir}</string>`);
   await writeFile(f.plistPath, previous); await f.loadJob();
   expect((await f.lifecycle.status(f.dataDir)).installation).toBe("installed");
@@ -195,7 +199,7 @@ test("the previous startup contract remains removable without silent replacement
   expect(await readFile(f.plistPath, "utf8")).toBe(previous);
   expect((await f.lifecycle.uninstall(f.dataDir)).installation).toBe("absent");
   expect((await f.lifecycle.install(f.dataDir)).installation).toBe("installed");
-  expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(2);
+  expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(4);
 });
 
 function nativeIdentity(f: Awaited<ReturnType<typeof fixture>>): MacosAppIdentity {
@@ -211,7 +215,8 @@ test("an admitted app is the direct launchd executable with a separate bundle id
   expect(plist).toContain(`<key>AssociatedBundleIdentifiers</key><array><string>${MACOS_APP_BUNDLE_ID}</string></array>`);
   expect(plist).toContain("<key>ExitTimeOut</key><integer>60</integer>");
   expect(plist).toContain(`<key>TEXTBUTLER_LAUNCH_AGENT_GENERATION</key><string>${receipt.generation}</string>`);
-  expect(receipt).toMatchObject({ schemaVersion: 3, application });
+  expect(receipt).toMatchObject({ schemaVersion: 4, application });
+  expect(receipt.plistText).toBe(plist); expect(plist).toContain("<key>ProcessType</key><string>Standard</string>");
   expect(await lifecycle.install(f.dataDir)).toMatchObject({ installation: "installed" });
   expect(f.calls.filter(args => args[0] === "bootstrap")).toHaveLength(1);
   expect(await lifecycle.uninstall(f.dataDir)).toMatchObject({ installation: "absent" });
@@ -223,7 +228,7 @@ test("moving from the legacy Bun service to the app requires normal removal and 
   await expect(lifecycle.install(f.dataDir)).rejects.toThrow("another app identity");
   expect(f.state.job!.args[0]).toBe("/usr/bin/env");
   await lifecycle.uninstall(f.dataDir); await lifecycle.install(f.dataDir);
-  expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(3);
+  expect(JSON.parse(await readFile(f.receiptPath, "utf8")).schemaVersion).toBe(4);
   expect(await readFile(settingsPath, "utf8")).toBe(before);
 });
 test("changed app admission never falls back to shared Bun or changes an owned service", async () => {
@@ -235,6 +240,67 @@ test("changed app admission never falls back to shared Bun or changes an owned s
   // Removal uses the exact recorded job even if the install receipt is now
   // unavailable. It does not need to execute the changed app to stop launchd.
   expect(await createLaunchAgentLifecycle({ ...f.host, application: async () => { throw new Error("changed app"); } }).uninstall(f.dataDir)).toMatchObject({ installation: "absent" });
+});
+
+// Reproduce an installation recorded by an older binary: the same plist with
+// the earlier template's ProcessType=Background plus the earlier receipt
+// schema, then reload the job launchd would report for it.
+async function downgrade(f: Awaited<ReturnType<typeof fixture>>, schemaVersion: 2 | 3): Promise<string> {
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8")) as Record<string, unknown>;
+  const prior: Record<string, unknown> = { ...receipt, schemaVersion };
+  delete prior.plistText; if (schemaVersion === 2) delete prior.application;
+  await writeFile(f.receiptPath, `${JSON.stringify(prior)}\n`, { mode: 0o600 });
+  const priorPlist = (await readFile(f.plistPath, "utf8")).replace("<key>ProcessType</key><string>Standard</string>", "<key>ProcessType</key><string>Background</string>");
+  await writeFile(f.plistPath, priorPlist, { mode: 0o600 });
+  await f.loadJob();
+  return priorPlist;
+}
+test("a service recorded by an older binary remains verifiable and removable", async () => {
+  const f = await fixture(); await f.lifecycle.install(f.dataDir);
+  const priorPlist = await downgrade(f, 2);
+  expect((await f.lifecycle.status(f.dataDir)).installation).toBe("installed");
+  await expect(f.lifecycle.install(f.dataDir)).rejects.toThrow("earlier launch contract");
+  expect(await readFile(f.plistPath, "utf8")).toBe(priorPlist);
+  expect((await f.lifecycle.uninstall(f.dataDir)).installation).toBe("absent");
+  expect((await f.lifecycle.install(f.dataDir)).installation).toBe("installed");
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  expect(receipt.schemaVersion).toBe(4); expect(await readFile(f.plistPath, "utf8")).toBe(receipt.plistText);
+});
+test("the prior app-bound launch contract remains verifiable and removable", async () => {
+  const f = await fixture(), application = nativeIdentity(f);
+  const lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => application });
+  await lifecycle.install(f.dataDir);
+  const priorPlist = await downgrade(f, 3);
+  expect((await lifecycle.status(f.dataDir)).installation).toBe("installed");
+  await expect(lifecycle.install(f.dataDir)).rejects.toThrow("earlier launch contract");
+  expect(await readFile(f.plistPath, "utf8")).toBe(priorPlist);
+  expect((await lifecycle.uninstall(f.dataDir)).installation).toBe("absent");
+  expect((await lifecycle.install(f.dataDir)).installation).toBe("installed");
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  expect(receipt).toMatchObject({ schemaVersion: 4, application });
+  expect(await readFile(f.plistPath, "utf8")).toContain("<key>ProcessType</key><string>Standard</string>");
+});
+test("an older recorded contract migrates forward only while its service is absent", async () => {
+  const f = await fixture(), application = nativeIdentity(f);
+  const lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => application });
+  await lifecycle.install(f.dataDir);
+  await downgrade(f, 3);
+  f.state.job = null;
+  expect((await lifecycle.install(f.dataDir)).installation).toBe("installed");
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  expect(receipt).toMatchObject({ schemaVersion: 4, application });
+  const plist = await readFile(f.plistPath, "utf8");
+  expect(plist).toBe(receipt.plistText); expect(plist).toContain("<key>ProcessType</key><string>Standard</string>");
+  expect(f.state.job!.args).toEqual([join(application.appPath, "Contents", "MacOS", "TextButler"), "--daemon"]);
+});
+test("a receipt whose recorded artifact was replaced fails closed", async () => {
+  const f = await fixture(); await f.lifecycle.install(f.dataDir);
+  const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  receipt.plistText = receipt.plistText.replace("<key>ProcessType</key><string>Standard</string>", "<key>ProcessType</key><string>Background</string>");
+  await writeFile(f.receiptPath, `${JSON.stringify(receipt)}\n`, { mode: 0o600 });
+  expect((await f.lifecycle.status(f.dataDir)).installation).toBe("conflict");
+  await expect(f.lifecycle.uninstall(f.dataDir)).rejects.toThrow("exact recorded");
+  expect(await readFile(f.plistPath, "utf8")).toContain("<key>ProcessType</key><string>Standard</string>");
 });
 test("schema3 refuses another loaded generation even at the same executable and plist path", async () => {
   const f = await fixture(), lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => nativeIdentity(f) }); await lifecycle.install(f.dataDir);

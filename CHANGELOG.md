@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.20 (2026-09-24)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.20` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Make the LaunchAgent receipt record the exact rendered plist it installed (schema version 4): installation verification now compares the on-disk service definition with the recorded artifact instead of re-rendering it under the current binary, so a launch-template change can no longer make a newer `textbutler` unable to verify or uninstall a service an older binary installed. Older receipts keep verifying against their historical template bytes, `daemon install` refuses to mutate an owned service on an earlier contract until it is removed and reinstalled, and an absent service's older receipt advances to the recorded-artifact contract in place.
+
 ## 0.8.19 (2026-09-23)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.19` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
