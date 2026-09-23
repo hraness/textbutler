@@ -242,22 +242,22 @@ test("changed app admission never falls back to shared Bun or changes an owned s
   expect(await createLaunchAgentLifecycle({ ...f.host, application: async () => { throw new Error("changed app"); } }).uninstall(f.dataDir)).toMatchObject({ installation: "absent" });
 });
 
-// Reproduce an installation recorded by an older binary: the same plist with
-// the earlier template's ProcessType=Background plus the earlier receipt
-// schema, then reload the job launchd would report for it.
-async function downgrade(f: Awaited<ReturnType<typeof fixture>>, schemaVersion: 2 | 3): Promise<string> {
+// Reproduce an installation recorded by an older binary: the earlier receipt
+// schema plus a plist rendered under a ProcessType any shipped template used,
+// then reload the job launchd would report for it.
+async function downgrade(f: Awaited<ReturnType<typeof fixture>>, schemaVersion: 2 | 3, processType: "Background" | "Standard" = "Background"): Promise<string> {
   const receipt = JSON.parse(await readFile(f.receiptPath, "utf8")) as Record<string, unknown>;
   const prior: Record<string, unknown> = { ...receipt, schemaVersion };
   delete prior.plistText; if (schemaVersion === 2) delete prior.application;
   await writeFile(f.receiptPath, `${JSON.stringify(prior)}\n`, { mode: 0o600 });
-  const priorPlist = (await readFile(f.plistPath, "utf8")).replace("<key>ProcessType</key><string>Standard</string>", "<key>ProcessType</key><string>Background</string>");
+  const priorPlist = (await readFile(f.plistPath, "utf8")).replace("<key>ProcessType</key><string>Standard</string>", `<key>ProcessType</key><string>${processType}</string>`);
   await writeFile(f.plistPath, priorPlist, { mode: 0o600 });
   await f.loadJob();
   return priorPlist;
 }
-test("a service recorded by an older binary remains verifiable and removable", async () => {
+test.each(["Background", "Standard"] as const)("a %s-priority service recorded by an older binary remains verifiable and removable", async processType => {
   const f = await fixture(); await f.lifecycle.install(f.dataDir);
-  const priorPlist = await downgrade(f, 2);
+  const priorPlist = await downgrade(f, 2, processType);
   expect((await f.lifecycle.status(f.dataDir)).installation).toBe("installed");
   await expect(f.lifecycle.install(f.dataDir)).rejects.toThrow("earlier launch contract");
   expect(await readFile(f.plistPath, "utf8")).toBe(priorPlist);
@@ -266,11 +266,11 @@ test("a service recorded by an older binary remains verifiable and removable", a
   const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
   expect(receipt.schemaVersion).toBe(4); expect(await readFile(f.plistPath, "utf8")).toBe(receipt.plistText);
 });
-test("the prior app-bound launch contract remains verifiable and removable", async () => {
+test.each(["Background", "Standard"] as const)("a %s-priority app-bound service recorded by an older binary remains verifiable and removable", async processType => {
   const f = await fixture(), application = nativeIdentity(f);
   const lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => application });
   await lifecycle.install(f.dataDir);
-  const priorPlist = await downgrade(f, 3);
+  const priorPlist = await downgrade(f, 3, processType);
   expect((await lifecycle.status(f.dataDir)).installation).toBe("installed");
   await expect(lifecycle.install(f.dataDir)).rejects.toThrow("earlier launch contract");
   expect(await readFile(f.plistPath, "utf8")).toBe(priorPlist);
@@ -280,11 +280,11 @@ test("the prior app-bound launch contract remains verifiable and removable", asy
   expect(receipt).toMatchObject({ schemaVersion: 4, application });
   expect(await readFile(f.plistPath, "utf8")).toContain("<key>ProcessType</key><string>Standard</string>");
 });
-test("an older recorded contract migrates forward only while its service is absent", async () => {
+test.each(["Background", "Standard"] as const)("an older %s-priority contract migrates forward only while its service is absent", async processType => {
   const f = await fixture(), application = nativeIdentity(f);
   const lifecycle = createLaunchAgentLifecycle({ ...f.host, application: async () => application });
   await lifecycle.install(f.dataDir);
-  await downgrade(f, 3);
+  await downgrade(f, 3, processType);
   f.state.job = null;
   expect((await lifecycle.install(f.dataDir)).installation).toBe("installed");
   const receipt = JSON.parse(await readFile(f.receiptPath, "utf8"));
@@ -292,6 +292,13 @@ test("an older recorded contract migrates forward only while its service is abse
   const plist = await readFile(f.plistPath, "utf8");
   expect(plist).toBe(receipt.plistText); expect(plist).toContain("<key>ProcessType</key><string>Standard</string>");
   expect(f.state.job!.args).toEqual([join(application.appPath, "Contents", "MacOS", "TextButler"), "--daemon"]);
+});
+test("an older receipt never accepts a service definition outside its recorded variants", async () => {
+  const f = await fixture(); await f.lifecycle.install(f.dataDir);
+  await downgrade(f, 2);
+  await writeFile(f.plistPath, (await readFile(f.plistPath, "utf8")).replace("<key>ProcessType</key><string>Background</string>", "<key>ProcessType</key><string>Adaptive</string>"), { mode: 0o600 });
+  expect((await f.lifecycle.status(f.dataDir)).installation).toBe("conflict");
+  await expect(f.lifecycle.uninstall(f.dataDir)).rejects.toThrow("exact recorded");
 });
 test("a receipt whose recorded artifact was replaced fails closed", async () => {
   const f = await fixture(); await f.lifecycle.install(f.dataDir);

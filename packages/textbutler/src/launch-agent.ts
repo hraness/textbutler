@@ -69,17 +69,26 @@ function argsFor(receipt: RenderableReceipt): readonly string[] {
   return [invocation.executable, ...invocation.args];
 }
 function plistPath(home: string, label: LaunchAgentLabel = LAUNCH_AGENT_LABEL): string { return join(home, "Library", "LaunchAgents", `${label}.plist`); }
-function render(receipt: RenderableReceipt): string {
-  // Earlier schemas must keep their historical bytes so a newer binary still
-  // recognizes, reports and removes the artifact it recorded then. Only the
-  // current schema renders the current contract.
+const CURRENT_PROCESS_TYPE = "Standard";
+// Every ProcessType value a shipped template has rendered. Receipts written
+// before the receipt recorded its artifact verify against this closed set of
+// exact historical renders, never against arbitrary bytes.
+const HISTORICAL_PROCESS_TYPES = ["Background", "Standard"] as const;
+function render(receipt: RenderableReceipt, processType: string = CURRENT_PROCESS_TYPE): string {
   const application = receipt.application != null ? `<key>AssociatedBundleIdentifiers</key><array><string>${xml(receipt.application.bundleId)}</string></array>\n<key>EnvironmentVariables</key><dict><key>TEXTBUTLER_LAUNCH_AGENT_GENERATION</key><string>${receipt.generation}</string></dict>\n` : "";
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n${application}<key>WorkingDirectory</key><string>${xml(receipt.schemaVersion === 1 ? receipt.dataDir : "/")}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>${receipt.application != null ? 60 : 15}</integer>\n<key>ProcessType</key><string>${receipt.schemaVersion === 4 ? "Standard" : "Background"}</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${receipt.label}</string>\n<key>ProgramArguments</key><array>${argsFor(receipt).map(arg => `<string>${xml(arg)}</string>`).join("")}</array>\n${application}<key>WorkingDirectory</key><string>${xml(receipt.schemaVersion === 1 ? receipt.dataDir : "/")}</string>\n<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer>\n<key>ExitTimeOut</key><integer>${receipt.application != null ? 60 : 15}</integer>\n<key>ProcessType</key><string>${processType}</string>\n<key>LimitLoadToSessionType</key><string>Aqua</string>\n<key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>/dev/null</string>\n<key>StandardErrorPath</key><string>/dev/null</string>\n</dict></plist>\n`;
 }
-/** The exact artifact a receipt binds: recorded bytes for schema 4, the
- * historical render for older receipts. Verification never re-derives the
- * current template, so contract changes cannot strand an installed service. */
+/** The artifact a receipt binds when producing bytes: recorded for schema 4,
+ * the current contract render for older receipts being advanced. */
 function expectedPlistText(receipt: Receipt): string { return receipt.schemaVersion === 4 ? receipt.plistText : render(receipt); }
+/** The artifacts a receipt accepts when verifying an installation: the
+ * recorded bytes for schema 4, or every known historical render for a
+ * receipt written before it recorded its artifact. A launch-template change
+ * can therefore never strand a service an earlier binary installed. */
+function expectedPlistTexts(receipt: Receipt): readonly string[] {
+  if (receipt.schemaVersion === 4) return [receipt.plistText];
+  return HISTORICAL_PROCESS_TYPES.map(processType => render(receipt, processType));
+}
 
 function parseReceipt(text: string, host: LaunchAgentHost, dataDir: string): Receipt {
   const item: unknown = JSON.parse(text);
@@ -202,7 +211,7 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
     const receiptFile = join(dataDir, "state", "launch-agent.json");
     const stored = await readOwned(receiptFile, host.uid); const receipt = stored ? parseReceipt(stored.text, host, dataDir) : null;
     const installed = await readOwned(plist, host.uid);
-    if (installed && (!receipt || installed.text !== expectedPlistText(receipt))) fail("The LaunchAgent plist is not the exact recorded Textbutler artifact.");
+    if (installed && (!receipt || !expectedPlistTexts(receipt).includes(installed.text))) fail("The LaunchAgent plist is not the exact recorded Textbutler artifact.");
     const job = parseJob(await host.run(["print", target]), receipt, host);
     return { receiptFile, stored, receipt, installed, job };
   };
@@ -263,9 +272,13 @@ export function createLaunchAgentLifecycle(host: LaunchAgentHost = defaultLaunch
         try { await lstat(daemonSocketPath(dataDir)); fail("An existing daemon socket must be reconciled before bootstrapping a service."); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
         let stored = state.stored;
         const serialized = `${JSON.stringify(receipt)}\n`;
-        if (stored === null || stored.text !== serialized) stored = await updateFile(state.receiptFile, stored, serialized, host.uid);
         const plistText = expectedPlistText(receipt);
-        if (state.installed === null || state.installed.text !== plistText) await updateFile(plist, state.installed, plistText, host.uid);
+        // Replacing an artifact an earlier contract recorded: write the plist
+        // first so an interruption still verifies against the older receipt's
+        // historical renders instead of stranding a newer receipt behind them.
+        if (state.installed !== null && state.installed.text !== plistText) await updateFile(plist, state.installed, plistText, host.uid);
+        if (stored === null || stored.text !== serialized) stored = await updateFile(state.receiptFile, stored, serialized, host.uid);
+        if (state.installed === null) await updateFile(plist, null, plistText, host.uid);
         receipt = { ...receipt, phase: "installing" }; stored = await updateFile(state.receiptFile, stored, `${JSON.stringify(receipt)}\n`, host.uid);
         const result = await host.run(["bootstrap", `gui/${host.uid}`, plist]);
         const job = parseJob(await host.run(["print", target]), receipt, host);
