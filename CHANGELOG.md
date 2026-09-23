@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.18 (2026-09-23)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.18` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Let the local TextButler app build against a persistent owner signing identity with `--signing-identity`, so macOS permission grants such as Full Disk Access and Apple Events bind to a stable certificate instead of each ad-hoc rebuild's changing code hash. The managed app receipt records the signing class explicitly (`ad-hoc` or `certificate`), treats a signing-class change as a new permission target that requires reinstall, and rejects unreviewed signing classes at startup. Ad-hoc signing remains the default for development builds.
+
 ## 0.8.17 (2026-09-23)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.17` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.

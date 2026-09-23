@@ -1,6 +1,6 @@
 {
   "name": "@hraness/message-like-me",
-  "version": "0.8.17",
+  "version": "0.8.18",
   "description": "A local-first CLI and Agent Skill for studying private messaging history and drafting messages that sound like you.",
   "license": "MIT",
   "type": "module",
