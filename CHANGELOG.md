@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.19 (2026-09-23)
+
+- Bind legacy installation to the exact public `@hraness/message-like-me@0.8.19` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
+- Run the Textbutler daemon at standard launchd priority instead of `Background`: on a loaded host the previous setting starved the messaging child's spawn-synchronous startup, so automation initialization could outlast its request deadline and cycle through recovery without ever answering inbound messages.
+- Make the automation child's initialize watchdog progress-aware: it re-arms only while the recorded process group proves CPU progress, so a slowly starting child is adopted instead of orphaned while a genuinely frozen child still dies on the original deadline under the same hard cap.
+- Escalate failed-child cleanup to the recorded process group whenever that group may be alive rather than only while the direct child process entry is absent, so same-group helpers left behind by a closed child meet SIGKILL instead of surviving as orphans.
+
 ## 0.8.18 (2026-09-23)
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.18` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.

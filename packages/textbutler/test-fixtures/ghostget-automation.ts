@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { basename } from "node:path";
 import { AUTOMATION_PROTOCOL } from "../../transport/src/automation-contract.ts";
 
@@ -13,7 +14,14 @@ process.stdin.on("data", (chunk: string) => {
   let at: number;
   while ((at = buffer.indexOf("\n")) !== -1) {
     const request = JSON.parse(buffer.slice(0, at)); buffer = buffer.slice(at + 1);
-    if (request.method === "initialize") reply(request, { initialized: true });
+    if (request.method === "initialize" && mode === "slow-initialize") {
+      // A same-group helper burns CPU while initialize answers late, mirroring
+      // a loaded host whose startup progress must extend the request watchdog.
+      spawn(process.execPath, ["-e", "const s=Date.now();while(Date.now()-s<600);"], { detached: false, stdio: "ignore" }).unref();
+      setTimeout(() => reply(request, { initialized: true }), 700);
+    }
+    else if (request.method === "initialize" && mode === "deaf-initialize") { /* A frozen child never answers. */ }
+    else if (request.method === "initialize") reply(request, { initialized: true });
     else if (request.method === "conversations" && mode.startsWith("remote-")) {
       process.stdout.write(JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id: request.id, ok: false,
         error: { code: mode.slice("remote-".length), message: "private fixture body, handle and /synthetic/private/path" } }) + "\n");
@@ -31,7 +39,13 @@ process.stdin.on("data", (chunk: string) => {
     else if (request.method === "cancel") {
       reply(request, { cancelled: true });
       if (sending) { const params = sending.params as Record<string, string>; reply(sending, { id: "run:fixture", planId: params.planId, intentId: "intent:fixture", enrollmentId: "enrollment:fixture", state: "partial", accepted: [{ messageId: "sent:fixture", providerReceiptId: null }], totalActions: 2, reason: "Synthetic cancellation", retryable: false }); sending = undefined; }
-    } else if (request.method === "close") { reply(request, { closed: true }); process.stdin.pause(); setTimeout(() => process.exit(0), 5); }
+    } else if (request.method === "close") {
+      reply(request, { closed: true });
+      // A same-group sibling that ignores SIGTERM must still meet the SIGKILL
+      // escalation after this child exits; it must never be left orphaned.
+      if (mode === "leave-sibling") spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"], { detached: false, stdio: "ignore" }).unref();
+      process.stdin.pause(); setTimeout(() => process.exit(0), 5);
+    }
     else process.exit(3);
   }
 });

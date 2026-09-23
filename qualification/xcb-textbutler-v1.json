@@ -14,7 +14,7 @@
   },
   "sources": {
     "bun.lock": "7931f129ecf2a2a8aa00dfa164f26e87c4e81e9f4992d215d6a52e080085dbbb",
-    "package.json": "f4b15a7d70b1d1606232bdc9234085ccb456abe8f3748f1c5be4daab704b111d",
+    "package.json": "03cca0373fe56b0595fc52d1824bf3bb2ba9234b702ac127ea155f4c872ff08c",
     "packages/control/src/index.ts": "582369440a0e5af38bf418b446480b43e8bf35a5676aabd2b4e5f7d907a656ac",
     "packages/textbutler/src/cli.ts": "86d5de9e679ad795b9d2e94762bedbff04b53a40e15846f7604080d14e3ee0c0",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
@@ -22,7 +22,7 @@
     "packages/textbutler/src/daemon.ts": "158a15c0404de06c4b318a338ed7ba7e1727617b49f9301d095cf6406e1aa95c",
     "packages/textbutler/src/host-config.ts": "ce53265541564c0ef0ebeeb6c3c8fbb2af0e065656aa6f871eef8ec14d742b7d",
     "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
-    "packages/textbutler/src/launch-agent.ts": "16d63e713691a236071da04a77b348106ee2d822a586d0519d07a988bb59b589",
+    "packages/textbutler/src/launch-agent.ts": "ab2db5d4eb64b41ae4f95f9c624d68a6fac900826db5e9aa7f1fbe652fe30478",
     "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
     "packages/textbutler/src/message-summary.ts": "75163888ce53a7535a93f23a8228853d984af7a3677a4c8d0709cf6384187523",
     "packages/textbutler/src/messages-cli.ts": "44e5db75549e212ab2686d3673c5433908f1f9554bf133e98fd574d09255e66f",
@@ -46,6 +46,6 @@
   },
   "validation": {
     "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
-    "receiptSha256": "f052a7bfef3cbb8b520b60df37e827403d8574545e4a1140496e4b28a5d6658d"
+    "receiptSha256": "7e07ab92fb474f7ee9ea9a6e3ea3311a9d568e05e605d62e6936697ebcc098c4"
   }
 }

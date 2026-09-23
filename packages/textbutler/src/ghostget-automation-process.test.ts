@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { createGhostgetAutomationProcess, createSupervisedGhostgetAutomation, GhostgetTransportRecovering, AUTOMATION_CUSTODY_FILE } from "./ghostget-automation-process.ts";
+import { createGhostgetAutomationProcess, createSupervisedGhostgetAutomation, GhostgetTransportRecovering, AUTOMATION_CUSTODY_FILE, probeGroupCpuMs } from "./ghostget-automation-process.ts";
 import { automationFailure, type AutomationFailure, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 const roots: string[] = [];
 afterEach(async () => { for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true }); });
@@ -166,6 +166,41 @@ test("custody from a provably dead owner is reclaimed with its evidence preserve
     const preserved = JSON.parse(await readFile(join(config.custodyDirectory, recovered[0]!), "utf8"));
     expect(preserved.hostPid).toBe(dead.pid); expect(preserved.status).toBe("in-flight-or-unreconciled");
   } finally { await supervised.close(); }
+});
+test("a progressing initialize outlives the watchdog while a frozen one still dies on it", async () => {
+  // The fixture's same-group helper burns CPU past the watchdog: rising group
+  // CPU evidence re-arms it, so the late response is adopted instead of
+  // orphaned. The probe is injected because Linux ps reports CPU at whole-
+  // second granularity, which cannot see this sub-second fixture progress.
+  const slow = await options("slow-initialize");
+  let ticks = 0;
+  const process = await createGhostgetAutomationProcess(slow, { requestWatchdogMs: 250, initializeProgressSampleMs: 40, initializeHardCapMs: 30_000, probeGroupCpuMs: () => ++ticks });
+  await process.close();
+
+  // Constant CPU evidence never extends the watchdog: a deaf child dies on it.
+  const deaf = await options("deaf-initialize");
+  await expect(createGhostgetAutomationProcess(deaf, { requestWatchdogMs: 200, initializeProgressSampleMs: 40, probeGroupCpuMs: () => 0 })).rejects.toThrow();
+  expect((await lstat(join(deaf.custodyDirectory, AUTOMATION_CUSTODY_FILE))).isFile()).toBe(true);
+});
+test("the group CPU probe observes real process-group work", async () => {
+  // A detached burner over one second: macOS ps shows centisecond progress
+  // quickly while Linux whole-second granularity still moves within the burn.
+  const burner = spawn(process.execPath, ["-e", "const s=Date.now();while(Date.now()-s<2000);"], { detached: true, stdio: "ignore" });
+  try {
+    const first = probeGroupCpuMs(burner.pid!);
+    await new Promise(resolve => setTimeout(resolve, 1600));
+    const later = probeGroupCpuMs(burner.pid!);
+    expect(first).not.toBeUndefined();
+    expect(later).toBeGreaterThan(first!);
+  } finally { try { process.kill(-burner.pid!, "SIGKILL"); } catch { /* test cleanup only */ } }
+});
+test("a same-group survivor of a closed child meets SIGKILL escalation and is never orphaned", async () => {
+  const config = await options("leave-sibling");
+  const process = await createGhostgetAutomationProcess(config, { cleanupGraceMs: 60 });
+  await expect(process.close()).rejects.toThrow();
+  const record = JSON.parse(await readFile(join(config.custodyDirectory, AUTOMATION_CUSTODY_FILE), "utf8"));
+  expect(Number.isSafeInteger(record.processGroup)).toBe(true);
+  await groupGone(record.processGroup);
 });
 test("custody from a live owner is never reclaimed", async () => {
   const config = await options();
