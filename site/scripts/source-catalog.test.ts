@@ -243,18 +243,18 @@ describe('supported source presentation', () => {
       'does not expose Beeper’s raw export arguments or establish complete-history coverage',
     );
     expect(renderedSourcesPage).toContain('Every ingest path is read-only with respect to its source');
-    expect(renderedSourcesPage).toContain('Legacy reader support in v0.8.18');
+    expect(renderedSourcesPage).toContain('Legacy reader support in v0.8.20');
     expect(renderedSourcesPage).toContain(
       'ghostget beeper export-message-like-me --auth &lt;id&gt; --output /absolute/private/path/beeper-bundle',
     );
     expect(renderedSourcesPage).toContain(
-      'https://github.com/hraness/textbutler/blob/v0.8.18/docs/local-message-bundle-v1.md',
+      'https://github.com/hraness/textbutler/blob/v0.8.20/docs/local-message-bundle-v1.md',
     );
     expect(renderedSourcesPage).toContain(
       'ghostget whatsapp export-message-like-me --auth &lt;id&gt; --output /absolute/private/path/whatsapp-bundle',
     );
     expect(renderedSourcesPage).toContain(
-      'https://github.com/hraness/textbutler/blob/v0.8.18/docs/local-message-bundle-v2.md',
+      'https://github.com/hraness/textbutler/blob/v0.8.20/docs/local-message-bundle-v2.md',
     );
     expect(chrome).toContain("{ href: '/sources', label: 'Legacy history tools' }");
     expect(sitemap).toContain("absoluteUrl('/sources')");
@@ -330,10 +330,10 @@ describe('supported source presentation', () => {
     expect(changelog).toContain('## 0.8.5 (2026-09-06)');
     expect(changelog).toContain('## 0.8.3 (2026-09-06)');
     expect(changelog).not.toContain('## Unreleased');
-    expect(changelog.indexOf('## 0.8.5')).toBeLessThan(changelog.indexOf('## 0.8.3'));
+    expect(changelog.indexOf('## 0.8.5 (')).toBeLessThan(changelog.indexOf('## 0.8.3 ('));
     const currentChangelog = changelog.slice(
-      changelog.indexOf('## 0.8.3'),
-      changelog.indexOf('## 0.8.2'),
+      changelog.indexOf('## 0.8.3 ('),
+      changelog.indexOf('## 0.8.2\n'),
     );
     expect(currentChangelog).toContain('`@hraness/wrench@0.16.7`');
     expect(currentChangelog).toContain('`beeper-local@2.4.0`');
