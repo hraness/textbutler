@@ -4,6 +4,7 @@ import {
   MarketingPage,
   MarketingProofFrame,
   MarketingQuestionList,
+  MarketingRelated,
   MarketingSection,
   MarketingTrustBoundary,
   ProductHero,
@@ -167,6 +168,26 @@ export default function Home() {
           </MarketingSection>
 
           <MarketingQuestionList className="mlm-marketing-questions" heading="A few things to know" headingId="questions-title" id="questions" label="" questions={HOME_QUESTIONS.map(({ answer, question }) => ({ answer: <p>{answer}</p>, question }))} />
+          <MarketingRelated heading="From the same workshop" headingId="related-title" label="Related" summary="Each Hraness product owns one private domain and gives your agent the same kind of access: local, bounded, and inspectable." items={[
+            {
+              name: "PeopleBlade",
+              href: "https://peopleblade.com",
+              role: "A private contact book for you and your agent",
+              relationship: "Textbutler drafts what you'd say; PeopleBlade keeps who they are — a unified local book with notes, history, and reviewable identity.",
+            },
+            {
+              name: "Soulscrape",
+              href: "https://soulscrape.com",
+              role: "A dated, cited dossier on a person",
+              relationship: "When a reply needs more than memory, a Soulscrape dossier gives the conversation a cited, bounded model of the person.",
+            },
+            {
+              name: "Wordcell",
+              href: "https://wordcell.io",
+              role: "A Markdown knowledge base for agents",
+              relationship: "The butler's memory lives in ordinary files; Wordcell is the same idea grown into a full queryable vault your agent can search.",
+            },
+          ]} />
           <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation and review a reply. Enable automatic replies only after account checks and a live test with your chosen recipient." />
         </MarketingPage>
       </main>
