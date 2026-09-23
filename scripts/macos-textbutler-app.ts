@@ -81,11 +81,16 @@ export async function stageTextbutlerMacosApp(identity: MacosAppIdentity, source
   await verifyMacosApp(identity, destination);
 }
 
+/** A codesigning identity is a keychain query string, never a path or flag. */
+function signingIdentity(value: unknown): string {
+  if (typeof value !== "string" || value.length < 1 || Buffer.byteLength(value) > 256 || !/^[\x20-\x7e]+$/u.test(value) || value.startsWith("-")) throw new Error("Choose a printable codesigning identity name.");
+  return value;
+}
 /** Native-only builder seam used by synthetic custody tests. Production callers
  * enter through buildTextbutlerMacosApp and its distribution admission. */
 export async function compileTextbutlerMacosApp(input: {
   home: string; dataDir: string; appPath: string; runtime: string; runtimeSha256: string;
-  entrypoint: string; entrypointSha256: string; output: string; syntheticAutomationPermission?: "allowed" | "denied";
+  entrypoint: string; entrypointSha256: string; output: string; signingIdentity?: string; syntheticAutomationPermission?: "allowed" | "denied";
 }): Promise<{ directory: string; identity: MacosAppIdentity }> {
   if (process.platform !== "darwin" || process.getuid?.() === undefined || process.getuid() === 0) throw new Error("The TextButler app requires a non-root macOS build.");
   for (const key of ["home", "dataDir", "appPath", "runtime", "entrypoint", "output"] as const) macosAppPath(input[key]);
@@ -108,10 +113,13 @@ export async function compileTextbutlerMacosApp(input: {
     await writeFile(join(scratch, "textbutler-launch-config.h"), `${Object.entries(values).map(([key, value]) => `#define ${key} ${JSON.stringify(value)}`).join("\n")}\n#define TB_UID ${process.getuid()}\n${input.syntheticAutomationPermission === undefined ? "" : `#define TB_TEST_AUTOMATION_PERMISSION ${JSON.stringify(input.syntheticAutomationPermission)}\n`}`, { flag: "wx", mode: 0o600 });
     await run(["/usr/bin/xcrun", "clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2", "-framework", "CoreFoundation", "-framework", "ApplicationServices", "-I", scratch, compiledSource, "-o", executable]);
     await removeGeneratedFinderMetadata(app);
-    await run(["/usr/bin/codesign", "--force", "--sign", "-", "--timestamp=none", "--identifier", MACOS_APP_BUNDLE_ID, app]);
+    // A persistent signing identity keeps macOS permission grants bound to the
+    // certificate across rebuilds; ad-hoc signing rebinds grants to each cdhash.
+    const signer = input.signingIdentity === undefined ? "-" : signingIdentity(input.signingIdentity);
+    await run(["/usr/bin/codesign", "--force", "--sign", signer, "--timestamp=none", "--identifier", MACOS_APP_BUNDLE_ID, app]);
     await removeGeneratedFinderMetadata(app);
     await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", app]);
-    const identity: MacosAppIdentity = { schemaVersion: 1, bundleId: MACOS_APP_BUNDLE_ID, signing: "ad-hoc", messagesBundleId, automationConsent: input.syntheticAutomationPermission === undefined ? "native-api" : "synthetic", appPath: input.appPath, home: input.home, dataDir: input.dataDir, runtime: input.runtime, entrypoint: input.entrypoint, runtimeSha256: input.runtimeSha256, entrypointSha256: input.entrypointSha256,
+    const identity: MacosAppIdentity = { schemaVersion: 1, bundleId: MACOS_APP_BUNDLE_ID, signing: input.signingIdentity === undefined ? "ad-hoc" : "certificate", messagesBundleId, automationConsent: input.syntheticAutomationPermission === undefined ? "native-api" : "synthetic", appPath: input.appPath, home: input.home, dataDir: input.dataDir, runtime: input.runtime, entrypoint: input.entrypoint, runtimeSha256: input.runtimeSha256, entrypointSha256: input.entrypointSha256,
       executableSha256: await appFileDigest(executable, { executable: true }), infoPlistSha256: await appFileDigest(join(app, "Contents", "Info.plist")), signatureSha256: await appFileDigest(join(app, "Contents", "_CodeSignature", "CodeResources")), sourceSha256 };
     if (await appFileDigest(SOURCE) !== sourceSha256) throw new Error("The native launcher source changed during compilation; this build is not admitted.");
     await seal(app); await verifyMacosApp(identity, app);
@@ -120,11 +128,11 @@ export async function compileTextbutlerMacosApp(input: {
     return { directory: input.output, identity };
   } finally { await rm(scratch, { recursive: true, force: true }); }
 }
-export async function buildTextbutlerMacosApp(options: { from: string; output: string; appPath?: string; dataDir?: string }): Promise<{ directory: string; identity: MacosAppIdentity }> {
+export async function buildTextbutlerMacosApp(options: { from: string; output: string; appPath?: string; dataDir?: string; signingIdentity?: string }): Promise<{ directory: string; identity: MacosAppIdentity }> {
   const distribution = await verifyDistribution(macosAppPath(options.from));
   if (distribution.manifest.runtime.platform !== "darwin" || distribution.manifest.runtime.arch !== process.arch || distribution.manifest.runtime.version !== Bun.version) throw new Error("The installed TextButler payload targets another runtime.");
   const runtime = await validateBun(process.execPath, distribution.manifest.runtime.sha256), home = homedir();
-  return compileTextbutlerMacosApp({ home, dataDir: options.dataDir ?? join(home, "Library", "Application Support", "Textbutler"), appPath: options.appPath ?? join(home, "Applications", "TextButler.app"), runtime: runtime.path, runtimeSha256: distribution.manifest.runtime.sha256, entrypoint: join(options.from, "textbutler.mjs"), entrypointSha256: await appFileDigest(join(options.from, "textbutler.mjs")), output: options.output });
+  return compileTextbutlerMacosApp({ home, dataDir: options.dataDir ?? join(home, "Library", "Application Support", "Textbutler"), appPath: options.appPath ?? join(home, "Applications", "TextButler.app"), runtime: runtime.path, runtimeSha256: distribution.manifest.runtime.sha256, entrypoint: join(options.from, "textbutler.mjs"), entrypointSha256: await appFileDigest(join(options.from, "textbutler.mjs")), output: options.output, ...(options.signingIdentity === undefined ? {} : { signingIdentity: signingIdentity(options.signingIdentity) }) });
 }
 
 /** Darwin's supported exclusive rename prevents a raced destination from being
@@ -340,7 +348,7 @@ export async function upgradeVerifiedMacosApp(previous: MacosAppIdentity, next: 
   } finally { try { await helper?.close(); } finally { daemon?.close(); lifecycle.close(); } }
 }
 
-export async function installTextbutlerMacosApp(options: { from: string; upgrade?: boolean }): Promise<{ appPath: string; receiptPath: string; alreadyInstalled: boolean; signing: "ad-hoc"; previous?: { archive: string } }> {
+export async function installTextbutlerMacosApp(options: { from: string; upgrade?: boolean }): Promise<{ appPath: string; receiptPath: string; alreadyInstalled: boolean; signing: MacosAppIdentity["signing"]; previous?: { archive: string } }> {
   if (process.platform !== "darwin") throw new Error("TextButler.app requires macOS.");
   const from = macosAppPath(options.from), identity = await readMacosAppReceipt(join(from, "macos-app.json"));
   if (identity.automationConsent !== "native-api") throw new Error("A synthetic permission fixture cannot be installed as TextButler.app.");
@@ -359,11 +367,11 @@ export async function installTextbutlerMacosApp(options: { from: string; upgrade
       const previousPayload = await verifyDistribution(dirname(previous.entrypoint));
       if (previousPayload.manifest.runtime.sha256 !== previous.runtimeSha256) throw new Error("The previous app payload no longer matches its recorded runtime.");
       const retained = await upgradeVerifiedMacosApp(previous, identity, app);
-      return { appPath: identity.appPath, receiptPath, alreadyInstalled: false, signing: "ad-hoc", previous: retained };
+      return { appPath: identity.appPath, receiptPath, alreadyInstalled: false, signing: identity.signing, previous: retained };
     }
     await verifyMacosApp(identity);
     await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", identity.appPath]);
-    return { appPath: identity.appPath, receiptPath, alreadyInstalled: true, signing: "ad-hoc" };
+    return { appPath: identity.appPath, receiptPath, alreadyInstalled: true, signing: identity.signing };
   }
   // A prior complete app with no receipt can be recovered only when every byte
   // equals this verified build. Foreign or partial apps remain untouched.
@@ -379,7 +387,7 @@ export async function installTextbutlerMacosApp(options: { from: string; upgrade
   await verifyMacosApp(identity);
   await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", identity.appPath]);
   await publishPrivateArtifact(dirname(receiptPath), "macos-app.json", Buffer.from(`${JSON.stringify(identity)}\n`)); await syncDirectory(dirname(receiptPath));
-  return { appPath: identity.appPath, receiptPath, alreadyInstalled: false, signing: "ad-hoc" };
+  return { appPath: identity.appPath, receiptPath, alreadyInstalled: false, signing: identity.signing };
 }
 
 const SETUP_LABEL = "app.textbutler.imessage-setup";
@@ -503,11 +511,11 @@ if (import.meta.main) {
     for (let at = 0; at < args.length;) {
       const key = args[at++]!;
       if (key === "--upgrade" && action === "install" && !upgrade) { upgrade = true; continue; }
-      const value = args[at++]; if (!["--from", "--output", "--app-path", "--data-dir"].includes(key) || value === undefined || values.has(key)) throw new Error("Use build --from ABS --output ABS [--app-path ABS] [--data-dir ABS], or install --from ABS [--upgrade]."); values.set(key, macosAppPath(value));
+      const value = args[at++]; if (!["--from", "--output", "--app-path", "--data-dir", "--signing-identity"].includes(key) || value === undefined || values.has(key)) throw new Error("Use build --from ABS --output ABS [--app-path ABS] [--data-dir ABS] [--signing-identity NAME], or install --from ABS [--upgrade]."); values.set(key, key === "--signing-identity" ? signingIdentity(value) : macosAppPath(value));
     }
     const from = values.get("--from");
     if (action === "imessage-setup" && values.size === 1 && values.has("--data-dir")) { const result = await launchTextbutlerImessageSetup({ dataDir: values.get("--data-dir")! }); process.stdout.write(`${JSON.stringify({ ok: result.status === "completed", ...result })}\n`); if (result.status !== "completed") process.exitCode = 1; }
-    else if (action === "build" && from !== undefined) { const output = values.get("--output"); if (!output) throw new Error("Choose a new --output directory."); const appPath = values.get("--app-path"), dataDir = values.get("--data-dir"); const result = await buildTextbutlerMacosApp({ from, output, ...(appPath === undefined ? {} : { appPath }), ...(dataDir === undefined ? {} : { dataDir }) }); process.stdout.write(`${JSON.stringify({ ok: true, ...result, detail: "Local ad-hoc signed app built; no service or permission was changed. Approval must be verified again after rebuilding this identity." })}\n`); }
+    else if (action === "build" && from !== undefined) { const output = values.get("--output"); if (!output) throw new Error("Choose a new --output directory."); const appPath = values.get("--app-path"), dataDir = values.get("--data-dir"), signer = values.get("--signing-identity"); const result = await buildTextbutlerMacosApp({ from, output, ...(appPath === undefined ? {} : { appPath }), ...(dataDir === undefined ? {} : { dataDir }), ...(signer === undefined ? {} : { signingIdentity: signer }) }); process.stdout.write(`${JSON.stringify({ ok: true, ...result, detail: result.identity.signing === "certificate" ? "Local certificate-signed app built; macOS permission grants stay bound to this signing identity across rebuilds." : "Local ad-hoc signed app built; no service or permission was changed. Approval must be verified again after rebuilding this identity." })}\n`); }
     else if (action === "install" && from !== undefined && values.size === 1) process.stdout.write(`${JSON.stringify({ ok: true, ...await installTextbutlerMacosApp({ from, upgrade }), detail: "App installed inertly. Owner settings and services are unchanged. Verify macOS permissions for the new app identity; use normal System Settings if reapproval is required." })}\n`);
     else throw new Error("Use build or install with its exact arguments.");
   } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : "TextButler app operation failed."}\n`); process.exitCode = 1; }

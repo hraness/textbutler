@@ -25,7 +25,7 @@
     }
   ],
   "sourceInventoryCount": 30,
-  "sourceDigest": "2a66c92274ffa12b33000d20e9a1ae1328f2b00a7d3715f07076c4f417a669f5",
+  "sourceDigest": "a6ea089ea6b753d0d822df02a67c279ccee793b70df5a4972691eb26d07e466b",
   "testSources": {
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
     "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
@@ -55,10 +55,10 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "45d3db41e2ce2481d61f0370609616d3cd79b9a23c64bd4c7b5fe6811565e9a7",
-  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation, including the reply steel-thread reconciliation, supervised transport and workspace custody tests; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "aee0fc2dfd425935448b77ec259775d81507b59e0aaa95caaa93d888ebabff48",
+  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun with the certificate-signing inputs; host scheduler output is separate. Both package typechecks completed with empty logs.",
   "review": {
-    "method": "Integration-owner reseal of the 0.8.17 release-prep commit on reviewed main head: the only newly changed sealed input is the package version bump; the receipt already carries the steel-thread hardening work \u2014 uncertain-send reconciliation (journal uncertainRuns/reconcile, owner-replies reconcile, the replies.reconcile control request and CLI), batched set-scoped event draining with pending retention and sync hysteresis, bounded debounce with pinned capped runs, dispatch-intent journaling that survives late cancels, typed driver-fault classification, supervised Ghostget child recovery with independent custody-death evidence, workspace AGENTS.md write rejection with directory fsync and staging sweep, and inode/mtime-keyed settings plus executable verification caches. The coupled 18-file synthetic suite and both package typechecks were rerun with the new inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
+    "method": "Integration-owner reseal of the app-signing identity change on the reviewed main head: MacosAppIdentity.signing now admits 'ad-hoc' or 'certificate', and scripts/macos-textbutler-app.ts accepts an explicit --signing-identity for build so a persistent owner certificate keeps macOS permission grants bound across app rebuilds while ad-hoc remains the default. The managed-upgrade permission-target check still refuses signing-class changes, so ad-hoc-to-certificate transition uses the supported fresh-install path. The coupled 18-file synthetic suite and both package typechecks were rerun with the new inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
     "references": [
       {
         "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
@@ -153,13 +153,13 @@
   },
   "inputSnapshot": {
     "count": 247,
-    "sha256": "a1a623f2293510f88ae270d353844d2595c4b523d8be9e7974f6508d01fbeaf5",
+    "sha256": "49ae4030dcb8e29abbcd118d0c253e865d06abb7d67eccac3c78b5fd14a29e9d",
     "unchangedAcrossValidation": true,
     "inputs": {
       "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
       "bun.lock": "7931f129ecf2a2a8aa00dfa164f26e87c4e81e9f4992d215d6a52e080085dbbb",
       "docs/textbutler/agent-cli.md": "e803d01f6c5fd30de3169d897c8375c490357d923f84a33876b86231abd5d924",
-      "docs/textbutler/architecture.md": "4dee3697d8d951c747423eb87e6687f33610024b708fc344a5f0c0a7b510f315",
+      "docs/textbutler/architecture.md": "8365ea9a4ab66851a8687c9781fe7eb1fbc4576d358ffa34e2a1c442ec3fa434",
       "docs/textbutler/getting-started.md": "df359d73e4b42539751972652de881a6fe0a9a34d0f14def299882fc146878a6",
       "docs/textbutler/ghostget-contract.md": "aa029df8643b9c730d037b20bef624193809cda19e597b8589c32fdf53e6deee",
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
@@ -200,8 +200,8 @@
       "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
       "packages/textbutler/src/launch-agent.test.ts": "3120cbdbc362a87cef45059b5d07bff3de6306c323b5c7a7759cfd8eff80b0a3",
       "packages/textbutler/src/launch-agent.ts": "16d63e713691a236071da04a77b348106ee2d822a586d0519d07a988bb59b589",
-      "packages/textbutler/src/macos-app.test.ts": "6c8a14feff283fdcca30add81587b0cd8f6071a571cd7bf077fb0f7de006e047",
-      "packages/textbutler/src/macos-app.ts": "7b6635763f7f3ca70609d5a2398e3a6f17d33f70a12664f1e8b4507f5a2004b9",
+      "packages/textbutler/src/macos-app.test.ts": "1725fc220eb1aabe727b0cb1ebfd5cef9b8ae2c80c02e6e8044918f3e4d8f1f5",
+      "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
       "packages/textbutler/src/managed-codex-owner.test.ts": "848db23b6843d8c7473a5f476e3d0adfe57349a3e6ad4f40620f1cd6125ae32d",
       "packages/textbutler/src/managed-codex.test.ts": "9af77d806d52f05f98de978e355e3073cb334fcd82f9baf79e455accc7806524",
       "packages/textbutler/src/managed-codex.ts": "844a6d9a89540622e53f40d42a15bb5f0b3cec353496c593d31c15e141d2b0eb",
@@ -291,7 +291,7 @@
       "scripts/install-textbutler.ts": "c3717b5d57b2bfea642770782aa334b5d9d8a6e8f85cd40048222e8a4d869347",
       "scripts/local-message-bundle-schema.test.ts": "777c352b2913e6252ece3643f150a7b57aa55d5a42a91566c2bfe993b2b0cc99",
       "scripts/macos-textbutler-app.test.ts": "088ab25f386e7c7d8787b986a2345e5e427c17ac0022cf4856ce32102c3391d4",
-      "scripts/macos-textbutler-app.ts": "c081ece8dfcd93fca93d41dc6be36599fe81dcf4791a32d5a33f36bb3892d5a0",
+      "scripts/macos-textbutler-app.ts": "d90f63cbff924b9bbd8801b2a5704c0e902719dcb0c2bfc33af31ba699b5f32b",
       "scripts/npm-provenance-verification.test.ts": "3159ed0fedb0b57fba115f566fed2979701e69bbe9001442dbddb40de7d769fd",
       "scripts/npm-provenance-verification.ts": "81df0fefd55781648a8ae10ba419f9f046a2ba39bdd0836ddbecc72c1fba9bbd",
       "scripts/npm-release-policy.test.ts": "c7cfc36efe4e1bd5668f60d4c020c2b698d80cf552ecc389b8d76ecd47c862ce",
@@ -410,9 +410,9 @@
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "previousQualification": {
-    "validationSha256": "6d10fbe4ee2b8c23e7c2b6f7431bdb402012956efa9559c3484878f29d7e0774",
-    "evidenceSha256": "64d4a2d21912d1ef8734fcf5b909c6fdd649f2a7e4ca2c059460834a9e5b249b",
-    "logSha256": "45d3db41e2ce2481d61f0370609616d3cd79b9a23c64bd4c7b5fe6811565e9a7",
+    "validationSha256": "218387cd677e092d63d1729d661038f918ae98077b0faee9ad2b45032f6fb031",
+    "evidenceSha256": "ac9e61078f2bb6ca0a3307bcd02e6b36a977b17a32df444456e8f7077c9b8dc9",
+    "logSha256": "aee0fc2dfd425935448b77ec259775d81507b59e0aaa95caaa93d888ebabff48",
     "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
   }
 }
