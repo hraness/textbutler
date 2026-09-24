@@ -43,12 +43,24 @@ function expectEveryPin(
 }
 
 test("CI runs the standalone package on Ubuntu and only synthetic local-data fixtures on macOS", async () => {
-  const workflow = await readFile(join(WORKFLOWS, "ci.yml"), "utf8");
+  const [workflow, packageManifest] = await Promise.all([
+    readFile(join(WORKFLOWS, "ci.yml"), "utf8"),
+    readFile(PACKAGE_MANIFEST, "utf8"),
+  ]);
 
   expect(workflow).toContain("runs-on: ubuntu-24.04");
   expect(workflow).toContain("runs-on: macos-15");
-  expect(workflow.match(/bun-version: "1\.3\.14"/gu)?.length).toBe(2);
+  const bunInstalls = workflow.match(/uses: oven-sh\/setup-bun@/gu)?.length ?? 0;
+  expect(bunInstalls).toBeGreaterThanOrEqual(2);
+  expect(workflow.match(/bun-version: "1\.3\.14"/gu)?.length).toBe(bunInstalls);
   expect(workflow).toContain("bun run check");
+  // The complete gate is split across parallel Linux jobs; every command of `bun run check`
+  // must still run somewhere in the workflow.
+  const checkScript = (JSON.parse(packageManifest) as { scripts: Record<string, string> }).scripts.check;
+  for (const command of checkScript.split(" && ")) {
+    expect(workflow).toContain(command);
+  }
+  expect(workflow).toContain("name: Required");
   expect(workflow).toContain("bun test src/imessage.test.ts src/contacts.test.ts src/metrics.test.ts");
   expect(workflow).toContain("HOME: ${{ runner.temp }}/message-like-me-fixture-home");
   expect(workflow).toContain("git status --porcelain --untracked-files=all -- dist bun.lock");
