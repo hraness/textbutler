@@ -18,6 +18,17 @@ export interface ContactSettings {
   accountId?: string;
   disclosure: { character: string; begin: string; end: string };
 }
+/** Owner configuration for one conversation's learned response plan. */
+export interface ContactHabitatPlan {
+  version: 1;
+  guidance: string;
+  contextMessages: number;
+  maxReplyCharacters: number;
+  humor: "off" | "light" | "match";
+  webSearch: boolean;
+  memeSearch: boolean;
+  personality?: { tone: "neutral" | "warm" | "playful" | "direct"; formality: "casual" | "balanced" | "formal" };
+}
 export interface Contact { id: string; name: string; subtitle: string; settings: ContactSettings;
   messaging?: { provider: "imessage" | "whatsapp" | "beeper"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
 export interface Activity { id: string; at: string; contactId: string | null; title: string; detail: string }
@@ -91,7 +102,9 @@ export type ControlRequest =
   | { protocol: typeof CONTROL_PROTOCOL; command: "messaging.start"; provider: "imessage" | "whatsapp" | "beeper" }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.settings.update"; contactId: string; expectedRevision: number; settings: ContactSettings }
   | { protocol: typeof CONTROL_PROTOCOL; command: "habitat.read"; contactId: string }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "habitat.configure"; contactId: string; expectedRevision: number; plan: ContactHabitatPlan }
   | { protocol: typeof CONTROL_PROTOCOL; command: "habitat.rollback"; contactId: string; expectedRevision: number }
+  | { protocol: typeof CONTROL_PROTOCOL; command: "habitat.memory.clear"; contactId: string; expectedRevision: number }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.read"; contactId: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "contact.memory.write"; contactId: string; expectedRevision: string; content: string }
   | { protocol: typeof CONTROL_PROTOCOL; command: "global.settings.update"; expectedRevision: number; settings: DesktopSnapshot["settings"] }
@@ -114,7 +127,7 @@ export type ControlResponse =
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "enrolled"; snapshot: DesktopSnapshot; contactId: string; historyCount: number; historyOmittedCount: number; historyShortenedCount: number; historyInitialized: boolean }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "snapshot"; snapshot: DesktopSnapshot }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "memory"; contactId: string; revision: string; content: string }
-  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "habitat"; contactId: string; revision: number; content: string; installationDailyReservedMicroUsd: number }
+  | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "habitat"; contactId: string; revision: number; ownerRevision?: number; content: string; installationDailyReservedMicroUsd: number }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "replies"; scannedAt: string; checked: number; unreadable: number; pending: readonly PendingReplyItem[]; drafts: readonly ReplyDraftView[] }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-suggestion"; draft: ReplyDraftView | null; pending: PendingReplyItem }
   | { protocol: typeof CONTROL_PROTOCOL; ok: true; kind: "reply-draft"; draft: ReplyDraftDetail }
@@ -289,7 +302,9 @@ export function parseControlResponse(value: unknown): ControlResponse {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "enrolled", snapshot: response.snapshot, contactId, historyCount: integer(row.historyCount, 0, 200), historyOmittedCount: integer(row.historyOmittedCount, 0, 200), historyShortenedCount: integer(row.historyShortenedCount, 0, 200), historyInitialized: bool(row.historyInitialized) };
   }
   if (row.kind === "memory") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "memory", contactId: text(row.contactId, 256), revision: digest(row.revision), content: text(row.content, 65_536) };
-  if (row.kind === "habitat") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "habitat", contactId: text(row.contactId, 80), revision: integer(row.revision, 0), content: text(row.content, 262_144), installationDailyReservedMicroUsd: integer(row.installationDailyReservedMicroUsd, 0) };
+  if (row.kind === "habitat") return { protocol: CONTROL_PROTOCOL, ok: true, kind: "habitat", contactId: text(row.contactId, 80), revision: integer(row.revision, 0),
+    ...(row.ownerRevision === undefined ? {} : { ownerRevision: integer(row.ownerRevision, 0) }),
+    content: text(row.content, 262_144), installationDailyReservedMicroUsd: integer(row.installationDailyReservedMicroUsd, 0) };
   if (row.kind === "replies") {
     return { protocol: CONTROL_PROTOCOL, ok: true, kind: "replies", scannedAt: text(row.scannedAt, 64), checked: integer(row.checked, 0, 10_000),
       unreadable: integer(row.unreadable, 0, 10_000), pending: list(row.pending, 200).map(pendingReplyItem), drafts: list(row.drafts, 64).map(replyDraftView) };

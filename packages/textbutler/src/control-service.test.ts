@@ -16,6 +16,9 @@ import { parseHostConfig } from "./host-config.ts";
 import { parseControlResponse } from "../../control/src/index.ts";
 import { createXcbSubscriptionHost } from "./xcb-host.ts";
 import { contactCapabilityIdentity } from "./contact-capabilities.ts";
+import { ContactHabitat, DEFAULT_HABITAT_PLAN } from "./contact-habitat.ts";
+import { createHabitatAgent } from "./habitat-agent.ts";
+import { createFastDriver } from "./fast-driver.ts";
 
 const roots: string[] = [], services: TextbutlerControlService[] = [];
 afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -92,6 +95,112 @@ describe("persistent owner control service", () => {
     const stored = JSON.parse(await readFile(join(dataDir, "state", "settings.json"), "utf8"));
     expect(stored).toMatchObject({ revision: 2, settings: { paused: false, maxActiveContacts: 2 } });
     await initializeOwnerState(dataDir); expect((await service.snapshot()).revision).toBe(2);
+  });
+  test("owner habitat configuration is strict and conditional without changing settings or other contacts", async () => {
+    const { service, dataDir } = await setup(), notifications: string[] = [];
+    const unsubscribe = service.onHabitatChanged(id => notifications.push(id));
+    const before = await readFile(join(dataDir, "state", "settings.json"), "utf8");
+    const plan = { ...DEFAULT_HABITAT_PLAN, guidance: "Give one useful example.", personality: { tone: "warm", formality: "casual" }, webSearch: true };
+    const request = { protocol, command: "habitat.configure", contactId: "synthetic-a", expectedRevision: 0, plan };
+    expect(await service.request({ protocol, command: "habitat.read", contactId: "synthetic-a" })).toMatchObject({ ok: true, kind: "habitat", revision: 0 });
+    expect(service.runJournal().habitatState("synthetic-a")).toBeNull();
+    const response = await service.request(request);
+    expect(response).toMatchObject({ ok: true, kind: "habitat", contactId: "synthetic-a", revision: 1, ownerRevision: 1 });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(response)))).toEqual(response);
+    if (!response.ok || response.kind !== "habitat") throw Error("Expected configured habitat");
+    expect(JSON.parse(response.content).plan).toEqual(plan);
+    expect(notifications).toEqual(["synthetic-a"]);
+    expect(await service.request(request)).toMatchObject({ ok: false, code: "conflict" });
+    expect(await service.request({ ...request, contactId: "unknown" })).toMatchObject({ ok: false, code: "invalid-request" });
+    expect(await readFile(join(dataDir, "state", "settings.json"), "utf8")).toBe(before);
+    expect(service.runJournal().habitatState("synthetic-b")).toBeNull();
+    expect(notifications).toEqual(["synthetic-a"]);
+    unsubscribe();
+    expect(await service.request({ ...request, expectedRevision: 1, plan: { ...plan, webSearch: false } })).toMatchObject({ ok: true, revision: 2 });
+    expect(notifications).toEqual(["synthetic-a"]);
+  });
+  test("habitat configure rejects unsupported plan fields and unsafe revisions before mutation", async () => {
+    const { service } = await setup();
+    const request = { protocol, command: "habitat.configure", contactId: "synthetic-a", expectedRevision: 0, plan: DEFAULT_HABITAT_PLAN };
+    for (const plan of [null, [], {}, { ...DEFAULT_HABITAT_PLAN, tools: ["shell"] }, { ...DEFAULT_HABITAT_PLAN, webSearch: "yes" },
+      { ...DEFAULT_HABITAT_PLAN, contextMessages: 33 }, { ...DEFAULT_HABITAT_PLAN, guidance: "x".repeat(4097) },
+      { ...DEFAULT_HABITAT_PLAN, personality: { tone: "warm", formality: "casual", accountId: "other" } },
+      { ...DEFAULT_HABITAT_PLAN, personality: { tone: "intense", formality: "balanced" } }]) {
+      expect(await service.request({ ...request, plan })).toMatchObject({ ok: false, code: "invalid-request" });
+    }
+    for (const expectedRevision of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, "0"]) {
+      expect(await service.request({ ...request, expectedRevision })).toMatchObject({ ok: false, code: "invalid-request" });
+    }
+    expect(() => parseControlRequest({ ...request, plan: { ...DEFAULT_HABITAT_PLAN, get guidance() { throw Error("getter must not run"); } } })).toThrow("JSON data only");
+    expect(service.runJournal().habitatState("synthetic-a")).toBeNull();
+  });
+  test("habitat mutations require pause and notify only after successful mutation", async () => {
+    const { service } = await setup(), notifications: string[] = [];
+    service.onHabitatChanged(id => notifications.push(id));
+    const habitat = new ContactHabitat(service.runJournal(), "synthetic-a"), baseline = habitat.snapshot();
+    const promoted = { ...DEFAULT_HABITAT_PLAN, guidance: "A learned concise style." };
+    service.runJournal().writeHabitatState("synthetic-a", 0, JSON.stringify({ ...baseline, revision: 1, champion: promoted, ancestors: [DEFAULT_HABITAT_PLAN] }));
+    expect(await service.request({ protocol, command: "global.settings.update", expectedRevision: 1, settings: { paused: false, activeContactLimit: 1 } })).toMatchObject({ ok: true });
+    for (const command of ["habitat.configure", "habitat.rollback", "habitat.memory.clear"]) {
+      expect(await service.request({ protocol, command, contactId: "synthetic-a", expectedRevision: 1, ...(command === "habitat.configure" ? { plan: DEFAULT_HABITAT_PLAN } : {}) })).toMatchObject({ ok: false, code: "conflict" });
+    }
+    expect(habitat.snapshot().champion).toEqual(promoted); expect(notifications).toEqual([]);
+    expect(await service.request({ protocol, command: "global.settings.update", expectedRevision: 2, settings: { paused: true, activeContactLimit: 1 } })).toMatchObject({ ok: true });
+    expect(await service.request({ protocol, command: "habitat.rollback", contactId: "synthetic-a", expectedRevision: 0 })).toMatchObject({ ok: false, code: "conflict" });
+    expect(await service.request({ protocol, command: "habitat.rollback", contactId: "synthetic-a", expectedRevision: 1 })).toMatchObject({ ok: true, kind: "habitat", revision: 2 });
+    expect(habitat.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN); expect(notifications).toEqual(["synthetic-a"]);
+  });
+  test("learned memory is inspectable and owner clearing is conditional, isolated and exact", async () => {
+    const { service } = await setup(), journal = service.runJournal(), notifications: string[] = [];
+    service.onHabitatChanged(id => notifications.push(id));
+    const habitat = new ContactHabitat(journal, "synthetic-a"), baseline = habitat.snapshot();
+    const memory = [{ id: "preference-1", at: 1, author: "contact", text: "Please keep explanations brief.", sourceDigest: "a".repeat(64), truncated: false }];
+    journal.writeHabitatState("synthetic-a", 0, JSON.stringify({ ...baseline, revision: 1, memory }));
+    const read = await service.request({ protocol, command: "habitat.read", contactId: "synthetic-a" });
+    if (!read.ok || read.kind !== "habitat") throw Error("Expected habitat inspection");
+    expect(JSON.parse(read.content)).toMatchObject({ memory, memoryCutoff: null });
+    expect(habitat.snapshot().revision).toBe(1);
+    const request = { protocol, command: "habitat.memory.clear", contactId: "synthetic-a", expectedRevision: 1 };
+    for (const invalid of [{ ...request, expectedRevision: "1" }, { ...request, expectedRevision: -1 }, { ...request, extra: true },
+      { ...request, contactId: "unknown" }]) expect(await service.request(invalid)).toMatchObject({ ok: false, code: "invalid-request" });
+    expect(await service.request({ ...request, expectedRevision: 0 })).toMatchObject({ ok: false, code: "conflict" });
+    expect(notifications).toEqual([]);
+    const response = await service.request(request);
+    expect(response).toMatchObject({ ok: true, kind: "habitat", revision: 2, ownerRevision: 1 });
+    if (!response.ok || response.kind !== "habitat") throw Error("Expected cleared memory");
+    expect(JSON.parse(response.content)).toMatchObject({ memory: [], memoryCutoff: expect.any(Number), plan: baseline.champion });
+    expect(parseControlResponse(JSON.parse(JSON.stringify(response)))).toEqual(response);
+    expect(journal.habitatState("synthetic-b")).toBeNull();
+    expect(await service.request(request)).toMatchObject({ ok: false, code: "conflict" });
+    expect(await service.request({ ...request, expectedRevision: 2 })).toMatchObject({ ok: true, revision: 3, ownerRevision: 2 });
+    expect(notifications).toEqual(["synthetic-a", "synthetic-a"]);
+  });
+  test("habitat inspection includes bounded tool evidence without reply bodies and reports omitted entries", async () => {
+    const { service } = await setup(), journal = service.runJournal(), habitat = new ContactHabitat(journal, "synthetic-a");
+    const plan = { ...DEFAULT_HABITAT_PLAN, guidance: "g".repeat(4096) }, baseline = habitat.snapshot();
+    const episodes = Array.from({ length: 9 }, (_, index) => ({ reply: { runId: `run-${index}`, at: index + 1, intent: "Explain",
+      trigger: { id: `trigger-${index}`, at: index, author: "contact", kind: "message", text: "private trigger body", relatedMessageId: null },
+      context: [], messageIds: [`sent-${index}`], text: "private reply body", planDigest: null,
+      memory: [{ id: `remembered-${index}`, at: index, author: "contact", text: "private historical memory", sourceDigest: "a".repeat(64), truncated: false }],
+      priorMemory: [{ id: `earlier-tool-memory-${index}`, sourceDigest: "b".repeat(64) }],
+      actionKinds: ["text"], tools: [{ kind: "meme-search", query: "public template", result: "r".repeat(4096) }, { kind: "meme-image", query: "template-id", result: "r".repeat(4096) }] },
+      followups: [], initialClaimed: false, followupClaimed: false, reflection: null }));
+    const evaluations = Array.from({ length: 24 }, (_, index) => ({ key: `evaluation-${index}`, at: index, phase: "initial", status: "retained", reason: "r".repeat(1024), receipts: [],
+      evidenceIds: Array.from({ length: 40 }, (_, evidence) => `${evidence}-${"i".repeat(100)}`) }));
+    const lineage = Array.from({ length: 16 }, (_, index) => ({ key: `lineage-${index}`, kind: "promotion", from: plan, to: plan, reason: "r".repeat(1024) }));
+    journal.writeHabitatState("synthetic-a", 0, JSON.stringify({ ...baseline, revision: 1, champion: plan, episodes, evaluations, lineage }));
+    const response = await service.request({ protocol, command: "habitat.read", contactId: "synthetic-a" });
+    if (!response.ok || response.kind !== "habitat") throw Error("Expected habitat inspection");
+    expect(Buffer.byteLength(response.content)).toBeLessThanOrEqual(262_144);
+    expect(parseControlResponse(JSON.parse(JSON.stringify(response)))).toEqual(response);
+    const content = JSON.parse(response.content);
+    expect(content.recentEpisodes).toHaveLength(8);
+    expect(content.recentEpisodes.at(-1)).toMatchObject({ runId: "run-8", actionKinds: ["text"], tools: episodes[8]!.reply.tools,
+      memoryIds: ["remembered-8"], priorMemory: [{ id: "earlier-tool-memory-8", sourceDigest: "b".repeat(64) }] });
+    expect(content.omitted.episodes).toBe(1); expect(content.omitted.evaluations).toBeGreaterThan(0);
+    expect(response.content).not.toContain("private trigger body"); expect(response.content).not.toContain("private reply body");
+    expect(response.content).not.toContain("private historical memory");
+    expect(habitat.snapshot().revision).toBe(1); expect(habitat.snapshot().evaluations).toHaveLength(24);
   });
   test("capacity and explicit contact identity are enforced on real settings", async () => {
     const { service } = await setup(); const snapshot = await service.snapshot();
@@ -243,6 +352,44 @@ describe("owner reply triage through the control surface", () => {
     expect(parseControlResponse(JSON.parse(JSON.stringify(composed)))).toEqual(composed);
     expect(sent).toEqual([]);
     expect(await run({ command: "messages.summarize", contactId: "synthetic-a", limit: 20 })).toMatchObject({ ok: false, code: "unavailable" });
+  });
+  test("settled manual habitat suggestions release their scopes after success, failure and silence", async () => {
+    const { service, run, dataDir, sent } = await replySetup();
+    const journal = service.runJournal(), workspace = await ContactWorkspace.create(join(dataDir, "contacts", "synthetic-a"));
+    let time = Date.now(), calls = 0, mode: "success" | "failure" | "silent" = "success";
+    const signals: AbortSignal[] = [];
+    const driver = createFastDriver({ kind: "local", baseUrl: "http://127.0.0.1:1234/v1", model: "synthetic" }, { journal, fetch: async () => {
+      calls++;
+      const value = mode === "failure" ? {} : { respond: mode === "success", confidence: 0.99, reason: mode === "success" ? "requested" : "not_needed",
+        summary: "A synthetic suggestion", actions: mode === "success" ? [{ kind: "text", text: "A useful answer." }] : [], tool: null };
+      return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ value }) } }] });
+    } });
+    const habitat = createHabitatAgent({ journal, driver, getWorkspace: async () => workspace, capabilities: async () => ["text"], active: () => true });
+    service.setReplyAgent({ ...habitat.agent, async compose(request) { signals.push(request.signal); return habitat.agent.compose(request); } });
+    const clock = spyOn(Date, "now").mockImplementation(() => time);
+    try {
+      for (const outcome of ["success", "failure", "silent"] as const) {
+        mode = outcome;
+        for (let index = 0; index < 66; index++) {
+          // Expire completed owner-job receipts; the habitat's live run cap is
+          // independent and must be reclaimed at settlement, not by that TTL.
+          time += 600_001;
+          const response = await run({ command: "replies.suggest", contactId: "synthetic-a" });
+          expect(signals.at(-1)?.aborted).toBe(true);
+          if (outcome === "failure") expect(response).toMatchObject({ ok: false, code: "unavailable" });
+          else {
+            expect(response).toMatchObject({ ok: true, kind: "reply-suggestion" });
+            if (!response.ok || response.kind !== "reply-suggestion") throw Error("Expected settled suggestion");
+            if (outcome === "silent") expect(response.draft).toBeNull();
+            else {
+              expect(response.draft).not.toBeNull();
+              expect(await run({ command: "replies.discard", draftId: response.draft!.id })).toMatchObject({ ok: true });
+            }
+          }
+        }
+      }
+      expect(signals).toHaveLength(198); expect(calls).toBe(198); expect(sent).toEqual([]);
+    } finally { clock.mockRestore(); await habitat.close(); }
   });
   test("message command parsing rejects unbounded history and arbitrary actions or paths", () => {
     for (const limit of [0, 201, 1.5, "20", undefined]) expect(() => parseControlRequest({ protocol, command: "messages.history", contactId: "synthetic-a", limit })).toThrow();

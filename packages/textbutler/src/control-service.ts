@@ -18,7 +18,7 @@ import { OwnerMessages } from "./owner-messages.ts";
 import { parseActionIntent } from "../../transport/src/index.ts";
 import { Hooks } from "./hooks.ts";
 import type { ButlerAgent } from "./runtime.ts";
-import { ContactHabitat } from "./contact-habitat.ts";
+import { ContactHabitat, parseHabitatPlan } from "./contact-habitat.ts";
 import type { HabitatHostConfig } from "./host-config.ts";
 
 export const TEXTBUTLER_CONTROL_PROTOCOL = "textbutler.control.v1" as const;
@@ -83,8 +83,17 @@ export function parseControlRequest(value: unknown): ControlRequest {
     if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(loginId)) fail("invalid-request", "Invalid provider sign-in identity.");
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, accountId: contactId(item.accountId), loginId };
   }
-  if (item.command === "habitat.read" || item.command === "habitat.rollback") {
-    exact(item, ["protocol", "command", "contactId", ...(item.command === "habitat.rollback" ? ["expectedRevision"] : [])]);
+  if (item.command === "habitat.configure") {
+    exact(item, ["protocol", "command", "contactId", "expectedRevision", "plan"]);
+    const plan = record(item.plan);
+    if (plan.personality !== undefined) record(plan.personality);
+    try {
+      return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId),
+        expectedRevision: integer(item.expectedRevision), plan: parseHabitatPlan(plan) };
+    } catch { fail("invalid-request", "Invalid contact habitat plan or revision."); }
+  }
+  if (item.command === "habitat.read" || item.command === "habitat.rollback" || item.command === "habitat.memory.clear") {
+    exact(item, ["protocol", "command", "contactId", ...(item.command === "habitat.read" ? [] : ["expectedRevision"])]);
     return item.command === "habitat.read" ? { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId) }
       : { protocol: TEXTBUTLER_CONTROL_PROTOCOL, command: item.command, contactId: contactId(item.contactId), expectedRevision: integer(item.expectedRevision) };
   }
@@ -225,6 +234,7 @@ export class TextbutlerControlService {
   private candidates = new Map<string, { conversation: ObservedConversation; expires: number }>();
   private automationCandidates = new Map<string, { candidate: AutomationCandidate; expires: number }>();
   private readonly settingsListeners = new Set<(settings: Settings) => void>();
+  private readonly habitatListeners = new Set<(contactId: string) => void>();
   private readonly grantWork = new Map<string, Promise<unknown>>();
   private readonly grantFailures = new Set<string>();
   private readonly grantChanging = new Set<string>();
@@ -278,7 +288,9 @@ export class TextbutlerControlService {
     this.runtimeStatus = { ...status };
   }
   onSettingsChanged(listener: (settings: Settings) => void): () => void { this.settingsListeners.add(listener); return () => this.settingsListeners.delete(listener); }
+  onHabitatChanged(listener: (contactId: string) => void): () => void { this.habitatListeners.add(listener); return () => this.habitatListeners.delete(listener); }
   private notifySettings(settings: Settings): void { for (const listener of this.settingsListeners) { try { listener(settings); } catch { /* Owner state is authoritative; observers cannot roll it back. */ } } }
+  private notifyHabitat(contactId: string): void { for (const listener of this.habitatListeners) { try { listener(contactId); } catch { /* The committed owner plan remains authoritative. */ } } }
   private pendingGrant(contactId: string): boolean {
     return this.journal.pendingGrants(contactId).length !== 0 || this.journal.grantIntents(contactId).length !== 0;
   }
@@ -421,7 +433,12 @@ export class TextbutlerControlService {
     const jobId = randomUUID(), controller = new AbortController();
     const job: { result?: ControlResponse; expires: number } = { expires: Date.now() + 600_000 }; this.jobs.set(jobId, job);
     const timer = setTimeout(() => controller.abort(), 120_000);
-    const promise = Promise.resolve().then(() => work(controller.signal)).then(result => { job.result = result; }, error => { job.result = this.error(error); }).finally(() => { clearTimeout(timer); this.activeJob = undefined; });
+    const promise = Promise.resolve().then(() => work(controller.signal)).then(result => { job.result = result; }, error => { job.result = this.error(error); }).finally(() => {
+      clearTimeout(timer);
+      // The settled result survives closing its scope. Release signal-owned
+      // inference caches and handlers before admitting the next owner job.
+      controller.abort(); this.activeJob = undefined;
+    });
     this.activeJob = { controller, promise };
     return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "job", jobId };
   }
@@ -577,19 +594,41 @@ export class TextbutlerControlService {
         return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "snapshot", snapshot: await this.snapshot() };
       });
     }
-    if (request.command === "habitat.read" || request.command === "habitat.rollback") {
+    if (request.command === "habitat.read" || request.command === "habitat.configure" || request.command === "habitat.rollback" || request.command === "habitat.memory.clear") {
       if (!current.state.settings.contacts.some(contact => contact.id === request.contactId)) fail("invalid-request", "Unknown contact habitat.");
       const habitat = new ContactHabitat(this.journal, request.contactId);
-      if (request.command === "habitat.rollback") {
-        if (!current.state.settings.paused) fail("conflict", "Pause automatic replies before rolling back a habitat.");
-        try { habitat.rollback(request.expectedRevision); } catch { fail("conflict", "The habitat changed or has no retained predecessor. Read it before rolling back."); }
+      if (request.command !== "habitat.read") {
+        if (!current.state.settings.paused) fail("conflict", "Pause automatic replies before changing a habitat.");
+        if (request.command === "habitat.configure") {
+          try { habitat.configure(request.expectedRevision, request.plan); } catch { fail("conflict", "The habitat changed. Read it before saving a plan."); }
+        } else if (request.command === "habitat.memory.clear") {
+          try { habitat.clearMemory(request.expectedRevision, Date.now()); } catch { fail("conflict", "The habitat changed. Read it before clearing learned memory."); }
+        } else {
+          try { habitat.rollback(request.expectedRevision); } catch { fail("conflict", "The habitat changed or has no retained predecessor. Read it before rolling back."); }
+        }
+        this.notifyHabitat(request.contactId);
       }
       const state = habitat.snapshot(), config = this.habitatConfig;
+      const view = { enabled: config?.enabled ?? false, driver: config?.driver.kind ?? null, model: config?.driver.model ?? null,
+        evolutionModel: config?.evolutionModel ?? null, dailyBudgetUsd: config?.driver.kind === "gateway" ? config.driver.dailyBudgetUsd : 0,
+        plan: state.champion, memory: state.memory ?? [], memoryCutoff: state.memoryCutoff ?? null,
+        episodes: state.episodes.length, evaluations: [...state.evaluations], lineage: [...state.lineage],
+        recentEpisodes: state.episodes.slice(-8).map(({ reply }) => ({ runId: reply.runId, at: reply.at, planDigest: reply.planDigest,
+          actionKinds: reply.actionKinds ?? [], tools: reply.tools ?? [],
+          memoryIds: (reply.memory ?? []).map(entry => entry.id), priorMemory: reply.priorMemory ?? [] })),
+        omitted: { evaluations: 0, lineage: 0, episodes: Math.max(0, state.episodes.length - 8) } };
+      let content = JSON.stringify(view);
+      // Keep learned excerpts and recent tool evidence inspectable without
+      // returning full conversations or overflowing the control response.
+      while (Buffer.byteLength(content) > 262_144) {
+        if (view.evaluations.length) { view.evaluations.shift(); view.omitted.evaluations++; }
+        else if (view.lineage.length) { view.lineage.shift(); view.omitted.lineage++; }
+        else if (view.recentEpisodes.length) { view.recentEpisodes.shift(); view.omitted.episodes++; }
+        else fail("capacity", "The habitat plan exceeds the control response limit.");
+        content = JSON.stringify(view);
+      }
       return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "habitat", contactId: request.contactId, revision: state.revision,
-        installationDailyReservedMicroUsd: this.journal.apiUsage(Date.now()), content: JSON.stringify({ enabled: config?.enabled ?? false,
-          driver: config?.driver.kind ?? null, model: config?.driver.model ?? null, evolutionModel: config?.evolutionModel ?? null,
-          dailyBudgetUsd: config?.driver.kind === "gateway" ? config.driver.dailyBudgetUsd : 0,
-          plan: state.champion, episodes: state.episodes.length, evaluations: state.evaluations, lineage: state.lineage }) };
+        ownerRevision: state.ownerRevision ?? 0, installationDailyReservedMicroUsd: this.journal.apiUsage(Date.now()), content };
     }
     if (request.command === "messages.history") return this.startJob(async signal => ({ protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true,
       kind: "message-history", ...await this.messages.history(request.contactId, request.limit, signal) }));

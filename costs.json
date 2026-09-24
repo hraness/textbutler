@@ -3,8 +3,8 @@
   "surfaces": {
     "local:contact-habitats": {
       "kind": "authoritative", "retention": "account", "owner": "packages/textbutler/src/contact-habitat.ts", "deletion": "docs/textbutler/local-data.md",
-      "budget": { "contacts": 128, "bytesPerContact": 524288, "episodesPerContact": 16, "followupsPerEpisode": 5, "lineageEntries": 16, "evaluationsPerDayPerContact": 8 },
-      "note": "private journal state; contact-scoped plans, bounded observation windows, at-most-once checkpoint claims and conditional host-owned promotion"
+      "budget": { "contacts": 128, "bytesPerContact": 524288, "episodesPerContact": 16, "followupsPerEpisode": 5, "toolsPerEpisode": 2, "toolQueryBytes": 256, "toolResultBytes": 4096, "actionKindsPerEpisode": 8, "memoryEntriesPerContact": 8, "memoryTextBytes": 512, "memoryEntriesPerEpisode": 8, "priorMemoryEntriesPerEpisode": 8, "lineageEntries": 16, "evaluationsPerDayPerContact": 8 },
+      "note": "private journal state; contact-scoped personalities, source-backed remembered observations and owner tool configuration, bounded observation and tool-result evidence, at-most-once checkpoint claims and conditional host-owned promotion"
     },
     "local:habitat-evidence": {
       "kind": "derived", "retention": "persistent", "source": "bounded Algal executions of contact programs", "owner": "packages/textbutler/src/journal.ts",

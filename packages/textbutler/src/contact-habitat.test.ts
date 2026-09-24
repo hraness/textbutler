@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test";
 import { RunJournal } from "./journal.ts";
-import { ContactHabitat, DEFAULT_HABITAT_PLAN, habitatDigest, parseHabitatPlan, type HabitatObservation, type HabitatPlan, type HabitatReply } from "./contact-habitat.ts";
+import { ContactHabitat, DEFAULT_HABITAT_PLAN, HABITAT_LIMITS, habitatDigest, parseHabitatPlan, type HabitatObservation, type HabitatPlan, type HabitatReply } from "./contact-habitat.ts";
 
 const at = Date.parse("2026-09-20T12:00:00.000Z");
 const message = (id: string, time = at, author: HabitatObservation["author"] = "contact"): HabitatObservation => ({ id, at: time, author, kind: "message", text: "A synthetic question", relatedMessageId: null });
 const reply = (id = "run-1", time = at): HabitatReply => ({ runId: id, at: time, intent: "Explain the answer briefly", trigger: message(`trigger-${id}`, time - 1000), context: [], messageIds: [`sent-${id}`], text: "A synthetic answer", planDigest: null });
 const improved = (runIds: [string, string], evidenceIds: string[], candidate: HabitatPlan | null) => ({ candidate, reason: "Both examples improved", evidenceIds,
   scores: runIds.map((runId, index) => ({ runId, incumbent: 0.6, candidate: 0.8 + index * 0.1, safe: true })) });
+const retain = (remember?: string[]) => ({ candidate: null, reason: "Retain attributed observations", evidenceIds: [], scores: [], ...(remember === undefined ? {} : { remember }) });
 const followupCheckpoint = (habitat: ContactHabitat) => {
   habitat.record(reply()); habitat.observe(message("feedback-1", at + 1, "owner"), at + 1);
   habitat.observe(message("more-1", at + 2), at + 2); habitat.observe(message("more-2", at + 3), at + 3);
@@ -161,4 +162,200 @@ test("plans cannot add authorities, unbounded context, or executable programs", 
   expect(() => parseHabitatPlan({ ...DEFAULT_HABITAT_PLAN, tools: ["shell"] })).toThrow();
   expect(() => parseHabitatPlan({ ...DEFAULT_HABITAT_PLAN, contextMessages: 10000 })).toThrow();
   expect(() => parseHabitatPlan({ ...DEFAULT_HABITAT_PLAN, guidance: "x".repeat(5000) })).toThrow();
+});
+
+test("owner configuration seeds one personality, records its baseline, and rejects stale writes", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), other = new ContactHabitat(journal, "contact-b");
+    const plan: HabitatPlan = { ...DEFAULT_HABITAT_PLAN, guidance: "Offer one practical next step.", personality: { tone: "warm", formality: "casual" }, webSearch: true, memeSearch: false };
+    habitat.configure(0, plan);
+    expect(habitat.snapshot().champion).toEqual(plan);
+    expect(habitat.snapshot().ownerRevision).toBe(1);
+    expect(habitat.snapshot().lineage.at(-1)).toMatchObject({ kind: "configuration", from: DEFAULT_HABITAT_PLAN, to: plan });
+    expect(other.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN);
+    const stored = journal.habitatState("contact-a");
+    expect(() => habitat.configure(0, DEFAULT_HABITAT_PLAN)).toThrow("conflict");
+    expect(() => habitat.configure(1, { ...plan, personality: { tone: "warm", formality: "casual", tools: ["shell"] } })).toThrow();
+    expect(journal.habitatState("contact-a")).toEqual(stored);
+  } finally { journal.close(); }
+});
+
+test("personality can evolve with feedback while owner tool choices stay fixed", () => {
+  for (const changeTools of [false, true]) {
+    const journal = RunJournal.memory();
+    try {
+      const habitat = new ContactHabitat(journal, "contact-a");
+      const seeded: HabitatPlan = { ...DEFAULT_HABITAT_PLAN, webSearch: true, memeSearch: false, personality: { tone: "neutral", formality: "balanced" } };
+      habitat.configure(0, seeded);
+      const candidate: HabitatPlan = { ...seeded, personality: { tone: "direct", formality: "casual" }, ...(changeTools ? { memeSearch: true } : {}) };
+      expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], candidate))).toBe(!changeTools);
+      expect(habitat.snapshot().champion).toEqual(changeTools ? seeded : candidate);
+    } finally { journal.close(); }
+  }
+});
+
+test("owner changes invalidate pending evolution even if the plan returns to identical bytes", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), checkpoint = followupCheckpoint(habitat);
+    habitat.configure(habitat.snapshot().revision, { ...DEFAULT_HABITAT_PLAN, webSearch: true });
+    habitat.configure(habitat.snapshot().revision, DEFAULT_HABITAT_PLAN);
+    expect(habitatDigest(habitat.snapshot().champion)).toBe(checkpoint.baseDigest);
+    expect(habitat.finish(checkpoint, improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], { ...DEFAULT_HABITAT_PLAN, guidance: "An obsolete candidate" }))).toBe(false);
+    expect(habitat.snapshot().champion).toEqual(DEFAULT_HABITAT_PLAN);
+    expect(habitat.snapshot().evaluations.at(-1)).toMatchObject({ status: "retained", reason: expect.stringContaining("owner changed") });
+    expect(habitat.snapshot().episodes).toHaveLength(2);
+  } finally { journal.close(); }
+});
+
+test("a new owner baseline preserves history and cannot roll back to older tool grants", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a");
+    habitat.configure(0, { ...DEFAULT_HABITAT_PLAN, webSearch: true });
+    const candidate = { ...habitat.snapshot().champion, guidance: "An improved explanation style" };
+    expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], candidate))).toBe(true);
+    habitat.configure(habitat.snapshot().revision, { ...candidate, webSearch: false, memeSearch: false });
+    expect(habitat.snapshot().episodes).toHaveLength(2);
+    expect(habitat.snapshot().evaluations).toHaveLength(4);
+    expect(habitat.snapshot().lineage.map(entry => entry.kind)).toEqual(["configuration", "promotion", "configuration"]);
+    expect(() => habitat.rollback(habitat.snapshot().revision)).toThrow("conflict");
+    expect(habitat.snapshot().champion.webSearch).toBe(false);
+  } finally { journal.close(); }
+});
+
+test("legacy plans and replies retain their identities without synthetic personality or tool fields", () => {
+  const journal = RunJournal.memory();
+  try {
+    const legacyPlan = { ...DEFAULT_HABITAT_PLAN, guidance: "A legacy plan" };
+    expect(JSON.stringify(parseHabitatPlan(legacyPlan))).toBe(JSON.stringify(legacyPlan));
+    const state = { version: 1 as const, revision: 1, champion: legacyPlan, episodes: [{ reply: reply(), followups: [], initialClaimed: false, followupClaimed: false, reflection: null }], evaluations: [], lineage: [], ancestors: [DEFAULT_HABITAT_PLAN], denied: [habitatDigest(legacyPlan)] };
+    expect(Object.hasOwn(parseHabitatPlan({ ...legacyPlan, personality: undefined }), "personality")).toBe(false);
+    journal.writeHabitatState("contact-a", 0, JSON.stringify(state));
+    const habitat = new ContactHabitat(journal, "contact-a");
+    expect(habitat.snapshot()).toEqual(state);
+    expect(habitatDigest(habitat.snapshot().champion)).toBe(state.denied[0]!);
+    habitat.record(reply());
+    expect(journal.habitatState("contact-a")?.value).toBe(JSON.stringify(state));
+  } finally { journal.close(); }
+});
+
+test("submitted tool observations are bounded and part of reply identity", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a");
+    const tool = { kind: "web-search" as const, query: "public research", result: "An observed public excerpt" };
+    const recorded: HabitatReply = { ...reply(), tools: [tool], actionKinds: ["text", "link"] };
+    habitat.record(recorded); habitat.record(recorded);
+    expect(habitat.snapshot().episodes[0]?.reply.tools).toEqual([tool]);
+    expect(() => habitat.record({ ...recorded, tools: [{ ...tool, result: "Different evidence" }] })).toThrow("identity changed");
+    for (const tools of [[tool, tool, tool], [{ ...tool, result: "💬".repeat(1025) }], [{ ...tool, query: "é".repeat(129) }]]) {
+      expect(() => habitat.record({ ...reply("other"), tools })).toThrow();
+    }
+    expect(habitat.snapshot().episodes).toHaveLength(1);
+  } finally { journal.close(); }
+});
+
+test("owner configuration preserves rejection history and invalidates pending initial reflection", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), rejected = { ...DEFAULT_HABITAT_PLAN, guidance: "A rejected personality" };
+    expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], rejected))).toBe(true);
+    habitat.rollback(habitat.snapshot().revision);
+    habitat.record(reply("run-3", at + 120_000));
+    const pending = habitat.claim(at + 120_000)!;
+    habitat.configure(habitat.snapshot().revision, DEFAULT_HABITAT_PLAN);
+    expect(habitat.snapshot().denied).toEqual([habitatDigest(rejected)]);
+    expect(habitat.finish(pending, { candidate: rejected, reason: "Old reflection", scores: [], evidenceIds: [] })).toBe(false);
+    expect(habitat.snapshot().episodes.at(-1)?.reflection).toBeNull();
+  } finally { journal.close(); }
+});
+
+test("source-backed memory persists separately per contact with codepoint-safe attribution", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), source = { ...message("preference", at - 1000, "owner"), text: "é".repeat(255) + "😀tail" };
+    habitat.record({ ...reply(), trigger: source });
+    expect(habitat.finish(habitat.claim(at)!, retain([source.id]))).toBe(false);
+    const state = habitat.snapshot(), memory = state.memory![0]!;
+    expect(memory).toEqual({ id: source.id, at: source.at, author: "owner", text: "é".repeat(255), sourceDigest: habitatDigest(source), truncated: true });
+    expect(Buffer.byteLength(memory.text)).toBeLessThanOrEqual(HABITAT_LIMITS.memoryTextBytes);
+    expect(state.champion).toEqual(DEFAULT_HABITAT_PLAN); expect(state.evaluations.at(-1)?.memoryChanged).toBe(true);
+    expect(new ContactHabitat(journal, "contact-a").snapshot().memory).toEqual(state.memory);
+    expect(new ContactHabitat(journal, "contact-b").snapshot().memory).toBeUndefined();
+    habitat.record(reply("run-2", at + 1000)); habitat.finish(habitat.claim(at + 1000)!, retain());
+    expect(habitat.snapshot().memory).toEqual(state.memory);
+    habitat.record(reply("run-3", at + 2000)); habitat.finish(habitat.claim(at + 2000)!, retain([]));
+    expect(habitat.snapshot().memory).toEqual([]);
+  } finally { journal.close(); }
+});
+
+test("memory refuses invented, duplicate, reaction, future, and contradictory source IDs", () => {
+  for (const scenario of ["invented", "duplicate", "reaction", "future", "ambiguous", "body", "too-many"] as const) {
+    const journal = RunJournal.memory();
+    try {
+      const habitat = new ContactHabitat(journal, "contact-a"), source = message("source", scenario === "future" ? at + 1 : at - 1);
+      habitat.record({ ...reply(), trigger: scenario === "reaction" ? { ...source, kind: "reaction" } : source,
+        context: scenario === "ambiguous" ? [{ ...source, text: "A different statement" }] : [] });
+      const checkpoint = habitat.claim(at)!;
+      const ids = scenario === "invented" ? ["not-observed"] : scenario === "duplicate" ? ["source", "source"] : scenario === "too-many" ? Array.from({ length: 9 }, (_, i) => `id-${i}`) : ["source"];
+      expect(() => habitat.finish(checkpoint, scenario === "body" ? { ...retain(ids), remember: [{ id: "source", text: "Invented" }] } as never : retain(ids))).toThrow();
+      expect(habitat.snapshot().memory).toBeUndefined();
+    } finally { journal.close(); }
+  }
+});
+
+test("memory copies reconcile proven clipped views but reject same-ID source changes", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), source = { ...message("source", at - 1000), text: "s".repeat(900) };
+    const clipped = { ...source, text: source.text.slice(0, 512), sourceDigest: habitatDigest(source), truncated: true };
+    habitat.record({ ...reply(), trigger: source, context: [clipped] });
+    habitat.finish(habitat.claim(at)!, retain([source.id]));
+    expect(habitat.snapshot().memory?.[0]).toMatchObject({ text: "s".repeat(512), sourceDigest: habitatDigest(source), truncated: true });
+    habitat.record({ ...reply("run-2", at + 1000), context: [clipped] });
+    habitat.finish(habitat.claim(at + 1000)!, retain([source.id, "trigger-run-2"]));
+    expect(habitat.snapshot().memory).toHaveLength(2);
+    habitat.record({ ...reply("run-3", at + 2000), context: [{ ...clipped, sourceDigest: "a".repeat(64) }] });
+    expect(() => habitat.finish(habitat.claim(at + 2000)!, retain([source.id]))).toThrow("ambiguous");
+  } finally { journal.close(); }
+});
+
+test("owner, memory, and source changes invalidate pending retention without overwriting newer state", () => {
+  for (const change of ["owner", "memory", "source"] as const) {
+    const journal = RunJournal.memory();
+    try {
+      const habitat = new ContactHabitat(journal, "contact-a"); habitat.record(reply());
+      const checkpoint = habitat.claim(at)!;
+      if (change === "owner") habitat.configure(habitat.snapshot().revision, DEFAULT_HABITAT_PLAN);
+      else if (change === "source") habitat.observe(message("later", at + 1), at + 1);
+      else {
+        habitat.record(reply("run-2", at + 1000));
+        habitat.finish(habitat.claim(at + 1000)!, retain(["trigger-run-2"]));
+      }
+      const memory = habitat.snapshot().memory;
+      habitat.finish(checkpoint, retain(["trigger-run-1"]));
+      expect(habitat.snapshot().memory).toEqual(memory);
+      expect(habitat.snapshot().evaluations.find(value => value.key === checkpoint.key)?.memoryChanged).toBe(false);
+    } finally { journal.close(); }
+  }
+});
+
+test("owner clear blocks in-flight and later resurrection while preserving personality history", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), future = message("future-source", at + 20_000);
+    habitat.record({ ...reply(), context: [future] });
+    const pending = habitat.claim(at)!;
+    const before = habitat.snapshot(); habitat.clearMemory(before.revision, at);
+    expect(habitat.snapshot().memoryCutoff).toBe(future.at); expect(habitat.snapshot().ownerRevision).toBe(1);
+    expect(habitat.snapshot().champion).toEqual(before.champion); expect(habitat.snapshot().ancestors).toEqual(before.ancestors);
+    habitat.finish(pending, retain(["trigger-run-1"])); expect(habitat.snapshot().memory).toEqual([]);
+    habitat.record({ ...reply("run-2", at + 30_000), context: [future] });
+    const next = habitat.claim(at + 30_000)!;
+    expect(() => habitat.finish(next, retain([future.id]))).toThrow("unavailable");
+    habitat.finish(next, retain(["trigger-run-2"])); expect(habitat.snapshot().memory?.map(value => value.id)).toEqual(["trigger-run-2"]);
+    expect(() => habitat.clearMemory(before.revision, at + 40_000)).toThrow("conflict");
+  } finally { journal.close(); }
 });

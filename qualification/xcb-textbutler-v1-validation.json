@@ -1,49 +1,119 @@
 {
   "version": 1,
-  "scope": "TextButler contact-profile composition, owner messaging controls and native startup/setup source; synthetic tests only, including a development Ghostget 0.18.21 fixture, closed discovery diagnostics, literal iMessage/any GUID read and enrollment identity, route-neutral AI readiness copy, and pinned native transport provisioning before account linking. Actual Ghostget artifact admission, native send service enforcement, XCB/provider admission, macOS permissions and live messaging verification remain independent.",
+  "scope": "TextButler contact-profile composition, contact-specific personality and owner tool controls, habitat evolution, bounded source-backed contact memory, owner memory clearing, historical memory snapshots, bounded tool evidence, and native startup/setup source. Memory excerpts are untrusted attributed statements. Evidence is synthetic source validation only. Actual Ghostget artifact admission, native send service enforcement, XCB/provider qualification, runtime sandbox confinement, macOS permissions, live messaging verification and owner activation remain independent.",
   "toolchain": "Bun 1.3.14",
-  "command": "bun test packages/textbutler/src/xcb-client.test.ts packages/textbutler/src/xcb-host.test.ts packages/textbutler/src/native-task.test.ts packages/textbutler/src/native-subscription.test.ts packages/textbutler/src/routed-agent.test.ts packages/textbutler/src/provider-host.test.ts packages/textbutler/src/workspace.test.ts packages/textbutler/src/runtime.test.ts scripts/xcb-integration-admission.test.ts packages/textbutler/src/message-summary.test.ts packages/textbutler/src/messages-cli.test.ts packages/textbutler/src/owner-messages.test.ts packages/textbutler/src/owner-replies.test.ts packages/textbutler/src/control-service.test.ts packages/textbutler/src/imessage-setup.test.ts packages/transport/src/automation.test.ts packages/textbutler/src/automation-owner.test.ts packages/textbutler/src/ghostget-automation-process.test.ts",
+  "command": "bun run check:textbutler && bun test scripts/xcb-integration-admission.test.ts",
   "result": {
     "exitCode": 0,
-    "passed": 262,
+    "passed": 588,
     "failed": 0,
-    "assertions": 2032,
-    "files": 18
+    "assertions": 5171,
+    "files": 50
   },
-  "additionalChecks": [
+  "invocations": [
     {
-      "command": "bun run node_modules/typescript/bin/tsc --noEmit -p packages/transport/tsconfig.json",
-      "exitCode": 0,
-      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "evidence": "Observed current coupled composition completion; compiler output is empty. All retained inputs were unchanged before and after the suite and both typechecks."
+      "command": "bun run check:textbutler",
+      "scheduler": {
+        "command": "hra-host-run",
+        "mode": "heavy",
+        "lane": "compute"
+      },
+      "result": {
+        "exitCode": 0,
+        "passed": 581,
+        "failed": 0,
+        "assertions": 5135,
+        "files": 49
+      },
+      "logOffsetBytes": 0,
+      "logLengthBytes": 60001,
+      "logSha256": "03f236ae608ad6ddc0155675921d0e2de89522199a7296fd5a3c3a4e97c3f59e"
     },
     {
-      "command": "bun run node_modules/typescript/bin/tsc --noEmit -p packages/textbutler/tsconfig.json",
-      "exitCode": 0,
-      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "evidence": "Observed current coupled composition completion; compiler output is empty. All retained inputs were unchanged before and after the suite and both typechecks."
+      "command": "bun test scripts/xcb-integration-admission.test.ts",
+      "scheduler": {
+        "command": "hra-host-run",
+        "mode": "heavy",
+        "lane": "compute"
+      },
+      "result": {
+        "exitCode": 0,
+        "passed": 7,
+        "failed": 0,
+        "assertions": 36,
+        "files": 1
+      },
+      "logOffsetBytes": 60001,
+      "logLengthBytes": 925,
+      "logSha256": "cf83744bb552159587833f55ef48cdd9037e05562802678fe2dde5dd47db3983"
     }
   ],
-  "sourceInventoryCount": 30,
-  "sourceDigest": "6d23bad81a921144d4e3de6b5c22aa0b46205f51d83d0f6c5e094c868179ec02",
+  "additionalChecks": [
+    {
+      "command": "tsc --noEmit -p packages/transport/tsconfig.json",
+      "exitCode": 0,
+      "includedInCommand": "bun run check:textbutler",
+      "evidence": "Executed by the checked package.json script after the passing package tests. Its successful parent exit confirms both chained typechecks completed. Complete combined stdout and stderr are retained in the first invocation log segment; no separate compiler log is claimed."
+    },
+    {
+      "command": "tsc --noEmit -p packages/textbutler/tsconfig.json",
+      "exitCode": 0,
+      "includedInCommand": "bun run check:textbutler",
+      "evidence": "Executed by the checked package.json script after the passing package tests. Its successful parent exit confirms both chained typechecks completed. Complete combined stdout and stderr are retained in the first invocation log segment; no separate compiler log is claimed."
+    }
+  ],
+  "sourceInventoryCount": 39,
+  "sourceDigest": "3e029cc5062f4c3a72a4c101cf6331a40f8123908ecb52e7f650ada8cde4c79c",
   "testSources": {
+    "packages/textbutler/src/attribution.test.ts": "21192898e86674277c5cb91edff41b8328e79b6d03b7076736d8b5d53275cd16",
     "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
-    "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
+    "packages/textbutler/src/cli.test.ts": "107c77111ebf86eaef10f7d696d24d38494f5a503d1b687970d57e6c03048ea3",
+    "packages/textbutler/src/contact-habitat.test.ts": "7fb0d6d1231efc013f1dbadbd6577c85b0fe2acf9346563d73d75483bb996b33",
+    "packages/textbutler/src/control-service.test.ts": "99efbdecc19cda87e37a30355492945f6c84c92f443c17998799ac80d1529bb2",
+    "packages/textbutler/src/daemon-custody.test.ts": "8bc58904f2ddb921eaeccfaf272e29f87176137cdacb00cd1ab78408fa41013a",
+    "packages/textbutler/src/daemon.test.ts": "c93108a1f7d5d0b360463abb697dc571dcc42f26f60e115e5c89c1e5fe9d6113",
+    "packages/textbutler/src/enrollment.test.ts": "4f8d83b6ea5a281a30423eb12ab7d41fac89ed2d9f7178e4b949d5e1168b4ff6",
+    "packages/textbutler/src/fast-driver.test.ts": "183ecab523bc87ba3a83561f5afece88bee04348a4a88ba20b09013225ff458e",
     "packages/textbutler/src/ghostget-automation-process.test.ts": "245d7e4ba4ae973ac217f84d41ccfeb9381411b66d042169521dfc1e0aa06937",
+    "packages/textbutler/src/ghostget-owner-read.test.ts": "7aea9da06f4095a6020060ee3719f6b31b083cbd8d0de2ee560443fe82beefbf",
+    "packages/textbutler/src/habitat-agent.test.ts": "2598bfde672dfbb4c48692f58f8e363b1886fee2248d778fa1e1a69ab9e15144",
+    "packages/textbutler/src/habitat-program.test.ts": "4b9ce50d84d49be7fa575ec8c07b7444c8602bac49fffad304c5318f9d09fc9c",
+    "packages/textbutler/src/host-config.test.ts": "57b8f21951ff12ae19a79f0298984ca73add9cc84c3503e00db6ea514bbee69b",
     "packages/textbutler/src/imessage-setup.test.ts": "2246b341b5bee2714dc58065cd534bc69e4a04a464b3e94f397a50342783dad5",
+    "packages/textbutler/src/journal.test.ts": "22438a43cf9f655c840fcec1f0e7c63ed993e89d5c3f8373dcd7c34300b33920",
+    "packages/textbutler/src/launch-agent.test.ts": "ffc7548158f69f48b25b64077ed263cd8cacab7caeeeeeda58904bfb1b1b4ee6",
+    "packages/textbutler/src/macos-app.test.ts": "1725fc220eb1aabe727b0cb1ebfd5cef9b8ae2c80c02e6e8044918f3e4d8f1f5",
+    "packages/textbutler/src/managed-codex-owner.test.ts": "848db23b6843d8c7473a5f476e3d0adfe57349a3e6ad4f40620f1cd6125ae32d",
+    "packages/textbutler/src/managed-codex.test.ts": "9af77d806d52f05f98de978e355e3073cb334fcd82f9baf79e455accc7806524",
+    "packages/textbutler/src/meme-search.test.ts": "cdfb9027c44d5b4b8720a5077894d060fc27bd356675b1eb87486abff4122197",
+    "packages/textbutler/src/menubar.test.ts": "84d4c543aa13c2144593c2615018aa63d1140848785345c617c6d3c69267258f",
     "packages/textbutler/src/message-summary.test.ts": "286cd717f0741fd40ac8caa47df14c436e66697834446fdaaa3add283b387419",
     "packages/textbutler/src/messages-cli.test.ts": "c0c2db682378924bbaddfa81db831b652b92e9867dc037c1d4c78099df60a49e",
+    "packages/textbutler/src/native-claude.test.ts": "d46fae58abb2a0fef90fc5461fe9a295fffe7a2991fc0de0cbb65e1468663a2c",
+    "packages/textbutler/src/native-codex.test.ts": "fcb9c905a35f81044e01788c6d1911f73f268d3ee380ab06530a48fa3ff9f163",
     "packages/textbutler/src/native-subscription.test.ts": "06b348c961b14bbf234c6626ccfcb2e1d9a24164bec740a2de2fc88ba46df2e4",
     "packages/textbutler/src/native-task.test.ts": "0edb5312a2140fffcf63a58e3febaf2a46991ae0fb6ae22e1b73fa4373c5330f",
+    "packages/textbutler/src/onboarding.test.ts": "f9a8c943624cab05f07cb0cec40d6c2d15fd1b2730e83d6b2a386558560e6614",
+    "packages/textbutler/src/owner-cli.test.ts": "1fbdb5eea63e87f4d01068856dca20bdab3a4dadef2ad4b8c181c2fc1dde5ac3",
     "packages/textbutler/src/owner-messages.test.ts": "c44d179638bce1908c9994958ce80a8478b6d5d2dd7d3a4f998f3cf521c35773",
     "packages/textbutler/src/owner-replies.test.ts": "404547b888f1bb55ae82b2b86c92b151ed3e2a6540224f17c92f5159d0aedd1d",
+    "packages/textbutler/src/plugins.test.ts": "10c4058b3e3057040781c08a9a3035e706c86f8cbc9cf131fbd88de8ed079f89",
+    "packages/textbutler/src/policy.test.ts": "960dc2c7c4ff828e68e924f314046062ab9b0d8289da1daf6e450ee33ac150bc",
+    "packages/textbutler/src/provider-host-handoff.test.ts": "e59c2ff164e618a0bf671283747f3097bb5fe11d6def1b2197610d2de99e7aa1",
+    "packages/textbutler/src/provider-host-recovery.test.ts": "1e7403a87e4942dd8c4591b1958090d1a8f6eea845769b7fcc2fd6802d18a340",
     "packages/textbutler/src/provider-host.test.ts": "95c63010a19fa86daac6d758b78398dc3e786c31c3ced61884f6140786b1efa4",
+    "packages/textbutler/src/reply-loop.test.ts": "bd414f751c090216dc573878473a36a875f365dff8e2a594eea66300b8f23480",
     "packages/textbutler/src/routed-agent.test.ts": "0232fbfab4b1f7eafc3e928fbc4ad7443d45073677b21f2e33a76806ed78a2be",
+    "packages/textbutler/src/routed-managed-agent.test.ts": "11a60dea19cadde5ad23becb2a3dce32e339df6f0af7c1bff68dba6cbe3a4201",
     "packages/textbutler/src/runtime.test.ts": "73bd66f87c641ee0a17c999892d8d79d2cba8cb03a8128035033037f3adcb67b",
+    "packages/textbutler/src/tui.test.ts": "2f20d957c218360937d6e2d4fdca315f68a05e5f473046181831bfe682ad2820",
     "packages/textbutler/src/workspace.test.ts": "bf48baaf1c46261ac50f592d55d617e58fe04e8c7d927f5102b1cbae84bb076a",
     "packages/textbutler/src/xcb-client.test.ts": "1997655c7d682848889d28078e0a52f01358b434a72b5345dd7d04400ecd74e5",
     "packages/textbutler/src/xcb-host.test.ts": "2b0a5a41236edf44b4a1ee049c5245bd53df1f708d966113726daee9175969c6",
     "packages/transport/src/automation.test.ts": "1b61bbd3d514ebe15bea5ec453a330b2d533b91040193207abd46cc8594cdc03",
+    "packages/transport/src/cli.test.ts": "dca9f639aa31b897d21c1499728b5dc52a179ac25bde36e75d71dbc6435bd31a",
+    "packages/transport/src/ghostget-whatsapp.test.ts": "281f2bedb6977aaa51daa847bf0489c05dd7ec47a617b0e82f04c4b5d06660ad",
+    "packages/transport/src/ghostget.test.ts": "714e28a108efef316a7da6009bc6ca0caad1f6ca10139fccc1cfe1f57c0ac31c",
     "scripts/xcb-integration-admission.test.ts": "e567b1e06d2900b15e37cc8ba634cdb14dc35948dee8d01c63992626f87234ee"
   },
   "typeInputs": {
@@ -55,121 +125,156 @@
     "tsconfig.build.json": "aa54ba26b67f36cbdbc32ee65bcfaff16f74680f963cc0f5bf99552c59fc00f4",
     "tsconfig.json": "ea008503585d16dd66a1900ffab00ccd43ad316984b3e6be36a237cc9cc724c8"
   },
-  "logSha256": "c4f42868951d5749a49195a7f18f9187e18f40b4568d45bf58f4ae2693c96fd7",
-  "logScope": "Complete actual stdout and stderr from the 18-file synthetic composition invocation rerun over the 0.8.21 release sources; host scheduler output is separate. Both package typechecks completed with empty logs.",
+  "logSha256": "0f2143e2282e135350491fa76d48f8872ab294008af6324c3718da756fe4dfd0",
+  "logScope": "Complete actual stdout and stderr of the two successful host-scheduler invocations, concatenated in the recorded order with no added log text. Includes all package tests, both package typechecks and source-admission regressions. Invocation byte offsets, lengths and hashes identify the exact raw segments. Earlier failed validation is not represented as success or included in this log.",
   "review": {
-    "method": "Integration-owner reseal for the 0.8.21 release over reviewed main: package.json and site package versions advance to 0.8.21 with the changelog entry, carrying the LaunchAgent historical-render verification set completing the LaunchAgent contract fix. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
+    "method": "Independent AI source review is recorded in the referenced artifact and bound to exact reviewed file hashes. The validation owner verified the review artifact and every reviewed hash before and after these successful checks. All seven changed sources from the prior successful 39-source inventory are covered; the other 32 prior source hashes and the inventory are unchanged. No human approval or live/provider attestation is claimed.",
     "references": [
       {
-        "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
-        "files": [
-          "packages/control/src/index.ts",
-          "packages/textbutler/src/control-service.ts",
-          "packages/textbutler/src/owner-messages.ts",
-          "packages/textbutler/src/owner-replies.ts"
-        ],
-        "result": "Exact identity and revision rechecks, bounded history and summary samples, capabilities, targets, assets, disclosure, draft digest and explicit-send boundaries reviewed without remaining blockers."
-      },
-      {
-        "reviewerRole": "Composition validation owner, independent of the CLI, summary helper and media-import implementation",
-        "files": [
-          "packages/textbutler/src/messages-cli.ts",
-          "packages/textbutler/src/owner-cli.ts",
-          "packages/textbutler/src/message-summary.ts",
-          "packages/textbutler/src/workspace.ts"
-        ],
-        "result": "Explicit recipient selection, bounded physical-file import, no-send composition, pending job retention and unchanged empty-tool summary profile reviewed. Summary NUL output mismatch repaired and replayed."
-      },
-      {
-        "reviewerRole": "Independent native setup pin and composition validation reviewer",
-        "files": [
-          "packages/textbutler/src/imessage-setup.ts",
-          "packages/textbutler/src/imessage-setup.test.ts",
-          "docs/textbutler/agent-cli.md",
-          "docs/textbutler/architecture.md",
-          "docs/textbutler/getting-started.md",
-          "docs/textbutler/ghostget-contract.md"
-        ],
-        "result": "Exact Ghostget 0.18.20 package admission remains before child launch and setup custody; snapshots require the same version. Synthetic cases reject 0.18.16, 0.18.17, 0.18.18 and 0.18.19 before launch and reject older snapshots before permission grants. Documentation accurately distinguishes partial discovery eligibility from exact resolution and sending, and preserves separate live-verification requirements. All 50 source, test, type and reviewed documentation inputs were unchanged across this validation."
-      },
-      {
-        "reviewerRole": "Independent XCB client/host composition reviewer, separate from diagnostics implementation",
-        "files": [
-          "packages/textbutler/src/xcb-client.ts",
-          "packages/textbutler/src/xcb-client.test.ts",
-          "packages/textbutler/src/xcb-host.ts",
-          "packages/textbutler/src/xcb-host.test.ts"
-        ],
-        "result": "Reviewed fixed allowlisted diagnostics without process output, account data or error causes; first stop cause retention rejects late valid JSON after timeout; output limits and unknown-reason fallback remain bounded; generation deadlines and custody remain unchanged. Synthetic timer injection proves the configured 90-second discovery policy without waiting 90 seconds or claiming live performance. Current qualification, exact executable, account and model gates remain mandatory. All 50 retained source, test, type and documentation inputs were unchanged across 197 tests, 1298 assertions and a successful package typecheck."
-      },
-      {
-        "reviewerRole": "Integration owner, independent of the native-ready snapshot parser implementation",
-        "files": [
-          "packages/control/src/index.ts",
-          "packages/textbutler/src/control-service.test.ts"
-        ],
-        "result": "Approved the minimal removal of the Claude-API-only ready-state restriction. Synthetic qualified Claude Code and Codex XCB accounts now pass through the real subscription host, provider host, control service and JSON parser without inference. Both models, provider/route identity and account identity remain required; managed signed-in accounts remain unavailable and a managed ready state is still rejected. Existing API-ready snapshots remain compatible."
-      },
-      {
-        "reviewerRole": "Integration owner and separate diagnostics reviewer, independent of this implementation; composition owner independently reviewed inventory addition",
-        "files": [
-          "packages/transport/src/automation-diagnostics.ts",
-          "packages/transport/src/automation.ts",
-          "packages/textbutler/src/ghostget-automation-process.ts",
-          "packages/textbutler/src/automation-owner.ts",
-          "packages/textbutler/src/control-service.ts",
-          "packages/control/src/index.ts",
-          "packages/textbutler/src/imessage-setup.ts",
-          "packages/textbutler/src/imessage-setup.test.ts",
-          "scripts/xcb-integration-admission.ts",
-          "docs/textbutler/agent-cli.md",
-          "docs/textbutler/architecture.md",
-          "docs/textbutler/getting-started.md",
-          "docs/textbutler/ghostget-contract.md"
-        ],
-        "result": "Approved additive per-provider discovery diagnostics with closed stage/code pairs, exact allowlisted native markers, no raw messages/paths/handles/bodies/stderr, unchanged generic failure and partial-provider behavior. Newline marker and non-string remote error settlement findings were repaired; tests retain custody for malformed/recovery failures and require successful normal close. Exact 0.18.21 admission rejects earlier versions before setup launch or permissions. The new diagnostic module is explicitly bound in the 29-source inventory. All 246 source, synthetic fixture, test, type, reviewed documentation and instruction inputs remained unchanged across 238 tests, 1883 assertions and both successful package typechecks."
-      },
-      {
-        "reviewerRole": "Integration owner, independent of literal-coordinate and readiness-copy implementation; composition owner independently reviewed source-inventory addition",
-        "files": [
-          "packages/transport/src/automation-contract.ts",
-          "packages/transport/src/automation.test.ts",
-          "packages/textbutler/src/control-service.ts",
-          "packages/textbutler/src/control-service.test.ts",
-          "scripts/xcb-integration-admission.ts"
-        ],
-        "result": "Approved only the exact iMessage; and any; GUID prefix allowlist while preserving service=iMessage, literal GUID bytes, the existing byte/NUL limits, exact keys, positive safe row identity, and binding equality. Synthetic discovery/enrollment/history cases reject prefix or row changes even when a provider recomputes the enrollment digest. Route-neutral readiness copy avoids implying a Claude API account or an already-selected contact account. The coordinate contract is explicitly bound in the 30-source inventory. All 246 inputs remained unchanged across 240 tests, 1952 assertions and both successful package typechecks. No native send service guard or live messaging result is claimed."
-      },
-      {
-        "reviewerRole": "Integration owner, independent of the transport provisioning implementation",
-        "files": [
-          "packages/textbutler/src/imessage-setup.ts",
-          "packages/textbutler/src/imessage-setup.test.ts",
-          "docs/textbutler/getting-started.md"
-        ],
-        "result": "Approved provisioning the connector-pinned imsg artifact through the connector's own idempotent, hash-admitted install before account linking inside setup custody. The closed install response admits only the exact reviewed tool identity, version and artifact digest shape; missing fields, wrong tool identity, non-boolean markers and nonzero exits retain custody before any account read. The live failure mode this fixes \u2014 an admitted connector upgrade leaving an unpinned transport \u2014 was reproduced and resolved on the owner installation; this receipt claims only the synthetic evidence."
+        "artifact": "qualification/xcb-contact-personalities-review.json",
+        "sha256": "a234f3539a2b92b74087d756cfd4af5a1263746ce644d2f317fb41e9817c8811",
+        "kind": "independent-ai-source-review",
+        "result": "No remaining blocking source-review findings. Owner-controlled tool flags, contact scope, conditional revisions, stale-result invalidation, legacy plan identities, brokered effects, bounded memory and evaluation views, historical replay isolation, and settled owner-job cleanup remain enforced."
       }
-    ]
+    ],
+    "historicalReview": {
+      "scope": "Historical review retained from the previous qualification only. These references and their earlier historical chain are not fresh review, current test evidence, human approval or live verification for this memory change.",
+      "review": {
+        "method": "Independent AI source review is recorded in the referenced artifact and bound to exact reviewed file hashes. The validation owner verified the review artifact and every reviewed hash before and after these successful checks; all four changed sources from the prior 30-source inventory and all nine additions are covered. The other 26 prior source hashes remain unchanged. No human approval or live/provider attestation is claimed.",
+        "references": [
+          {
+            "artifact": "qualification/xcb-contact-personalities-review.json",
+            "sha256": "3b6cb2f8874f0885b83b746f0a96b0abd8b2a04eecb981248a1605cd4c5eb45d",
+            "kind": "independent-ai-source-review",
+            "result": "No remaining blocking source-review findings. Owner-controlled tool flags, contact scope, conditional revisions, stale-result invalidation, legacy plan identities, brokered effects, bounded storage and evaluation views, and settled owner-job cleanup remain enforced."
+          }
+        ],
+        "historicalReview": {
+          "scope": "Historical review retained from the previous qualification only. These references are not fresh review, current test evidence, human approval or live verification for this change.",
+          "method": "Integration-owner reseal for the 0.8.21 release over reviewed main: package.json and site package versions advance to 0.8.21 with the changelog entry, carrying the LaunchAgent historical-render verification set completing the LaunchAgent contract fix. The coupled 18-file synthetic suite and both package typechecks were rerun with the release inputs. Earlier review references describe the retained baseline work. Native per-send service enforcement, provider admission and live messaging verification remain separate.",
+          "references": [
+            {
+              "reviewerRole": "Integration owner, independent of the owner-messaging backend implementation",
+              "files": [
+                "packages/control/src/index.ts",
+                "packages/textbutler/src/control-service.ts",
+                "packages/textbutler/src/owner-messages.ts",
+                "packages/textbutler/src/owner-replies.ts"
+              ],
+              "result": "Exact identity and revision rechecks, bounded history and summary samples, capabilities, targets, assets, disclosure, draft digest and explicit-send boundaries reviewed without remaining blockers."
+            },
+            {
+              "reviewerRole": "Composition validation owner, independent of the CLI, summary helper and media-import implementation",
+              "files": [
+                "packages/textbutler/src/messages-cli.ts",
+                "packages/textbutler/src/owner-cli.ts",
+                "packages/textbutler/src/message-summary.ts",
+                "packages/textbutler/src/workspace.ts"
+              ],
+              "result": "Explicit recipient selection, bounded physical-file import, no-send composition, pending job retention and unchanged empty-tool summary profile reviewed. Summary NUL output mismatch repaired and replayed."
+            },
+            {
+              "reviewerRole": "Independent native setup pin and composition validation reviewer",
+              "files": [
+                "packages/textbutler/src/imessage-setup.ts",
+                "packages/textbutler/src/imessage-setup.test.ts",
+                "docs/textbutler/agent-cli.md",
+                "docs/textbutler/architecture.md",
+                "docs/textbutler/getting-started.md",
+                "docs/textbutler/ghostget-contract.md"
+              ],
+              "result": "Exact Ghostget 0.18.20 package admission remains before child launch and setup custody; snapshots require the same version. Synthetic cases reject 0.18.16, 0.18.17, 0.18.18 and 0.18.19 before launch and reject older snapshots before permission grants. Documentation accurately distinguishes partial discovery eligibility from exact resolution and sending, and preserves separate live-verification requirements. All 50 source, test, type and reviewed documentation inputs were unchanged across this validation."
+            },
+            {
+              "reviewerRole": "Independent XCB client/host composition reviewer, separate from diagnostics implementation",
+              "files": [
+                "packages/textbutler/src/xcb-client.ts",
+                "packages/textbutler/src/xcb-client.test.ts",
+                "packages/textbutler/src/xcb-host.ts",
+                "packages/textbutler/src/xcb-host.test.ts"
+              ],
+              "result": "Reviewed fixed allowlisted diagnostics without process output, account data or error causes; first stop cause retention rejects late valid JSON after timeout; output limits and unknown-reason fallback remain bounded; generation deadlines and custody remain unchanged. Synthetic timer injection proves the configured 90-second discovery policy without waiting 90 seconds or claiming live performance. Current qualification, exact executable, account and model gates remain mandatory. All 50 retained source, test, type and documentation inputs were unchanged across 197 tests, 1298 assertions and a successful package typecheck."
+            },
+            {
+              "reviewerRole": "Integration owner, independent of the native-ready snapshot parser implementation",
+              "files": [
+                "packages/control/src/index.ts",
+                "packages/textbutler/src/control-service.test.ts"
+              ],
+              "result": "Approved the minimal removal of the Claude-API-only ready-state restriction. Synthetic qualified Claude Code and Codex XCB accounts now pass through the real subscription host, provider host, control service and JSON parser without inference. Both models, provider/route identity and account identity remain required; managed signed-in accounts remain unavailable and a managed ready state is still rejected. Existing API-ready snapshots remain compatible."
+            },
+            {
+              "reviewerRole": "Integration owner and separate diagnostics reviewer, independent of this implementation; composition owner independently reviewed inventory addition",
+              "files": [
+                "packages/transport/src/automation-diagnostics.ts",
+                "packages/transport/src/automation.ts",
+                "packages/textbutler/src/ghostget-automation-process.ts",
+                "packages/textbutler/src/automation-owner.ts",
+                "packages/textbutler/src/control-service.ts",
+                "packages/control/src/index.ts",
+                "packages/textbutler/src/imessage-setup.ts",
+                "packages/textbutler/src/imessage-setup.test.ts",
+                "scripts/xcb-integration-admission.ts",
+                "docs/textbutler/agent-cli.md",
+                "docs/textbutler/architecture.md",
+                "docs/textbutler/getting-started.md",
+                "docs/textbutler/ghostget-contract.md"
+              ],
+              "result": "Approved additive per-provider discovery diagnostics with closed stage/code pairs, exact allowlisted native markers, no raw messages/paths/handles/bodies/stderr, unchanged generic failure and partial-provider behavior. Newline marker and non-string remote error settlement findings were repaired; tests retain custody for malformed/recovery failures and require successful normal close. Exact 0.18.21 admission rejects earlier versions before setup launch or permissions. The new diagnostic module is explicitly bound in the 29-source inventory. All 246 source, synthetic fixture, test, type, reviewed documentation and instruction inputs remained unchanged across 238 tests, 1883 assertions and both successful package typechecks."
+            },
+            {
+              "reviewerRole": "Integration owner, independent of literal-coordinate and readiness-copy implementation; composition owner independently reviewed source-inventory addition",
+              "files": [
+                "packages/transport/src/automation-contract.ts",
+                "packages/transport/src/automation.test.ts",
+                "packages/textbutler/src/control-service.ts",
+                "packages/textbutler/src/control-service.test.ts",
+                "scripts/xcb-integration-admission.ts"
+              ],
+              "result": "Approved only the exact iMessage; and any; GUID prefix allowlist while preserving service=iMessage, literal GUID bytes, the existing byte/NUL limits, exact keys, positive safe row identity, and binding equality. Synthetic discovery/enrollment/history cases reject prefix or row changes even when a provider recomputes the enrollment digest. Route-neutral readiness copy avoids implying a Claude API account or an already-selected contact account. The coordinate contract is explicitly bound in the 30-source inventory. All 246 inputs remained unchanged across 240 tests, 1952 assertions and both successful package typechecks. No native send service guard or live messaging result is claimed."
+            },
+            {
+              "reviewerRole": "Integration owner, independent of the transport provisioning implementation",
+              "files": [
+                "packages/textbutler/src/imessage-setup.ts",
+                "packages/textbutler/src/imessage-setup.test.ts",
+                "docs/textbutler/getting-started.md"
+              ],
+              "result": "Approved provisioning the connector-pinned imsg artifact through the connector's own idempotent, hash-admitted install before account linking inside setup custody. The closed install response admits only the exact reviewed tool identity, version and artifact digest shape; missing fields, wrong tool identity, non-boolean markers and nonzero exits retain custody before any account read. The live failure mode this fixes — an admitted connector upgrade leaving an unpinned transport — was reproduced and resolved on the owner installation; this receipt claims only the synthetic evidence."
+            }
+          ]
+        }
+      }
+    }
   },
   "inputSnapshot": {
-    "count": 247,
-    "sha256": "2a90779324daf88e2c849439afca48239f53732973cc2d5ebf400d6db21dcf0d",
+    "count": 284,
+    "sha256": "293a4fa43a9ea307947651f85535a9193e6e60a96caccffc359c724c98a891e4",
     "unchangedAcrossValidation": true,
+    "scope": "All retained source, test, fixture, typecheck-driver/configuration, documentation and review inputs listed here were byte-identical before and after the successful validation. Package manifests and lockfile bind the dependency selection; this is not an individual hash inventory of every installed dependency byte.",
     "inputs": {
-      "AGENTS.md": "cf7e1f11d6c49d3dde7cf941efcf12f12c69b941ccba205f6bcbc8709b414c8a",
+      "AGENTS.md": "25f1d45164e18cc6063d4c5e6a00f2fdfdce89e9afb6e4d04894d8378eb75f4f",
       "bun.lock": "7931f129ecf2a2a8aa00dfa164f26e87c4e81e9f4992d215d6a52e080085dbbb",
-      "docs/textbutler/agent-cli.md": "e803d01f6c5fd30de3169d897c8375c490357d923f84a33876b86231abd5d924",
-      "docs/textbutler/architecture.md": "8365ea9a4ab66851a8687c9781fe7eb1fbc4576d358ffa34e2a1c442ec3fa434",
-      "docs/textbutler/getting-started.md": "df359d73e4b42539751972652de881a6fe0a9a34d0f14def299882fc146878a6",
-      "docs/textbutler/ghostget-contract.md": "aa029df8643b9c730d037b20bef624193809cda19e597b8589c32fdf53e6deee",
+      "costs.json": "677a7f082d2a8a22d30e47e27241571232e66e5cb487d92dd557518ffb49ca41",
+      "docs/textbutler/agent-cli.md": "aeb2a904cebd8bdcccdd7f120068ec568e2c330407a2893c3851c3ac35098a56",
+      "docs/textbutler/architecture.md": "89c377f52f635817894f2569a8ac9dcb2ab2d3fb196bfea39f7573a2b5dd6eb9",
+      "docs/textbutler/getting-started.md": "4a6e3933bf301ffe702037478a33a40060ed99783abdedd344a2c21f95a2b7ff",
+      "docs/textbutler/ghostget-contract.md": "f54f509ea13e8e09ef876c70bed5af9bea4e83afdbf42e61f8190d130500b358",
+      "docs/textbutler/local-data.md": "32afeff3af1816159ce974dc1bf1e3f68ed74e43f7b7b8301432820ab3874dff",
+      "docs/textbutler/messaging-apps.md": "5be07481aa971fa86aea4efc8c347fc6a17f9db27254a8d75f28ba68e274ac0b",
+      "docs/textbutler/native-process-plan.md": "5bd5d7f3cd784c5a17ccca9bdcf7e34eed6f83fea590547fa36a218e00d70dbc",
+      "docs/textbutler/native-subscription.md": "b0f1677dde5cbc8259f3dc12c477b88cb53b799e7841ad190633e41ea1353c86",
+      "docs/textbutler/readiness.md": "aecbc7c52ea742dc791eee2d8109ae44f1ba747462bf95ad54797782dbee17d0",
+      "docs/textbutler/whatsapp.md": "6eb282012350380eb190ff71ea277f0d6e294ef412740e9495ef84c7171bf58e",
       "node_modules/typescript/lib/_tsc.js": "1c59e77a54b186ec43fa7f3e0d3c4bb15ca5eb5ba43e96b1d3a267139eddd3e3",
       "node_modules/typescript/lib/tsc.js": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983",
       "node_modules/typescript/package.json": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
       "package.json": "e377ec6da60859986a371bc133df163d1491d9d193dc80d50a0b0e43ad84e97a",
       "packages/control/package.json": "65d29388b48610001a954f7e9473483fd94ed0cf4d8a9fcb24a4b6975a129f6c",
-      "packages/control/src/index.ts": "582369440a0e5af38bf418b446480b43e8bf35a5676aabd2b4e5f7d907a656ac",
+      "packages/control/src/index.ts": "d16a84338c8a5d61e5a7ff5f577f1f534314fcb599cd614f3a351806f997e7a8",
       "packages/textbutler/examples/quiet-hours.ts": "e66e11d472968eb08b604111939863a32d7584eac793ee2b44ea5d6fe96a6741",
       "packages/textbutler/package.json": "eb632abde522385fb68e42696250ab363240e21def52923e70fc2c55697d6b5e",
+      "packages/textbutler/src/attribution.test.ts": "21192898e86674277c5cb91edff41b8328e79b6d03b7076736d8b5d53275cd16",
       "packages/textbutler/src/attribution.ts": "84d0ebaac74855702bde8902f5dc9a05894006062944e29df8a940d645e7334d",
       "packages/textbutler/src/automation-owner.test.ts": "26716aebc403a8bc12f06dad911272eecb2610f451bb1737e6af7ae0ce173908",
       "packages/textbutler/src/automation-owner.ts": "9dfa51e8936c8933d2e5aa0bbe9a0a5a3e22203f0f641dc511c56e8f94ea6a52",
@@ -177,8 +282,10 @@
       "packages/textbutler/src/cli.ts": "86d5de9e679ad795b9d2e94762bedbff04b53a40e15846f7604080d14e3ee0c0",
       "packages/textbutler/src/config.ts": "990c51ad8e3dadcde339b64a624aa5308e926cda9ed8a7f31f268e1b044838e1",
       "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
-      "packages/textbutler/src/control-service.test.ts": "b05d8e6c9ff15dade1f1b705ca1b4d64c6694afa8f8866cfade3453157f31dd6",
-      "packages/textbutler/src/control-service.ts": "b7008db4ebd8fbb9794504293be0ae389c1fd66d5d2f4a2ad6d96e15cd84c260",
+      "packages/textbutler/src/contact-habitat.test.ts": "7fb0d6d1231efc013f1dbadbd6577c85b0fe2acf9346563d73d75483bb996b33",
+      "packages/textbutler/src/contact-habitat.ts": "0b83db48c9fd61665bb9abd8724393e0d857b6240a3212747be1623d567757f6",
+      "packages/textbutler/src/control-service.test.ts": "99efbdecc19cda87e37a30355492945f6c84c92f443c17998799ac80d1529bb2",
+      "packages/textbutler/src/control-service.ts": "ed2821314481e8e57e8cd8af77298ea20797955bd5b4d1ab5966f6f7f619793d",
       "packages/textbutler/src/daemon-custody.test.ts": "8bc58904f2ddb921eaeccfaf272e29f87176137cdacb00cd1ab78408fa41013a",
       "packages/textbutler/src/daemon-custody.ts": "ead51b8c27bf88a0969ef9f4a7476bbedb71af5ec96d4d20919580715717ec8c",
       "packages/textbutler/src/daemon.test.ts": "c93108a1f7d5d0b360463abb697dc571dcc42f26f60e115e5c89c1e5fe9d6113",
@@ -186,10 +293,18 @@
       "packages/textbutler/src/decision.ts": "af8cd0bd8b196d14263242697ea8f426c068a7e6cf329b49077878ec2c910e01",
       "packages/textbutler/src/enrollment.test.ts": "4f8d83b6ea5a281a30423eb12ab7d41fac89ed2d9f7178e4b949d5e1168b4ff6",
       "packages/textbutler/src/enrollment.ts": "0a553c4364842a1643b2041302dba0635d7f56e8ee2afae3adc5a70113792e05",
+      "packages/textbutler/src/fast-driver.test.ts": "183ecab523bc87ba3a83561f5afece88bee04348a4a88ba20b09013225ff458e",
+      "packages/textbutler/src/fast-driver.ts": "1b2263f783e575aa43e5ee30f19d0d05b7ee346056969a0ddb79fbb3ca6300d2",
+      "packages/textbutler/src/gateway-search.ts": "5706ed2c486f186658d536fe7b92426945b51f8871a196a99dd0048d5bca78a4",
       "packages/textbutler/src/ghostget-automation-process.test.ts": "245d7e4ba4ae973ac217f84d41ccfeb9381411b66d042169521dfc1e0aa06937",
       "packages/textbutler/src/ghostget-automation-process.ts": "5739aab2f79c508707422b43ebcd5404623ff38c710ec736173a12b25fb1735d",
       "packages/textbutler/src/ghostget-owner-read.test.ts": "7aea9da06f4095a6020060ee3719f6b31b083cbd8d0de2ee560443fe82beefbf",
       "packages/textbutler/src/ghostget-owner-read.ts": "d9b81d6e1ebb79b247bb8c967def7b4d4d922654ebd157dff065e2f06cb1ea19",
+      "packages/textbutler/src/habitat-agent.test.ts": "2598bfde672dfbb4c48692f58f8e363b1886fee2248d778fa1e1a69ab9e15144",
+      "packages/textbutler/src/habitat-agent.ts": "9c114be7725e29f28cf3cbfb59e76f3a4a772ec571bfd5488202ec962741b235",
+      "packages/textbutler/src/habitat-evolution.ts": "9a006281b9315693cdcc96582dc1c4018319711db023a98886fe89cc46d80380",
+      "packages/textbutler/src/habitat-program.test.ts": "4b9ce50d84d49be7fa575ec8c07b7444c8602bac49fffad304c5318f9d09fc9c",
+      "packages/textbutler/src/habitat-program.ts": "50c589cfb17caf584be073f63b38079091c1cefa61dc2e5a915db7636ae863fb",
       "packages/textbutler/src/hooks.ts": "87603496f0454d1acd73393b8167bc421eec6e31067398dcfc2f3e28dd08f16f",
       "packages/textbutler/src/host-config.test.ts": "57b8f21951ff12ae19a79f0298984ca73add9cc84c3503e00db6ea514bbee69b",
       "packages/textbutler/src/host-config.ts": "ce53265541564c0ef0ebeeb6c3c8fbb2af0e065656aa6f871eef8ec14d742b7d",
@@ -205,6 +320,8 @@
       "packages/textbutler/src/managed-codex-owner.test.ts": "848db23b6843d8c7473a5f476e3d0adfe57349a3e6ad4f40620f1cd6125ae32d",
       "packages/textbutler/src/managed-codex.test.ts": "9af77d806d52f05f98de978e355e3073cb334fcd82f9baf79e455accc7806524",
       "packages/textbutler/src/managed-codex.ts": "844a6d9a89540622e53f40d42a15bb5f0b3cec353496c593d31c15e141d2b0eb",
+      "packages/textbutler/src/meme-search.test.ts": "cdfb9027c44d5b4b8720a5077894d060fc27bd356675b1eb87486abff4122197",
+      "packages/textbutler/src/meme-search.ts": "ad422591ece4d981dd97d66928984fd7512d303b8773503bcf79283813914c95",
       "packages/textbutler/src/menubar-icon.ts": "4dc17f1a9289bb0ce44720893e0175aaa31ec81cbde23878a3ab4efb499b72a9",
       "packages/textbutler/src/menubar.test.ts": "84d4c543aa13c2144593c2615018aa63d1140848785345c617c6d3c69267258f",
       "packages/textbutler/src/menubar.ts": "c0dddb7fab08f4964bfbd8945614ec1afa7183eeec916b2f42c7e48731bffff7",
@@ -222,8 +339,8 @@
       "packages/textbutler/src/native-task.ts": "e2a3f5ebb1586700af67f540273b5c4c6c0a33c4415a139693d6ca6d0f6dcaf6",
       "packages/textbutler/src/onboarding.test.ts": "f9a8c943624cab05f07cb0cec40d6c2d15fd1b2730e83d6b2a386558560e6614",
       "packages/textbutler/src/onboarding.ts": "8303f375a4805881ec850f9d1676450bb4373146a11b167047b71bd1165ce8bf",
-      "packages/textbutler/src/owner-cli.test.ts": "485945e21d3e9ed8db14573986f0fcde6231e3464edbd508f03ef7b0e565ddbe",
-      "packages/textbutler/src/owner-cli.ts": "67761bee07477793879c04bae1ab9761f2a9d63c260fe236c885ff55b83b3847",
+      "packages/textbutler/src/owner-cli.test.ts": "1fbdb5eea63e87f4d01068856dca20bdab3a4dadef2ad4b8c181c2fc1dde5ac3",
+      "packages/textbutler/src/owner-cli.ts": "2d3d5db9bc0a4d5cfa7366f91493006cf028f7fe4269f652d5ee2d1f0b8b3fee",
       "packages/textbutler/src/owner-messages.test.ts": "c44d179638bce1908c9994958ce80a8478b6d5d2dd7d3a4f998f3cf521c35773",
       "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
       "packages/textbutler/src/owner-replies.test.ts": "404547b888f1bb55ae82b2b86c92b151ed3e2a6540224f17c92f5159d0aedd1d",
@@ -236,8 +353,8 @@
       "packages/textbutler/src/provider-host.test.ts": "95c63010a19fa86daac6d758b78398dc3e786c31c3ced61884f6140786b1efa4",
       "packages/textbutler/src/provider-host.ts": "ae0ad4f052aa6cd065772c2dcfecff355296b20519b03ba38cb9a2c7978a5813",
       "packages/textbutler/src/reply-actions.ts": "c7a7d238fb9116771dee6b7c162596cef180253a456a3364bfd83d6fa8a12e01",
-      "packages/textbutler/src/reply-loop.test.ts": "4866a1ee725f21839839c0d3db0db771142f08677525cae42bfcf0b44a9b203c",
-      "packages/textbutler/src/reply-loop.ts": "d33800f4695ae9908c1bd60621f68e136405521fcc2b7c20660aa237c3f72873",
+      "packages/textbutler/src/reply-loop.test.ts": "bd414f751c090216dc573878473a36a875f365dff8e2a594eea66300b8f23480",
+      "packages/textbutler/src/reply-loop.ts": "aef054156b0826c452117f07a1faa7a9d1e195ad64eb4fdbc342ffbb18072c26",
       "packages/textbutler/src/routed-agent.test.ts": "0232fbfab4b1f7eafc3e928fbc4ad7443d45073677b21f2e33a76806ed78a2be",
       "packages/textbutler/src/routed-agent.ts": "113742ede2a0199dd68df749815f4e1bdde78aaf3b7259929ad409cee22e708b",
       "packages/textbutler/src/routed-managed-agent.test.ts": "11a60dea19cadde5ad23becb2a3dce32e339df6f0af7c1bff68dba6cbe3a4201",
@@ -271,11 +388,14 @@
       "packages/transport/src/validation.ts": "a482390285f42df331f018f6c3ef7476f54b93fcdecb88c3b91c081b401c75c9",
       "packages/transport/test-fixtures/ghostget-cli.ts": "ea33382151aceb1e6253aa07549ffafc584fbb896d3a400ae54b1235eb8072e5",
       "packages/transport/tsconfig.json": "99683a7a0697ba737c905da9e2efcfb184e7387d8633062f8af425e5b5d0093e",
+      "qualification/xcb-contact-personalities-review.json": "a234f3539a2b92b74087d756cfd4af5a1263746ce644d2f317fb41e9817c8811",
       "scripts/build-dist.ts": "5d16739e0293681c6fe30d23a89d7237aa3bf247eddf7c12610ad25b16c12ec4",
       "scripts/build-textbutler.ts": "22a207a92da457eb5a09badbd57ea98298657d89bfb447cffa079de7ab6f2271",
+      "scripts/check-cost-surfaces.mjs": "78729c34c24682fcf030bfe5f0fdd4780ada4a729a6adf4d30ab00fb21d4650e",
       "scripts/check-dist.ts": "dde8da31e088ac1be805cb4023408a6d11587e104072008ee6348c8e58c75ade",
       "scripts/check-effect-architecture.ts": "fd0f33a48bc20a09991f90354e5a3bce8bbe81e37251520ca71dd574d5b8a471",
       "scripts/check-github-release.ts": "cf270c82a47b626117f8b02183b0ed043ef6dad338e582a55b3c4ab1c3ca44ea",
+      "scripts/check-habitat-driver.ts": "bb23bb29529c42b1cacdc20c98e66169613118d678ffe93f3bdb9ef4a8e7e49c",
       "scripts/check-npm-retry-state.ts": "e20d2f4c2969f932fb61a665b56deb6f5bb3442e450f9263e3f0bfaa161536a7",
       "scripts/check-npm-trusted-publishing.ts": "263cc663d0f57955a638345d32061fafbc118ba6905da386940a0b9662c3561f",
       "scripts/check-public-graphs.test.ts": "b3ba836bb4773486503da22598f2951bd1b594d5cd6fe1d628b41bee4b547ae9",
@@ -298,12 +418,15 @@
       "scripts/npm-release-policy.ts": "e8016ab5fa2d0a6409c67fb3b1a4c62dcf9d97f55a5ed7d39119ae48d0307bd8",
       "scripts/package-smoke-privacy.test.ts": "a428d7c261105e4856fa936086d474637f2f3728a27bd556c45773d3b5e2d463",
       "scripts/package-smoke.ts": "b348e269a5c5eae921cb4a0aca90141007f4d801d1268faf58c3e5ab7c060c8f",
+      "scripts/provision-habitat-gateway.ts": "77f5290cb58e0115f983254bca876dc37c426718ac814c9b48cb17ecd858081e",
       "scripts/publish-github-release.ts": "2a2f831242ea060f87a5c7d875a516b36cd6289f87465116651965d80095eaf7",
       "scripts/publish-npm-release.ts": "baaaa9c863ec4d039aa3ac4fdcd84de4f799b0ac1fa47acf297f5ddc857da908",
       "scripts/reconcile-imessage-setup.test.ts": "f965c8b02618e1f79b9c8344a93b4371aed433e14a6856b112551fa7529a75bb",
       "scripts/reconcile-imessage-setup.ts": "a744cece03d9c439ca8e7770664b773272cbc96ed17107fd1b3973ae0dedade8",
+      "scripts/release-app-token.mjs": "2694b0fcd4238da26cfb64eff15436e55fc16a7f04dd3f29083cc2bd5a024c4e",
       "scripts/release-app-token.test.ts": "d55319fcd758a39d362c69470c374d521fcec7524235605cdeb1557dad71e5bd",
       "scripts/release-artifact-checksum.ts": "8493a1215e1f444dd35f49d51ff76ed5caa5ededdbfa0bc1f1622311a1c08295",
+      "scripts/release-authority-cleanup.mjs": "5ce01aeb6c6fc84f7642b56dc925e9f9afb8d6588e9618a0dfab6da894a7f61a",
       "scripts/release-authority-cleanup.test.ts": "b91b0a0c295d949856dbf77551269a38b92600c792f2a6fd6626432f9dc0e2d6",
       "scripts/release-authority.test.ts": "77f8b9779dcfe42e35732a0dda3ff16c1fdee048cecdd875841427648331bd2e",
       "scripts/release-distribution-policy.test.ts": "254cf7db3dc33f732104ff8db7043feeb785fc4feb0ba1b38cbfdd189f739875",
@@ -312,14 +435,23 @@
       "scripts/release-included-response.ts": "fc22e8a7078b1ba44b3e31764c136de914c165928f670a7141fbf894a483e19e",
       "scripts/release-process-environment.test.ts": "c9a5fcd58cfcafd6d849a2580e70220675798033a0414a80baef41dbc6e4d806",
       "scripts/release-process-environment.ts": "3c507c235681412acf5c22ecdb18f788640c16a37ee91f62676af04fcd668d79",
+      "scripts/release-production-authority.mjs": "6a1ee1d3a869a1e91c003f97270a81c35860b81fb73fb2c462c786f7916437ff",
+      "scripts/release-provider-outcome.mjs": "876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d",
       "scripts/release-provider-outcome.test.ts": "5037b857d2073608beb10ed509a640dc348e3e0efa879a8a7b30c73f7014ceee",
       "scripts/release-ref-authority.test.ts": "7960fa9e728c683beeb333abb2f368bb3987d6ec0d7fef91cdb6cc29a854753a",
       "scripts/release-ref-authority.ts": "00658b8c4e584bebd71260227e97bc784d1611ba8685461ea32e550da30fb60e",
+      "scripts/release-ref-writer.mjs": "38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591",
       "scripts/release-ref-writer.test.ts": "a78697347ab139c6fb2e98a2db107b709bf43c893f26b4d88b9ff66fdb4b0a25",
+      "scripts/release-status-attester.mjs": "efeb5bd9979315fda0e9b6d8e1b64d60ca363b79ec1c290204c90a4be25dc30c",
       "scripts/release-status-attester.test.ts": "e30731b22a53b426b9725939585405212f4f8b6bf399f70c69087a3ab635e6b6",
+      "scripts/release-workflow-range.mjs": "50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7",
       "scripts/release-workflow-range.test.ts": "1a164dcd90cd4d0ba43539bd7e3b9f26598445d45aac08d84c21669b011e0b6f",
       "scripts/release-workflow.test.ts": "1a83eeca64e8bddab5f4b2ee947144b3216291df016553fa29afcc13fa4b8042",
+      "scripts/release-writer-canary.mjs": "e8c46c600316de3f2d42124fb14b40753dc862f9e65f7fe3a7dd7c0762391839",
       "scripts/release-writer-canary.test.ts": "21b3b56387b0d0bb42e8bd0b0ed1873ebcc537c19e3d52dd142c691b1a101f68",
+      "scripts/site-production-subject.mjs": "573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20",
+      "scripts/site-production.mjs": "70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d",
+      "scripts/site-production.test.mjs": "16a1a431cd94286982c68714226c318e39d93eb2305437fe90949753555acd19",
       "scripts/style-profile-schema.test.ts": "cd68a0a23757828c2f5a8c050ec348e84bc94bbcc38db7c3e0fc0845f1712aaf",
       "scripts/support-runtime-policy.test.ts": "3e7176dafd8935c4418a3a61d0de182f02d408ffee9fef3a93fa5b58790f17ed",
       "scripts/support-runtime-policy.ts": "5d491b08871f14977ecb1c23fceda3aba70dd6111f1ca8a22be2de9be082fb0f",
@@ -328,9 +460,11 @@
       "scripts/textbutler-distribution.test.ts": "1b1afd672d637a9cdd6ff75fb573f89a628f937079e75cbf24048efdda9499b3",
       "scripts/textbutler-distribution.ts": "7e2aebe867e418268f708c87da945d4d116c9233ea7b41ac6b2fe8ef5632b2de",
       "scripts/validate-skill.ts": "2c983db18bb0553d1bd6c8a057fa0f38fdaab88452c13a6c2477d268e00b60ce",
+      "scripts/verify-npm-provenance-signer.mjs": "de1722ba230fd0ec101b500a7fcd2388e55d3f3987d15dfd1a25c7e2cdcb0852",
+      "scripts/verify-npm-provenance-signer.test.mjs": "05ec8b3c642707cedb12055d505f0dde4439da6bd39c96009f316d4d616c9fd9",
       "scripts/verify-textbutler-macos-app.ts": "e31427b114da7fc719bda89b46664d025ae464224ccd0f1c6951f5ce23c7af61",
       "scripts/xcb-integration-admission.test.ts": "e567b1e06d2900b15e37cc8ba634cdb14dc35948dee8d01c63992626f87234ee",
-      "scripts/xcb-integration-admission.ts": "1d56b8854381d4a540a7522b024fe1de11ed04816d86a4dc210503ef1b271a14",
+      "scripts/xcb-integration-admission.ts": "910bceacd706a678aefb15742377b5dec1c39af66240fc06561d4c49c5d2c887",
       "src/agentic-messaging-v1.test.ts": "91263731c9a2db0e11cf2b3d78e48c84997d87e63f65f6a8bcae8947026956c7",
       "src/agentic-messaging-v1.ts": "72a160b400442ca01c912386b319494a4137993bb8c3a9790e0a6d5fd752fbb2",
       "src/args.test.ts": "de3e81d60de85cf90a1cd63b53f4f520a8c08456d95c8ba546701e0ff08addea",
@@ -407,12 +541,13 @@
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",
-    "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+    "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
+    "unchangedAcrossValidation": true
   },
   "previousQualification": {
-    "validationSha256": "a565425e4495ada5854edda4425e4b72a1e85124784ef0a881f6ac9c21b45afd",
-    "evidenceSha256": "46fd4ac43bb32f5e95495b001a31e18a51dda78e3833a75f10fdbc52577d1cc3",
-    "logSha256": "c4f42868951d5749a49195a7f18f9187e18f40b4568d45bf58f4ae2693c96fd7",
-    "scope": "Historical baseline evidence; earlier review references are retained as history and do not claim current live verification."
+    "validationSha256": "a4d788c8a5724263fe388c1ccb4941673f5a1b3f1d84c45a6420d4d3f57defce",
+    "evidenceSha256": "6b61eb0e502c85f2c05115d20d3029bdbd18f0660a599d32cad99483f5fc7cd1",
+    "logSha256": "f90a362cb29389c129e8bcd6445ed3e82b058b22fd9ef95b24bc64c0deb3e8b6",
+    "scope": "Historical baseline evidence captured before this memory refresh. Its earlier test and review references remain historical and do not claim current live verification."
   }
 }

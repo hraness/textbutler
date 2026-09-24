@@ -1,4 +1,5 @@
 import { CONTROL_PROTOCOL, validateContactSettings, type Contact, type ControlRequest, type ControlResponse, type DesktopSnapshot } from "../../control/src/index.ts";
+import { parseHabitatPlan } from "./contact-habitat.ts";
 
 export type OwnerControlClient = (request: ControlRequest) => Promise<ControlResponse>;
 
@@ -19,8 +20,12 @@ export const OWNER_COMMAND_HELP = `Owner controls:
   contacts mode CONTACT smart|keyword [--keyword WORD]
   contacts self CONTACT on|off        Mark a conversation as your own address
   jobs show JOB_ID                    Read a pending operation's result
-  habitats show CONTACT              Inspect the plan, learning history and budget
+  habitats show CONTACT              Inspect personality, memory, learning and budget
+  habitats configure CONTACT REVISION JSON
+                                     Set the full plan while automatic replies are paused
   habitats rollback CONTACT REVISION Roll back while automatic replies are paused
+  habitats memory-clear CONTACT REVISION
+                                     Clear learned excerpts while replies are paused
 
 Use an exact contact ID or a unique contact name. Adding a contact keeps
 automatic replies off. History is imported only with --history.
@@ -93,9 +98,17 @@ export async function handleOwnerCommand(args: readonly string[], options: {
     && (args.length === 4 || args.length === 6 && args[4] === "--keyword" && typeof args[5] === "string");
   const self = family === "contacts" && verb === "self" && args.length === 4 && (value === "on" || value === "off");
   const job = family === "jobs" && verb === "show" && args.length === 3 && identity(target);
-  const habitat = family === "habitats" && (verb === "show" && args.length === 3 || verb === "rollback" && args.length === 4 && /^(?:0|[1-9]\d{0,15})$/u.test(value ?? "") && Number.isSafeInteger(Number(value)));
+  const habitatRevision = /^(?:0|[1-9]\d{0,15})$/u.test(value ?? "") && Number.isSafeInteger(Number(value));
+  const habitat = family === "habitats" && (verb === "show" && args.length === 3
+    || (verb === "rollback" || verb === "memory-clear") && args.length === 4 && habitatRevision || verb === "configure" && args.length === 5 && habitatRevision);
   if (!(status || pause || messagingList || messagingStart || conversations || contactsList || add || account || activation || mode || self || job || habitat)) {
     throw new OwnerCliError(`Unrecognized owner command.\n\n${OWNER_COMMAND_HELP}`);
+  }
+  let habitatPlan: ReturnType<typeof parseHabitatPlan> | undefined;
+  if (habitat && verb === "configure") {
+    if (Buffer.byteLength(args[4]!) > 8192) throw new OwnerCliError("The habitat plan JSON exceeds 8,192 bytes.");
+    try { habitatPlan = parseHabitatPlan(JSON.parse(args[4]!)); }
+    catch { throw new OwnerCliError("Use a complete valid habitat plan JSON from habitats show, with only supported personality and tool fields."); }
   }
   const { request, print } = options;
   const report = (response: ControlResponse): number => {
@@ -121,7 +134,9 @@ export async function handleOwnerCommand(args: readonly string[], options: {
     initializeHistory: value === "--history" }, request));
   const contact = resolveOwnerContact(snapshot, target!);
   if (habitat) return report(await request(verb === "show" ? { protocol: CONTROL_PROTOCOL, command: "habitat.read", contactId: contact.id }
-    : { protocol: CONTROL_PROTOCOL, command: "habitat.rollback", contactId: contact.id, expectedRevision: Number(value) }));
+    : verb === "configure" ? { protocol: CONTROL_PROTOCOL, command: "habitat.configure", contactId: contact.id, expectedRevision: Number(value), plan: habitatPlan! }
+      : verb === "memory-clear" ? { protocol: CONTROL_PROTOCOL, command: "habitat.memory.clear", contactId: contact.id, expectedRevision: Number(value) }
+      : { protocol: CONTROL_PROTOCOL, command: "habitat.rollback", contactId: contact.id, expectedRevision: Number(value) }));
   const settings = { ...contact.settings, disclosure: { ...contact.settings.disclosure } };
   if (account) {
     const selected = snapshot.providerAccounts?.find(candidate => candidate.id === value);

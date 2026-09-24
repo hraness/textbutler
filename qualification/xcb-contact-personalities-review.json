@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "/root/review",
+    "independence": "The reviewer did not implement or edit the application, tests, admission gate, or validation receipts. Its only written artifact is this review record."
+  },
+  "sourceState": {
+    "branch": "codex/contact-personalities",
+    "baseCommit": "f1059b320a5feca72591e12a91458ae06b8a4ba0",
+    "identity": "The hashes below identify reviewed working-tree bytes; the base commit alone does not identify the reviewed changes."
+  },
+  "scope": "Contact personality and owner tool configuration; owner control API and CLI; habitat proposals, evaluation, historical tool evidence and cancellation; bounded source-backed contact memory, owner clearing and historical memory snapshots; bounded host tools and journal state; source-inventory expansion for the existing composition admission gate.",
+  "method": "Read-only inspection of the implementation, diffs, focused regression tests, admission validator and builder integration. Re-inspected repairs and measured exact source SHA-256 digests. No tests, builds, provider calls or live messaging checks were run by this reviewer.",
+  "result": "No remaining blocking source-review findings. Owner-controlled tool flags, contact scope, conditional revisions, stale-result invalidation, legacy plan identities, brokered effects, bounded memory and evaluation views, historical replay isolation, and settled owner-job cleanup remain enforced.",
+  "resolvedFindings": [
+    {
+      "finding": "Settled manual suggestion jobs retained signal-owned habitat run state and could exhaust the 64-run capacity.",
+      "reviewedRepair": "The owner job aborts its controller after its result settles and before admitting another job. The reviewed regression exercises 198 actual habitat suggestions across success, failure and silence; test execution evidence belongs to the separate validation receipt."
+    },
+    {
+      "finding": "Historical reply and tool evidence could make otherwise valid judge cases exceed the fixed context budget.",
+      "reviewedRepair": "Evaluation excerpts use JSON-encoded byte budgets and code-point-safe truncation. The complete evidence/preferences envelope is measured, new historical detail is progressively reduced or omitted with explicit markers, and stored episode evidence is unchanged. The existing hard context cap remains enforced."
+    },
+    {
+      "finding": "Public-query checks omitted private owner plan guidance from their comparison corpus.",
+      "reviewedRepair": "The corpus now includes plan guidance, and private proper-name tokens are compared against query tokens regardless of query casing. The documented residual risk of fully paraphrased private facts is unchanged."
+    },
+    {
+      "finding": "The optional Zod personality output admitted an explicit undefined property in its inferred TypeScript type, conflicting with exact optional control and ALGAL JSON contracts.",
+      "reviewedRepair": "The strict input schema still validates the same fields and bounds. Its output transform removes absent or undefined personality and preserves validated present personality as the final field. The explicit HabitatPlan type permits omission without an undefined value. Required field ordering and serialized legacy-plan digests remain unchanged; the reviewed regression asserts that parsing explicit undefined leaves no own personality property. Test literal annotations only narrow their compile-time types. No authority or runtime validation was weakened."
+    },
+    {
+      "finding": "Adding learned memory only to the first driver-call budget allowed later tool steps to exceed the fixed response context cap and left the stored exposure snapshot inaccurate.",
+      "reviewedRepair": "Every driver call fits the complete evidence/preferences envelope by removing bounded memory entries as needed and records explicit omission counts. A submitted episode retains the final inference memory snapshot. Earlier tool-step exposures absent from that snapshot retain only source IDs and digests. Historical variants use the episode snapshot, never the current ledger. The existing hard response and evaluation caps remain enforced."
+    },
+    {
+      "finding": "Different truncation depths for the same observed source could produce incompatible identities or falsely appear complete; raw followup ingestion did not share the source representation contract.",
+      "reviewedRepair": "Trusted ingestion centralizes a code-point-safe canonical observation capped at 2048 UTF-8 bytes, then binds shorter history and memory excerpts to that observation digest with explicit truncation. Reply-loop followups use the same helper. Resolution accepts compatible prefixes only when source digest, author and date agree, and rejects ambiguous or contradictory IDs. This digest identifies the bounded observation representation, not unavailable raw transport content."
+    }
+  ],
+  "admissionInventoryReview": {
+    "previousSources": 30,
+    "reviewedSources": 39,
+    "addedSources": [
+      "packages/textbutler/src/contact-habitat.ts",
+      "packages/textbutler/src/habitat-agent.ts",
+      "packages/textbutler/src/habitat-program.ts",
+      "packages/textbutler/src/habitat-evolution.ts",
+      "packages/textbutler/src/reply-loop.ts",
+      "packages/textbutler/src/fast-driver.ts",
+      "packages/textbutler/src/gateway-search.ts",
+      "packages/textbutler/src/meme-search.ts",
+      "packages/textbutler/src/journal.ts"
+    ],
+    "result": "The gate diff only adds nine existing bundled composition inputs to the exact source inventory. Journal coverage binds the conditional contact-state writes, evidence identity and retention, and installation-wide API reservations used by this path. Profile identities, exact inventory equality, source and evidence digest checks, physical-file validation, and pre/post-bundle source-byte equality are unchanged. This strengthens the admission boundary and does not bypass the stale-source failure."
+  },
+  "reviewedSourceSha256": {
+    "packages/control/src/index.ts": "d16a84338c8a5d61e5a7ff5f577f1f534314fcb599cd614f3a351806f997e7a8",
+    "packages/textbutler/src/contact-habitat.ts": "0b83db48c9fd61665bb9abd8724393e0d857b6240a3212747be1623d567757f6",
+    "packages/textbutler/src/control-service.ts": "ed2821314481e8e57e8cd8af77298ea20797955bd5b4d1ab5966f6f7f619793d",
+    "packages/textbutler/src/fast-driver.ts": "1b2263f783e575aa43e5ee30f19d0d05b7ee346056969a0ddb79fbb3ca6300d2",
+    "packages/textbutler/src/gateway-search.ts": "5706ed2c486f186658d536fe7b92426945b51f8871a196a99dd0048d5bca78a4",
+    "packages/textbutler/src/habitat-agent.ts": "9c114be7725e29f28cf3cbfb59e76f3a4a772ec571bfd5488202ec962741b235",
+    "packages/textbutler/src/habitat-evolution.ts": "9a006281b9315693cdcc96582dc1c4018319711db023a98886fe89cc46d80380",
+    "packages/textbutler/src/habitat-program.ts": "50c589cfb17caf584be073f63b38079091c1cefa61dc2e5a915db7636ae863fb",
+    "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
+    "packages/textbutler/src/meme-search.ts": "ad422591ece4d981dd97d66928984fd7512d303b8773503bcf79283813914c95",
+    "packages/textbutler/src/owner-cli.ts": "2d3d5db9bc0a4d5cfa7366f91493006cf028f7fe4269f652d5ee2d1f0b8b3fee",
+    "packages/textbutler/src/reply-loop.ts": "aef054156b0826c452117f07a1faa7a9d1e195ad64eb4fdbc342ffbb18072c26",
+    "scripts/xcb-integration-admission.ts": "910bceacd706a678aefb15742377b5dec1c39af66240fc06561d4c49c5d2c887"
+  },
+  "limitations": [
+    "This record is independent AI source review, not human approval or a provider attestation.",
+    "Test execution, typecheck results, logs and final integration gates are recorded separately by their validation owner.",
+    "This review does not establish live XCB/provider qualification, macOS permissions, runtime sandbox confinement, messaging delivery or owner activation.",
+    "Source digests bind the bounded canonical observation representation. Clear removes the current learned ledger and advances its cutoff; it does not erase retained episode history, evidence receipts or owner-authored MEMORY.md. Source-backed excerpts remain untrusted claims, not independently verified facts."
+  ],
+  "memoryReview": {
+    "retention": "The model may select at most eight distinct observed message IDs as the full desired ledger. Omission preserves existing memory; an empty selection clears it. Trusted code copies exact attributed excerpts capped at 512 UTF-8 bytes. It does not accept model-authored note text, invented source IDs or reaction sources.",
+    "freshness": "Sources must be observed no later than the trusted checkpoint time and after the memory-clear cutoff. Retention and plan promotion check the prior memory digest. Retention also requires the current owner revision, champion digest and exact current episode evidence to match the checkpoint, then persists with evaluation state in one conditional journal write.",
+    "ownerControl": "The paused owner memory-clear command requires the current revision, increments ownerRevision, and sets the cutoff to at least the trusted clear time and all retained source dates. It uses the existing cancellation and invalidation notification. Old checkpoints cannot restore cleared entries. Plan configuration and rollback remain separate from learned memory.",
+    "replayAndPrivacy": "Live replies receive the current bounded ledger as untrusted attributed statements. Historical replay uses only the final memory snapshot saved with that episode. Earlier tool-step-only exposure is represented by IDs and digests, and owner episode summaries omit historical excerpt bodies. Stored current quotes join the private public-query comparison corpus.",
+    "boundsAndCompatibility": "The ledger and each final episode snapshot contain at most eight entries, each quote at most 512 UTF-8 bytes. Prior exposure metadata is limited to eight entries. Encoded excerpts and aggregate envelope fitting preserve the existing 32768-byte response and 98304-byte reflection/judge limits. Existing legacy optional keys remain absent and serialized plan identity is preserved.",
+    "reviewedRegressions": "Read the focused regressions for source collisions and bounds, omitted/present/empty desired sets, trusted future-source exclusion, stale owner/memory/episode rejection, clear cutoff, contact isolation, multi-step memory fitting, final and prior snapshots, historical replay, private-query protection, and long trigger/history/followup provenance. Execution results belong to the separate validation owner."
+  }
+}
