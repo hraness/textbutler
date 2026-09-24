@@ -145,17 +145,19 @@ test('browser waits have a bounded deadline', async () => {
 test('presentation admission rejects missing atoms, fallback fonts, collection and preset leaks', () => {
   const sample = { width: 1440, theme: 'light', path: '/' };
   const valid = { paper: 'paper', background: 'rgb(251, 241, 199)', bodyFont: '"Nebula Sans", sans-serif', coarse: false, overflow: 0,
-    forms: 0, headers: 1, footers: 1, askAi: 1, preset: 'editorial', material: 'lantern', headerBackdrop: 'blur(20px) saturate(1.1)',
+    forms: 8, appearanceControls: [...['catppuccin','gruvbox','rose-pine','tokyo-night','paper'].map(value => ({name:'fixture-palette',value,legend:'Theme'})), ...['light','dark','system'].map(value => ({name:'fixture-mode',value,legend:'Appearance'}))], headers: 1, footers: 1, askAi: 1, preset: 'editorial', material: 'lantern', headerBackdrop: 'blur(20px) saturate(1.1)',
     layers: ['components.hraness-ui.priority1', 'components.hraness-design-kit.priority1'],
     fontWeights: ['400', '500', '600', '700'], renderedFonts: [{ isCustomFont: true, glyphCount: 9, postScriptName: 'InstrumentSerif-Regular' }],
-    headingSize: 64, headingLeading: 67.84, headingTracking: -1.6, headingWeight: '400', headerMinHeight: '72px',
-    headerWidth: 1216, gutter: '32px', heroPadding: ['56px', '64px'],
-    sections: Array.from({ length: 7 }, () => ({ font: '"Instrument Serif", serif', weight: '400', size: 52, leading: 56.16, tracking: -1.04 })),
-    summarySize: 17, summaryLeading: 27.2, workspaceInk: 'rgb(28, 25, 23)', bodyInk: 'rgb(28, 25, 23)',
+    headingSize: 88, headingLeading: 89.76, headingTracking: -2.2, headingWeight: '400', headerMinHeight: '52px',
+    headerWidth: 1216, gutter: '32px', heroPadding: ['112px', '128px'],
+    sections: Array.from({ length: 9 }, () => ({ font: '"Instrument Serif", serif', weight: '400', size: 56, leading: 60.48, tracking: -1.12 })),
+    summarySize: 20, summaryLeading: 33, workspaceInk: 'rgb(28, 25, 23)', bodyInk: 'rgb(28, 25, 23)',
     workspaceBackground: 'rgb(255, 253, 249)', frameBackground: 'rgb(255, 253, 249)',
-    actionHeights: [42, 42, 42, 42, 42], actionRadii: ['8px'], fieldBackground: 'url("/grain.svg"), url("/cells.svg"), radial-gradient(red, blue), linear-gradient(red, blue)', fieldBackgroundSize: '64px 64px, 768px 768px, 100% 100%, 100% 100%' };
+    actionHeights: [42, 42, 42, 42, 42], actionRadii: ['12px'], fieldBackground: 'url("/grain.svg"), repeating-conic-gradient(from 45deg, red, transparent), radial-gradient(red, blue), linear-gradient(red, blue)', fieldBackgroundSize: '64px 64px, 24px 24px, 100% 100%, 100% 100%' };
   expect(() => assertPresentation(valid, sample)).not.toThrow();
-  for (const change of [{ layers: [] }, { renderedFonts: [] }, { fontWeights: [] }, { forms: 1 },
+  for (const change of [{ layers: [] }, { renderedFonts: [] }, { fontWeights: [] }, { forms: 9 }, { appearanceControls: [] }, { appearanceControls: valid.appearanceControls.map((control, index) => index === 0 ? {...control, value: 'email'} : control) },
+    { appearanceControls: valid.appearanceControls.map((control, index) => index === 0 ? {...control, name: 'contact'} : control) },
+    { appearanceControls: valid.appearanceControls.map((control, index) => index === 0 ? {...control, legend: 'Private data'} : control) },
     { material: null }, { headerBackdrop: 'none' }, { fieldBackgroundSize: 'auto' }, { fieldBackground: 'linear-gradient(red, blue)' },
     { preset: null }, { headingSize: 68 }, { headerMinHeight: '56px' }, { actionRadii: ['10px'] }, { actionRadii: ['4px'] },
     { sections: [] }, { workspaceInk: 'rgb(248, 247, 244)' }, { summaryLeading: 24.65 },

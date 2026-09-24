@@ -17,7 +17,6 @@ import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, br
 async function assertWallAssets(context, background, origin) {
   const expected = [
     ['grain', 152319, 'b40c33a0e382c8e9d0518b4720321b5c262a929c28d40a190a902d07acd06553'],
-    ['cells', 17102, '2391e9b3ee964e1178fedc55c766d12ac43bfeda92cfa44aab16c64a15f9d712'],
   ];
   const urls = [...background.matchAll(/url\("([^"]+)"\)/gu)].map(match => new URL(match[1], origin));
   assert.equal(urls.length, expected.length);
@@ -265,6 +264,7 @@ try {
           coarse: matchMedia('(pointer: coarse)').matches,
           overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth,
           forms: document.querySelectorAll('form,input,textarea').length,
+          appearanceControls: [...document.querySelectorAll('.hraness-marketing-header details[data-hraness-appearance-menu] fieldset input[type=radio]')].filter(input => input.form === null).map(input => ({name: input.name, value: input.value, legend: input.closest('fieldset').querySelector('legend')?.textContent})),
           headers: document.querySelectorAll('.hraness-marketing-header').length,
           footers: document.querySelectorAll('.hraness-marketing-footer').length,
           askAi: document.querySelectorAll('.message-like-me-ask-ai').length,
@@ -329,7 +329,7 @@ try {
           fieldBackground: getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage,
         })), 'Restored transparency metrics');
         assert.deepEqual(restored, { matches: false, headerBackdrop: metrics.headerBackdrop, fieldBackground: metrics.fieldBackground });
-        const summary = page.locator('details summary').first();
+        const summary = page.locator('.hraness-marketing-question > summary').first();
         await summary.focus();
         await summary.press('Enter');
         await page.locator('details[open]').first().waitFor({ state: 'visible' });
