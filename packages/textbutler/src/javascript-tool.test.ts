@@ -22,10 +22,25 @@ test("guest delimiters cannot skip trusted hardening or expose disabled clocks",
   expect(result).not.toEqual({ ok: true, value: ["function", "function"] });
 });
 
-test("only one JavaScript worker is admitted at a time", async () => {
-  const first = run("return 1;");
-  expect(await run("return 2;")).toEqual({ ok: false, error: "resource-limit" });
-  expect(await first).toEqual({ ok: true, value: 1 });
+test("concurrent JavaScript requests serialize through one active worker", async () => {
+  const results = await Promise.all([run("return 1;"), run("return 2;")]);
+  expect(results).toEqual([{ ok: true, value: 1 }, { ok: true, value: 2 }]);
+});
+
+test("abort after requesting an available or queued worker never strands the slot", async () => {
+  const available = new AbortController();
+  const canceledBeforeSpawn = runJavascriptTool("return 1;", null, available.signal);
+  available.abort();
+  await expect(canceledBeforeSpawn).rejects.toThrow();
+  expect(await run("return 40 + 2;")).toEqual({ ok: true, value: 42 });
+
+  const active = run("while (true) {};");
+  const queued = new AbortController();
+  const canceledWhileQueued = runJavascriptTool("return 2;", null, queued.signal);
+  queued.abort();
+  await expect(canceledWhileQueued).rejects.toThrow();
+  expect(await active).toEqual({ ok: false, error: "resource-limit" });
+  expect(await run("return 42;")).toEqual({ ok: true, value: 42 });
 });
 
 test("code, input and output bounds reject oversized or non-JSON values", async () => {
@@ -77,5 +92,6 @@ test("worker watchdog bounds native QuickJS operations", async () => {
   const started = performance.now();
   expect(await run("return new Array(1_000_000_000) + ''; ")).toEqual({ ok: false, error: "resource-limit" });
   expect(performance.now() - started).toBeLessThan(2_000);
-  expect(await run("return 6 * 7;")).toEqual({ ok: false, error: "resource-limit" });
+  const queued = await run("return 6 * 7;");
+  expect(queued.ok ? queued.value === 42 : queued.error === "resource-limit").toBe(true);
 });

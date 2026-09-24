@@ -89,7 +89,7 @@
     "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
     "packages/textbutler/src/host-config.ts": "ce53265541564c0ef0ebeeb6c3c8fbb2af0e065656aa6f871eef8ec14d742b7d",
     "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
-    "packages/textbutler/src/javascript-tool.ts": "e9a17e64040c705c21287b4d77bd6eda98cb46a999ba2afc7a73169aef0c330d",
+    "packages/textbutler/src/javascript-tool.ts": "e764c42ea055d2d7437d3e50d5094f69adc42d08bfb80864ae99dd5b09cb4fa6",
     "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
     "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
     "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
@@ -133,8 +133,8 @@
   },
   "followupReview": {
     "reviewer": "/root/review",
-    "method": "Read-only reinspection of repaired findings and current lifecycle documentation/tests; no source edits or test/build execution by reviewer.",
-    "result": "All reviewed findings resolved; no new blockers.",
+    "method": "Read-only reinspection of the final JavaScript worker post-admission abort check, reserved-slot release before worker creation, and immediate/queued cancellation regressions. No source edits or test/build execution by reviewer.",
+    "result": "No findings. Cancellation after admission releases the reserved slot before worker creation, preserving FIFO handoff; regressions cover immediate and queued aborts followed by successful worker reuse.",
     "date": "2026-09-24"
   }
 }

@@ -5,9 +5,35 @@ import type { JsonValue } from "@hraness/algal";
 
 export const JAVASCRIPT_LIMITS = Object.freeze({ codeBytes: 8192, inputBytes: 16_384, outputBytes: 4096,
   memoryBytes: 8 * 1024 * 1024, stackBytes: 256 * 1024, cpuMs: 50, workerMs: 250, startupMs: 2000,
-  interruptChecks: 5000, jsonDepth: 16, jsonNodes: 1024 });
+  queueWaitMs: 1000, queuedWorkers: 4, interruptChecks: 5000, jsonDepth: 16, jsonNodes: 1024 });
 export type JavascriptResult = { ok: true; value: JsonValue } | { ok: false; error: "invalid-input" | "execution-failed" | "resource-limit" | "invalid-output" };
 let activeWorker: Worker | undefined;
+let workerSlotBusy = false;
+type WorkerWaiter = { signal: AbortSignal; resolve: (admitted: boolean) => void; timer: ReturnType<typeof setTimeout>; abort: () => void };
+const workerQueue: WorkerWaiter[] = [];
+function clearWaiter(waiter: WorkerWaiter) { clearTimeout(waiter.timer); waiter.signal.removeEventListener("abort", waiter.abort); }
+async function acquireWorker(signal: AbortSignal): Promise<boolean> {
+  signal.throwIfAborted();
+  if (!workerSlotBusy) { workerSlotBusy = true; return true; }
+  if (workerQueue.length >= JAVASCRIPT_LIMITS.queuedWorkers) return false;
+  return new Promise(resolve => {
+    let waiter!: WorkerWaiter;
+    const remove = (admitted: boolean) => { const index = workerQueue.indexOf(waiter); if (index >= 0) workerQueue.splice(index, 1); clearWaiter(waiter); resolve(admitted); };
+    const abort = () => remove(false);
+    const timer = setTimeout(() => remove(false), JAVASCRIPT_LIMITS.queueWaitMs);
+    waiter = { signal, resolve, timer, abort };
+    workerQueue.push(waiter); signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  });
+}
+function releaseWorkerSlot() {
+  while (workerQueue.length) {
+    const next = workerQueue.shift()!; clearWaiter(next);
+    if (next.signal.aborted) { next.resolve(false); continue; }
+    next.resolve(true); return;
+  }
+  workerSlotBusy = false;
+}
 
 /** Reject getters, non-JSON values and recursive/oversized structures before
  * host JSON serialization. Only copied JSON enters the interpreter. */
@@ -107,13 +133,15 @@ export async function runJavascriptTool(code: string, input: unknown, signal: Ab
     if (typeof code !== "string" || !code.trim() || code.includes("\0") || Buffer.byteLength(code) > JAVASCRIPT_LIMITS.codeBytes) return { ok: false, error: "invalid-input" };
     inputJson = encodedJson(input, JAVASCRIPT_LIMITS.inputBytes);
   } catch { return { ok: false, error: "invalid-input" }; }
-  if (activeWorker) return { ok: false, error: "resource-limit" };
+  const admitted = await acquireWorker(signal);
+  if (!admitted) { signal.throwIfAborted(); return { ok: false, error: "resource-limit" }; }
+  try { signal.throwIfAborted(); } catch (error) { releaseWorkerSlot(); throw error; }
   const embeddedWorker = typeof __TEXTBUTLER_JAVASCRIPT_WORKER_SOURCE === "string" ? __TEXTBUTLER_JAVASCRIPT_WORKER_SOURCE : undefined;
   const workerBlobUrl = embeddedWorker === undefined ? undefined : URL.createObjectURL(new Blob([embeddedWorker], { type: "text/javascript" }));
   const workerUrl = workerBlobUrl ?? new URL("./javascript-worker-entry.ts", import.meta.url);
   let worker: Worker;
   try { worker = new Worker(workerUrl, { env: {}, argv: [], execArgv: [] }); }
-  catch { if (workerBlobUrl) URL.revokeObjectURL(workerBlobUrl); return { ok: false, error: "execution-failed" }; }
+  catch { if (workerBlobUrl) URL.revokeObjectURL(workerBlobUrl); releaseWorkerSlot(); return { ok: false, error: "execution-failed" }; }
   worker.unref(); activeWorker = worker;
   return new Promise<JavascriptResult>((resolve, reject) => {
     let finished = false, started = false;
@@ -124,6 +152,7 @@ export async function runJavascriptTool(code: string, input: unknown, signal: Ab
       clearTimeout(timer); signal.removeEventListener("abort", abort); worker.removeAllListeners();
       const stopping = worker.terminate().then(() => {
         if (activeWorker === worker) activeWorker = undefined;
+        releaseWorkerSlot();
         if (workerBlobUrl) URL.revokeObjectURL(workerBlobUrl);
       });
       if (returnBeforeStop) { void stopping.catch(() => {}); resolve(result ?? { ok: false, error: "resource-limit" }); return; }

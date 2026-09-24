@@ -240,7 +240,7 @@
                 "packages/textbutler/src/imessage-setup.test.ts",
                 "docs/textbutler/getting-started.md"
               ],
-              "result": "Approved provisioning the connector-pinned imsg artifact through the connector's own idempotent, hash-admitted install before account linking inside setup custody. The closed install response admits only the exact reviewed tool identity, version and artifact digest shape; missing fields, wrong tool identity, non-boolean markers and nonzero exits retain custody before any account read. The live failure mode this fixes — an admitted connector upgrade leaving an unpinned transport — was reproduced and resolved on the owner installation; this receipt claims only the synthetic evidence."
+              "result": "Approved provisioning the connector-pinned imsg artifact through the connector's own idempotent, hash-admitted install before account linking inside setup custody. The closed install response admits only the exact reviewed tool identity, version and artifact digest shape; missing fields, wrong tool identity, non-boolean markers and nonzero exits retain custody before any account read. The live failure mode this fixes \u2014 an admitted connector upgrade leaving an unpinned transport \u2014 was reproduced and resolved on the owner installation; this receipt claims only the synthetic evidence."
             }
           ]
         }
@@ -551,7 +551,7 @@
     "scope": "Historical baseline evidence captured before this memory refresh. Its earlier test and review references remain historical and do not claim current live verification."
   },
   "currentValidation": "qualification/xcb-textbutler-v1-current-validation.json",
-  "currentValidationSha256": "6c2628912efc04cd4f5cd03f905ddabfcdd08e2c6b1ef450652a2a78a4d68f6e",
+  "currentValidationSha256": "6e6b122e6b228392852d0289c1cd603b437f706ba183e5989da4e8e2c96b4f74",
   "historical": true,
   "historicalNote": "Historical TextButler memory-refresh validation. The current full repository validation is recorded at currentValidation."
 }

@@ -38,17 +38,20 @@ passes selected data as input. That data stays on the local host during executio
 | Cooperative interrupt | 50 ms, with at most 5,000 interrupt checks |
 | Worker watchdog | 250 ms after worker startup; a calculation that misses this gets a resource-limit result and termination is requested |
 | Worker startup | 2,000 ms maximum before a bounded failure result |
+| Worker admission | One active worker, up to four queued calls, with a 1,000 ms queue wait |
 | Input/output structure | 16 levels and 1,024 values |
 
 The interpreter checks its deadline during execution and is disposed after every
 call. A separate worker watchdog requests termination if a native engine
 operation fails to reach an interrupt check. The host returns a bounded
-resource-limit result and refuses another calculation until worker termination
-settles. If termination cannot be confirmed, JavaScript stays unavailable for
-that app process; restarting the app clears the fail-closed guard. JSON output
-rejects pending asynchronous work. Loading the interpreter and generating the
-model response take additional time. The WebAssembly runtime and worker have
-fixed overhead outside the QuickJS heap limit.
+resource-limit result; one worker remains active, and at most four later calls
+wait up to one second for its slot. Calls beyond that queue return
+resource-limit. If termination cannot be confirmed, JavaScript stays unavailable
+for that app process and queued calls time out; restarting the app clears the
+fail-closed guard. JSON output rejects pending asynchronous work. Loading the
+interpreter and generating the model response take additional time. The
+WebAssembly runtime and worker have fixed overhead outside the QuickJS heap
+limit.
 
 Submitted replies retain tool outcomes for inspection and reflection. JavaScript
 evidence labels the code with its SHA-256 digest. Offline personality evaluation

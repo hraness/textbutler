@@ -6,6 +6,16 @@
       "budget": { "contacts": 128, "bytesPerContact": 524288, "episodesPerContact": 16, "followupsPerEpisode": 5, "toolsPerEpisode": 2, "toolQueryBytes": 256, "toolResultBytes": 4096, "actionKindsPerEpisode": 8, "memoryEntriesPerContact": 64, "memoryTextBytes": 1024, "memoryBytesPerContact": 98304, "memoryEntriesPerEpisode": 8, "priorMemoryEntriesPerEpisode": 24, "lineageEntries": 16, "evaluationsPerDayPerContact": 8 },
       "note": "private journal state; contact-scoped personalities, source-backed remembered observations and owner tool configuration, bounded observation and tool-result evidence, at-most-once checkpoint claims and conditional host-owned promotion"
     },
+    "local:contact-memory-search": {
+      "kind": "derived", "retention": "ephemeral", "source": "one contact's retained memory archive", "owner": "packages/textbutler/src/memory-search.ts",
+      "budget": { "archiveEntriesRead": 64, "queryBytes": 256, "queryTerms": 16, "returnedEntries": 8, "excerptBytes": 256, "resultBytes": 4096 },
+      "note": "local lexical ranking only; no external request and no archive mutation; source IDs and digests remain attached to returned excerpts"
+    },
+    "local:contact-javascript-tool": {
+      "kind": "derived", "retention": "ephemeral", "source": "owner-enabled calculation request for one contact", "owner": "packages/textbutler/src/javascript-tool.ts",
+      "budget": { "activeWorkers": 1, "queuedWorkers": 4, "queueWaitMs": 1000, "codeBytes": 8192, "inputBytes": 16384, "outputBytes": 4096, "quickjsHeapBytes": 8388608, "stackBytes": 262144, "workerDeadlineMs": 250 },
+      "note": "fresh QuickJS heap per calculation, no host APIs, modules, IO or credentials; watchdog requests worker termination and queue admission remains reserved until worker exit is confirmed"
+    },
     "local:habitat-evidence": {
       "kind": "derived", "retention": "persistent", "source": "bounded Algal executions of contact programs", "owner": "packages/textbutler/src/journal.ts",
       "budget": { "contacts": 128, "retainedReceiptsPerContact": 32, "bytesPerReceipt": 262144 },
