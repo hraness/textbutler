@@ -2,20 +2,21 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { RunJournal } from "./journal.ts";
 
-export const HABITAT_LIMITS = Object.freeze({ episodes: 16, followups: 5, windowMs: 1_800_000, quietMs: 30_000, evaluationsPerDay: 8, stateBytes: 524_288, memoryEntries: 8, memoryTextBytes: 512 });
+export const HABITAT_LIMITS = Object.freeze({ episodes: 16, followups: 5, windowMs: 1_800_000, quietMs: 30_000, evaluationsPerDay: 8, stateBytes: 524_288, memoryEntries: 64, memoryTextBytes: 1024, memoryBytes: 98_304, memorySnapshotEntries: 8, memorySnapshotTextBytes: 512, memoryExposureReferences: 24, memoryChanges: 8 });
 const text = (maximum: number) => z.string().refine(value => Buffer.byteLength(value) <= maximum && !value.includes("\0"));
 const id = text(256).min(1);
 const timestamp = z.number().int().nonnegative().safe();
 const personalitySchema = z.strictObject({ tone: z.enum(["neutral", "warm", "playful", "direct"]), formality: z.enum(["casual", "balanced", "formal"]) });
+const soulCoreSchema = z.strictObject({ voice: text(512), relationshipContext: text(512), sharedContext: text(512), boundaries: text(512) });
 // Optional fields stay absent in older plans: filling defaults here would change
 // the identities of retained champions, rollback tombstones and ALGAL receipts.
-const planInputSchema = z.strictObject({ version: z.literal(1), guidance: text(4096), contextMessages: z.number().int().min(4).max(32), maxReplyCharacters: z.number().int().min(80).max(1600), humor: z.enum(["off", "light", "match"]), webSearch: z.boolean(), memeSearch: z.boolean(), personality: personalitySchema.optional() });
-export type HabitatPlan = Omit<z.infer<typeof planInputSchema>, "personality"> & { personality?: z.infer<typeof personalitySchema> };
+const planInputSchema = z.strictObject({ version: z.literal(1), guidance: text(4096), contextMessages: z.number().int().min(4).max(32), maxReplyCharacters: z.number().int().min(80).max(1600), humor: z.enum(["off", "light", "match"]), webSearch: z.boolean(), memeSearch: z.boolean(), personality: personalitySchema.optional(), javascript: z.boolean().optional(), memorySearch: z.boolean().optional(), soulCore: soulCoreSchema.optional() });
+export type HabitatPlan = Omit<z.infer<typeof planInputSchema>, "personality" | "javascript" | "memorySearch" | "soulCore"> & { personality?: z.infer<typeof personalitySchema>; javascript?: boolean; memorySearch?: boolean; soulCore?: z.infer<typeof soulCoreSchema> };
 const planSchema = planInputSchema.transform((value): HabitatPlan => {
-  const { personality, ...plan } = value;
-  return personality === undefined ? plan : { ...plan, personality };
+  const { personality, javascript, memorySearch, soulCore, ...plan } = value;
+  return { ...plan, ...(personality === undefined ? {} : { personality }), ...(javascript === undefined ? {} : { javascript }), ...(memorySearch === undefined ? {} : { memorySearch }), ...(soulCore === undefined ? {} : { soulCore }) };
 });
-export const DEFAULT_HABITAT_PLAN: HabitatPlan = Object.freeze({ version: 1, guidance: "Be useful, concise, and honest. Match explicit preferences; do not manufacture familiarity. Stay silent when help is not wanted.", contextMessages: 12, maxReplyCharacters: 640, humor: "match", webSearch: false, memeSearch: true });
+export const DEFAULT_HABITAT_PLAN: HabitatPlan = Object.freeze({ version: 1, guidance: "Be useful, concise, and honest. Match explicit preferences; do not manufacture familiarity. Stay silent when help is not wanted.", contextMessages: 12, maxReplyCharacters: 640, humor: "match", webSearch: false, memeSearch: true, javascript: false, memorySearch: true });
 export const parseHabitatPlan = (value: unknown): HabitatPlan => Object.freeze(planSchema.parse(value));
 export const habitatDigest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const observationSchema = z.strictObject({ id, at: timestamp, author: z.enum(["owner", "contact"]), kind: z.enum(["message", "reaction"]), text: text(2048), relatedMessageId: id.nullable(), sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u).optional(), truncated: z.boolean().optional() });
@@ -30,24 +31,27 @@ export function boundHabitatObservation(value: HabitatObservation, maximum = 204
   const text = prefix(source.text, maximum), truncated = value.truncated === true || text !== value.text;
   return observationSchema.parse(truncated ? { ...source, text, sourceDigest: value.sourceDigest ?? habitatDigest(source), truncated: true } : source);
 }
-const memorySchema = z.strictObject({ id, at: timestamp, author: z.enum(["owner", "contact"]), text: text(HABITAT_LIMITS.memoryTextBytes), sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u), truncated: z.boolean() });
+const memoryCategory = z.enum(["preference", "shared-reference", "open-loop", "context"]);
+const memorySchema = z.strictObject({ id, at: timestamp, author: z.enum(["owner", "contact"]), text: text(HABITAT_LIMITS.memoryTextBytes), sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u), truncated: z.boolean(), category: memoryCategory.optional() });
 export type HabitatMemory = z.infer<typeof memorySchema>;
-const memoryList = z.array(memorySchema).max(HABITAT_LIMITS.memoryEntries).refine(values => new Set(values.map(value => value.id)).size === values.length);
-const rememberSchema = z.array(id).max(HABITAT_LIMITS.memoryEntries).refine(values => new Set(values).size === values.length);
-const toolSchema = z.strictObject({ kind: z.enum(["web-search", "meme-search", "meme-image"]), query: text(256), result: text(4096) });
+const memoryList = z.array(memorySchema).max(HABITAT_LIMITS.memoryEntries).refine(values => new Set(values.map(value => value.id)).size === values.length && Buffer.byteLength(JSON.stringify(values)) <= HABITAT_LIMITS.memoryBytes);
+const memorySnapshot = z.array(memorySchema.extend({ text: text(HABITAT_LIMITS.memorySnapshotTextBytes) })).max(HABITAT_LIMITS.memorySnapshotEntries).refine(values => new Set(values.map(value => value.id)).size === values.length);
+const rememberSchema = z.array(id).max(HABITAT_LIMITS.memoryChanges).refine(values => new Set(values).size === values.length);
+const memoryUpdateSchema = z.strictObject({ remember: z.array(z.strictObject({ id, category: memoryCategory })).max(HABITAT_LIMITS.memoryChanges), forget: rememberSchema }).refine(value => new Set(value.remember.map(entry => entry.id)).size === value.remember.length && value.remember.every(entry => !value.forget.includes(entry.id)));
+const toolSchema = z.strictObject({ kind: z.enum(["web-search", "meme-search", "meme-image", "javascript", "memory-search"]), query: text(256), result: text(4096) }).refine(value => value.kind !== "javascript" || /^sha256:[a-f0-9]{64}$/u.test(value.query));
 const actionKind = z.enum(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"]);
-const priorMemorySchema = z.array(z.strictObject({ id, sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u) })).max(HABITAT_LIMITS.memoryEntries).refine(values => new Set(values.map(value => value.id)).size === values.length);
-const replySchema = z.strictObject({ runId: id, at: timestamp, intent: text(1024), trigger: observationSchema, context: z.array(observationSchema).max(32), messageIds: z.array(id).max(8), text: text(8192), planDigest: z.string().regex(/^[a-f0-9]{64}$/u).nullable(), tools: z.array(toolSchema).max(2).optional(), actionKinds: z.array(actionKind).max(8).optional(), memory: memoryList.optional(), priorMemory: priorMemorySchema.optional() });
+const priorMemorySchema = z.array(z.strictObject({ id, sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u) })).max(HABITAT_LIMITS.memoryExposureReferences).refine(values => new Set(values.map(value => value.id)).size === values.length);
+const replySchema = z.strictObject({ runId: id, at: timestamp, intent: text(1024), trigger: observationSchema, context: z.array(observationSchema).max(32), messageIds: z.array(id).max(8), text: text(8192), planDigest: z.string().regex(/^[a-f0-9]{64}$/u).nullable(), tools: z.array(toolSchema).max(2).optional(), actionKinds: z.array(actionKind).max(8).optional(), memory: memorySnapshot.optional(), priorMemory: priorMemorySchema.optional() });
 export type HabitatReply = z.infer<typeof replySchema>;
 const reflectionSchema = z.strictObject({ candidate: planSchema.nullable(), reason: text(1024), evidenceIds: z.array(id).max(40) });
 const episodeSchema = z.strictObject({ reply: replySchema, followups: z.array(observationSchema).max(HABITAT_LIMITS.followups), initialClaimed: z.boolean(), followupClaimed: z.boolean(), reflection: reflectionSchema.nullable().default(null) });
 export type HabitatEpisode = z.infer<typeof episodeSchema>;
-const evaluationSchema = z.strictObject({ key: id, at: timestamp, phase: z.enum(["initial", "followup"]), status: z.enum(["pending", "retained", "promoted"]), reason: text(1024), receipts: z.array(z.string().regex(/^sha256:[a-f0-9]{64}$/u)).max(8).default([]), evidenceIds: z.array(id).max(40).default([]), memoryChanged: z.boolean().optional() });
+const evaluationSchema = z.strictObject({ key: id, at: timestamp, phase: z.enum(["initial", "followup"]), status: z.enum(["pending", "retained", "promoted"]), reason: text(1024), receipts: z.array(z.string().regex(/^sha256:[a-f0-9]{64}$/u)).max(8).default([]), evidenceIds: z.array(id).max(40).default([]), memoryChanged: z.boolean().optional(), memoryEvicted: z.number().int().min(0).max(HABITAT_LIMITS.memoryEntries + HABITAT_LIMITS.memoryChanges).optional() });
 const lineageSchema = z.strictObject({ key: id, kind: z.enum(["promotion", "rollback", "configuration"]), from: planSchema, to: planSchema, reason: text(1024) });
 const stateSchema = z.strictObject({ version: z.literal(1), revision: timestamp, champion: planSchema, episodes: z.array(episodeSchema).max(HABITAT_LIMITS.episodes), evaluations: z.array(evaluationSchema).max(64), lineage: z.array(lineageSchema).max(16), ancestors: z.array(planSchema).max(16).default([]), denied: z.array(z.string().regex(/^[a-f0-9]{64}$/u)).max(16).default([]), ownerRevision: timestamp.optional(), memory: memoryList.optional(), memoryCutoff: timestamp.optional() });
 export type HabitatState = z.infer<typeof stateSchema>;
 export type HabitatCheckpoint = Readonly<{ key: string; at: number; phase: "initial" | "followup"; baseDigest: string; evidenceDigest: string; ownerRevision: number; episode: HabitatEpisode; cases: readonly HabitatEpisode[]; plan: HabitatPlan; memory: readonly HabitatMemory[]; memoryDigest: string; memoryCutoff: number | null }>;
-const assessmentSchema = z.strictObject({ candidate: planSchema.nullable(), reason: text(1024), evidenceIds: z.array(id).max(40), scores: z.array(z.strictObject({ runId: id, incumbent: z.number().min(0).max(1), candidate: z.number().min(0).max(1), safe: z.boolean() })).max(4), remember: rememberSchema.optional() });
+const assessmentSchema = z.strictObject({ candidate: planSchema.nullable(), reason: text(1024), evidenceIds: z.array(id).max(40), scores: z.array(z.strictObject({ runId: id, incumbent: z.number().min(0).max(1), candidate: z.number().min(0).max(1), safe: z.boolean() })).max(4), remember: rememberSchema.optional(), memoryUpdate: memoryUpdateSchema.optional() }).refine(value => value.remember === undefined || value.memoryUpdate === undefined);
 export type HabitatAssessment = z.infer<typeof assessmentSchema>;
 export const parseHabitatAssessment = (value: unknown): HabitatAssessment => assessmentSchema.parse(value);
 const evidence = (episodes: readonly HabitatEpisode[]) => episodes.map(episode => ({ reply: episode.reply, followups: episode.followups }));
@@ -65,7 +69,7 @@ function resolveMemory(checkpoint: HabitatCheckpoint, ids: readonly string[]): H
       const previous = available.get(entry.id);
       if (!previous || previous.sourceDigest !== entry.sourceDigest || previous.at !== entry.at || previous.author !== entry.author
         || !(previous.text.startsWith(entry.text) || entry.text.startsWith(previous.text))) available.set(entry.id, null);
-      else if (entry.text.length > previous.text.length) available.set(entry.id, entry);
+      else if (entry.text.length > previous.text.length) available.set(entry.id, previous.category === undefined ? entry : { ...entry, category: previous.category });
     }
     else if (!available.has(entry.id)) available.set(entry.id, entry);
   };
@@ -75,6 +79,20 @@ function resolveMemory(checkpoint: HabitatCheckpoint, ids: readonly string[]): H
   for (const source of observations) if (source.kind === "message") add(remembered(source));
   for (const id of nonMessages) available.set(id, null);
   return ids.map(id => { const entry = available.get(id); if (!entry) throw Error("Memory source is unavailable or ambiguous"); return structuredClone(entry); });
+}
+function updateMemory(checkpoint: HabitatCheckpoint, update: NonNullable<HabitatAssessment["memoryUpdate"]>): { memory: HabitatMemory[]; evicted: number } {
+  if (update.forget.some(id => !checkpoint.memory.some(entry => entry.id === id))) throw Error("Memory forget target is unavailable");
+  const resolved = resolveMemory(checkpoint, update.remember.map(entry => entry.id));
+  const replacements = new Map(resolved.map((entry, index) => [entry.id, { ...entry, category: update.remember[index]!.category }]));
+  const memory = checkpoint.memory.filter(entry => entry.at <= checkpoint.at && (checkpoint.memoryCutoff === null || entry.at > checkpoint.memoryCutoff) && !update.forget.includes(entry.id))
+    .map(entry => replacements.get(entry.id) ?? structuredClone(entry));
+  for (const entry of replacements.values()) if (!memory.some(previous => previous.id === entry.id)) memory.push(entry);
+  let evicted = 0;
+  while (memory.length > HABITAT_LIMITS.memoryEntries || Buffer.byteLength(JSON.stringify(memory)) > HABITAT_LIMITS.memoryBytes) {
+    const oldest = memory.reduce((index, entry, current) => entry.at < memory[index]!.at || entry.at === memory[index]!.at && entry.id < memory[index]!.id ? current : index, 0);
+    memory.splice(oldest, 1); evicted++;
+  }
+  return { memory, evicted };
 }
 const due = (episode: HabitatEpisode, now: number) => !episode.initialClaimed || !episode.followupClaimed && (episode.followups.length >= HABITAT_LIMITS.followups
   || now >= episode.reply.at + HABITAT_LIMITS.windowMs || episode.followups.length >= 3 && now >= episode.followups.at(-1)!.at + HABITAT_LIMITS.quietMs);
@@ -147,12 +165,14 @@ export class ContactHabitat {
     const ownerUnchanged = (state.ownerRevision ?? 0) === checkpoint.ownerRevision;
     const episode = state.episodes.find(value => value.reply.runId === checkpoint.episode.reply.runId);
     const memoryUnchanged = habitatDigest(state.memory ?? []) === checkpoint.memoryDigest;
-    if (assessment.remember !== undefined) {
+    if (assessment.remember !== undefined || assessment.memoryUpdate !== undefined) {
       evaluation.memoryChanged = false;
       if (ownerUnchanged && memoryUnchanged && habitatDigest(state.champion) === checkpoint.baseDigest && episode
         && habitatDigest(evidence([episode])) === habitatDigest(evidence([checkpoint.episode]))) {
-        const next = resolveMemory(checkpoint, assessment.remember);
+        const updated = assessment.memoryUpdate === undefined ? { memory: resolveMemory(checkpoint, assessment.remember!), evicted: 0 } : updateMemory(checkpoint, assessment.memoryUpdate);
+        const next = updated.memory;
         evaluation.memoryChanged = habitatDigest(next) !== checkpoint.memoryDigest;
+        if (updated.evicted > 0) evaluation.memoryEvicted = updated.evicted;
         if (evaluation.memoryChanged) state.memory = next;
       }
     }
@@ -160,6 +180,8 @@ export class ContactHabitat {
       && habitatDigest(state.champion) === checkpoint.baseDigest && habitatDigest(evidence(cases)) === checkpoint.evidenceDigest
       && habitatDigest(assessment.candidate) !== checkpoint.baseDigest && !state.denied.includes(habitatDigest(assessment.candidate))
       && assessment.candidate.webSearch === state.champion.webSearch && assessment.candidate.memeSearch === state.champion.memeSearch
+      && assessment.candidate.javascript === state.champion.javascript && assessment.candidate.memorySearch === state.champion.memorySearch
+      && habitatDigest(assessment.candidate.soulCore ?? null) === habitatDigest(state.champion.soulCore ?? null)
       && assessment.scores.length === cases.length && scores.size === cases.length
       && cited.size > 0 && [...cited].every(id => cases.some(value => value.followups.some(message => message.id === id)))
       && cases.every(value => value.followups.some(message => cited.has(message.id)) && scores.get(value.reply.runId)?.safe === true

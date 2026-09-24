@@ -15,10 +15,12 @@
         "@hraness/desktop-foundation": "https://github.com/hraness/desktop-foundation/releases/download/v0.7.0/hraness-desktop-foundation-0.7.0.tgz",
         "@hraness/local-custody": "github:hraness/local-custody#v0.4.0",
         "@hraness/support-foundation": "github:hraness/support-foundation#2d034b357680353574411217d68b02b6755b07ed",
+        "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
         "@modelcontextprotocol/sdk": "1.30.0",
         "@types/bun": "1.3.14",
         "effect": "3.22.1",
         "fast-check": "4.9.0",
+        "quickjs-emscripten-core": "0.32.0",
         "sigstore": "4.1.1",
         "typescript": "6.0.3",
         "zod": "4.6.2",
@@ -63,6 +65,10 @@
     "@hraness/oh": ["@hraness/oh@https://github.com/hraness/oh/releases/download/v0.10.8/hraness-oh-0.10.8.tgz", { "peerDependencies": { "@libsql/client": ">=0.17.4 <1", "@suss/datalog": "0.20.0", "@tobilu/qmd": "2.5.3" }, "optionalPeers": ["@libsql/client", "@suss/datalog", "@tobilu/qmd"], "bin": { "oh": "./dist/cli.js" } }, "sha512-rtm+D1pzlxTE84zAnIFq3dxQulU/HpstnaUYYW1Cl9HjNG1p+Z0Oy0oNTUQpxtYHh3XClDS2MLsV693WcUwOOA=="],
 
     "@hraness/support-foundation": ["@hraness/support-foundation@github:hraness/support-foundation#2d034b3", {}, "hraness-support-foundation-2d034b3", "sha512-ayi8JeDAkaKkJDtQwe705DfNAas0na5fmf70BF+dHhADYdryBNhohahGDtItNZ+DD8rPxmmy7xRGfteixSC+1w=="],
+
+    "@jitl/quickjs-ffi-types": ["@jitl/quickjs-ffi-types@0.32.0", "", {}, "sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg=="],
+
+    "@jitl/quickjs-singlefile-browser-release-sync": ["@jitl/quickjs-singlefile-browser-release-sync@0.32.0", "", { "dependencies": { "@jitl/quickjs-ffi-types": "0.32.0" } }, "sha512-Hfdl7rh8dzxNWFRiYAYNbhn0RMF1/tO6SMH2mUW0aTibqwaAtqPRbi4WkwaIDlhNz8Z4dksJi1Zjl1R54Jsc/Q=="],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.30.0", "", { "dependencies": { "@hono/node-server": "^1.19.9 || ^2.0.5", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.2.1", "express-rate-limit": "^8.2.1", "hono": "^4.11.4", "jose": "^6.1.3", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA=="],
 
@@ -283,6 +289,8 @@
     "pure-rand": ["pure-rand@8.4.2", "", {}, "sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng=="],
 
     "qs": ["qs@6.16.0", "", { "dependencies": { "es-define-property": "^1.0.1", "side-channel": "^1.1.1" } }, "sha512-h6fhOIaRrID2CbEY2fqs+7t+UXZo+MLAnU5gRIq85uFtdiUPCdsApMlHhXogKVM4HM2DVbIjGNTTYH2OcmP1vA=="],
+
+    "quickjs-emscripten-core": ["quickjs-emscripten-core@0.32.0", "", { "dependencies": { "@jitl/quickjs-ffi-types": "0.32.0" } }, "sha512-QFnPfjFey8EqknSrSxe1hZrf1/8z7/6s1QzGOmKo6++02r7QRRX7ZoyNaZh7JuVjWsVW87KnQrbZqnHkOAzUyg=="],
 
     "range-parser": ["range-parser@1.3.0", "", {}, "sha512-hek2mFQpPuI4E1BBKrSto+BU3e3x4xuarsbiwr3+lf7p44juvFMV0XFWQAP3xUyqXA4RrXLIoaSUGbSt056ZMw=="],
 

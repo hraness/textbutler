@@ -13,7 +13,7 @@ import type { AgentRequest } from "./runtime.ts";
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const replyOutput = { respond: true, confidence: 0.95, reason: "requested", summary: "Explain briefly", actions: [{ kind: "text", text: "A useful answer" }], tool: null };
-const driverEvidence = (body: string): { history: { id: string }[]; results: { file?: string }[]; tools: string[]; memory: HabitatMemory[]; memoryOmitted: number } => JSON.parse(JSON.parse(body).messages[1].content).context.inputs.context.evidence;
+const driverEvidence = (body: string): { history: { id: string }[]; results: { file?: string; [key: string]: unknown }[]; tools: string[]; memory: HabitatMemory[]; memoryOmitted: number } => JSON.parse(JSON.parse(body).messages[1].content).context.inputs.context.evidence;
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 async function fixture(output: unknown, evolution?: Parameters<typeof createHabitatAgent>[0]["evolution"], overrides: Partial<Pick<Parameters<typeof createHabitatAgent>[0], "memes" | "getWorkspace">> = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "butler-habitat-"))), journal = RunJournal.memory(), workspace = await ContactWorkspace.create(root);
@@ -35,6 +35,67 @@ function seedMemory(f: Awaited<ReturnType<typeof fixture>>, texts: string[], lon
   state.finish(state.claim(f.now - 90_000)!, { candidate: null, reason: "Retain observed sources", evidenceIds: [], scores: [], remember: sources.map(source => source.id) });
   return state;
 }
+
+test("JavaScript is owner-granted, executes pure calculations and records only a code digest label", async () => {
+  const denied = await fixture((body: string) => {
+    expect(driverEvidence(body).tools).not.toContain("javascript");
+    return { ...replyOutput, actions: [], tool: { kind: "javascript", code: "return 42;" } };
+  });
+  await expect(denied.habitat.agent.compose(denied.request)).rejects.toThrow("not available");
+  expect(denied.calls()).toBe(1);
+  const code = "return input.values.reduce((sum,value) => sum + value, 0);";
+  const f = await fixture((body: string, call: number) => {
+    const evidence = driverEvidence(body);
+    expect(evidence.tools).toContain("javascript");
+    if (call === 1) return { ...replyOutput, actions: [], tool: { kind: "javascript", code, input: { values: [2, 5, 8] } } };
+    expect(evidence.results[0]).toEqual({ tool: "javascript", result: { ok: true, value: 15 } });
+    return replyOutput;
+  });
+  const state = new ContactHabitat(f.journal, f.request.contact.id);
+  state.configure(0, { ...DEFAULT_HABITAT_PLAN, javascript: true });
+  await f.habitat.agent.compose(f.request); expect(f.calls()).toBe(2); expect(state.snapshot().episodes).toEqual([]);
+  f.habitat.submitted({ ...f.request, actions: [{ kind: "text", text: "A useful answer" }], messageIds: ["accepted"], at: f.now });
+  expect(state.snapshot().episodes[0]?.reply.tools).toEqual([{ kind: "javascript", query: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
+    result: JSON.stringify({ tool: "javascript", result: { ok: true, value: 15 } }) }]);
+});
+
+test("JavaScript failures remain bounded observations and the normal two-tool budget applies", async () => {
+  const limited = await fixture((body: string, call: number) => {
+    if (call === 1) return { ...replyOutput, actions: [], tool: { kind: "javascript", code: "while(true){}" } };
+    expect(driverEvidence(body).results[0]).toEqual({ tool: "javascript", result: { ok: false, error: "resource-limit" } });
+    return replyOutput;
+  });
+  new ContactHabitat(limited.journal, limited.request.contact.id).configure(0, { ...DEFAULT_HABITAT_PLAN, javascript: true });
+  await expect(limited.habitat.agent.compose(limited.request)).resolves.toMatchObject({ actions: replyOutput.actions });
+  const exhausted = await fixture({ ...replyOutput, actions: [], tool: { kind: "javascript", code: "return 1;" } });
+  new ContactHabitat(exhausted.journal, exhausted.request.contact.id).configure(0, { ...DEFAULT_HABITAT_PLAN, javascript: true });
+  await expect(exhausted.habitat.agent.compose(exhausted.request)).rejects.toThrow("tool budget"); expect(exhausted.calls()).toBe(3);
+});
+
+test("memory-search reads only the contact archive and retains retrieved source provenance after submission", async () => {
+  const f = await fixture((body: string, call: number) => {
+    const evidence = driverEvidence(body);
+    expect(evidence.tools).toContain("memory-search");
+    if (call === 1) return { ...replyOutput, actions: [], tool: { kind: "memory-search", query: "violet picnic" } };
+    expect(evidence.results[0]).toMatchObject({ tool: "memory-search", matches: [{ id: "archive-0", category: "shared-reference", sourceDigest: "a".repeat(64), text: "Remember the violet picnic" }] });
+    return replyOutput;
+  });
+  const habitat = new ContactHabitat(f.journal, f.request.contact.id), initial = habitat.snapshot();
+  const memory = Array.from({ length: 12 }, (_, index) => ({ id: `archive-${index}`, at: f.now - 10_000 + index, author: "contact" as const,
+    text: index === 0 ? "Remember the violet picnic" : `Ordinary archived context ${index}`, category: "shared-reference" as const, sourceDigest: "a".repeat(64), truncated: false }));
+  f.journal.writeHabitatState(f.request.contact.id, 0, JSON.stringify({ ...initial, revision: 1, memory }));
+  const before = habitat.snapshot();
+  await f.habitat.agent.compose(f.request);
+  expect(habitat.snapshot()).toEqual(before);
+  f.habitat.submitted({ ...f.request, actions: [{ kind: "text", text: "A useful answer" }], messageIds: ["accepted"], at: f.now });
+  const recorded = habitat.snapshot().episodes[0]!.reply;
+  expect(recorded.tools?.[0]?.kind).toBe("memory-search");
+  expect([...(recorded.memory ?? []), ...(recorded.priorMemory ?? [])]).toContainEqual(expect.objectContaining({ id: "archive-0", sourceDigest: "a".repeat(64) }));
+  expect(habitat.snapshot().memory).toEqual(memory);
+  const denied = await fixture({ ...replyOutput, actions: [], tool: { kind: "memory-search", query: "violet picnic" } });
+  new ContactHabitat(denied.journal, denied.request.contact.id).configure(0, { ...DEFAULT_HABITAT_PLAN, memorySearch: false });
+  await expect(denied.habitat.agent.compose(denied.request)).rejects.toThrow("not available");
+});
 
 test("classification and composition share one model call; only an actual receipt creates learning evidence", async () => {
   const f = await fixture({ respond: true, confidence: 0.95, reason: "requested", summary: "Explain briefly", actions: [{ kind: "text", text: "A useful answer" }], tool: null });
@@ -75,7 +136,7 @@ test("background evolution replays both plans, judges blinded variants and retai
     if (!runId.startsWith("judge-")) {
       const context = request.context as unknown as { inputs: { context: { evidence: { memory: HabitatMemory[] } } } };
       expect(context.inputs.context.evidence.memory.map(entry => entry.id)).toEqual(["trigger-2"]);
-      return { candidate, reason: "Examples were requested", evidenceIds: ["feedback-1-0", "feedback-2-0"], remember: [] };
+      return { candidate, reason: "Examples were requested", evidenceIds: ["feedback-1-0", "feedback-2-0"], memoryUpdate: { remember: [{ id: "trigger-2", category: "shared-reference" }], forget: [] } };
     }
     expect(request.prompt).toContain("neither text-only replay executes tools");
     const context = request.context as unknown as { inputs: { context: { evidence: { cases: { runId: string; a: string; b: string; memory: HabitatMemory[]; observedReply: { tools: unknown[]; actionKinds: string[] } }[]; output: string } } } };
@@ -97,7 +158,8 @@ test("background evolution replays both plans, judges blinded variants and retai
   f.habitat.schedule(f.request.contact); await f.habitat.idle();
   expect(decisions).toBe(2); expect(f.calls()).toBe(4); expect(state.snapshot().champion).toEqual(candidate);
   expect(replaySizes).toEqual([8, 4, 8, 4]);
-  expect(state.snapshot().memory).toEqual([]); expect(state.snapshot().evaluations.at(-1)?.memoryChanged).toBe(true);
+  expect(state.snapshot().memory?.map(value => [value.id, value.category])).toContainEqual(["trigger-2", "shared-reference"]);
+  expect(state.snapshot().evaluations.at(-1)?.memoryChanged).toBe(true);
   expect(state.snapshot().evaluations.at(-1)?.receipts).toHaveLength(6);
   expect(state.snapshot().evaluations.at(-1)?.evidenceIds).toEqual(["feedback-1-0", "feedback-2-0"]);
 });
@@ -384,9 +446,18 @@ test("remembered private names cannot escape through gateway search", async () =
   await expect(f.habitat.agent.compose(f.request)).rejects.toThrow("Public search query is not admitted"); expect(searches).toBe(0);
 });
 
+test("owner-authored soul details are included in public-search privacy checks", async () => {
+  const f = await fixture({ ...replyOutput, actions: [], tool: { kind: "web-search", query: "Zelphora recipe" } });
+  const state = new ContactHabitat(f.journal, f.request.contact.id);
+  state.configure(0, { ...DEFAULT_HABITAT_PLAN, webSearch: true, soulCore: { voice: "Zelphora is the private project name", relationshipContext: "", sharedContext: "", boundaries: "" } });
+  f.driver.config = { kind: "gateway", model: "alibaba/qwen3.5-flash", credentialFile: "synthetic", dailyBudgetUsd: 1 };
+  f.driver.search = async () => { throw Error("Private query must not escape"); };
+  await expect(f.habitat.agent.compose(f.request)).rejects.toThrow("Public search query is not admitted");
+});
+
 test("reflection learns a long trigger also shown in clipped history without another model call", async () => {
   let reflections = 0;
-  const f = await fixture(replyOutput, async () => ({ id: "source-picker", async execute() { reflections++; return { candidate: null, reason: "Remember the explicit preference", evidenceIds: [], remember: ["message"] }; } }));
+  const f = await fixture(replyOutput, async () => ({ id: "source-picker", async execute() { reflections++; return { candidate: null, reason: "Remember the explicit preference", evidenceIds: [], memoryUpdate: { remember: [{ id: "message", category: "preference" }], forget: [] } }; } }));
   const request = { ...f.request, event: { ...f.request.event, text: "p".repeat(900) } };
   await f.workspace.write("history/recent.json", JSON.stringify({ messages: [{ id: request.event.id, at: request.event.occurredAt, author: "contact", text: request.event.text }] }));
   await f.habitat.agent.compose(request);
@@ -394,7 +465,21 @@ test("reflection learns a long trigger also shown in clipped history without ano
   f.habitat.schedule(request.contact); await f.habitat.idle();
   const state = new ContactHabitat(f.journal, request.contact.id).snapshot();
   expect(state.episodes[0]?.reply.context[0]?.truncated).toBe(true);
-  expect(state.memory?.[0]).toMatchObject({ id: "message", text: "p".repeat(512), truncated: true });
+  expect(state.memory?.[0]).toMatchObject({ id: "message", text: "p".repeat(900), truncated: false, category: "preference" });
   expect(state.memory?.[0]?.sourceDigest).toBe(habitatDigest({ id: request.event.id, at: request.event.occurredAt, author: "contact", kind: "message", text: request.event.text, relatedMessageId: null }));
   expect(f.calls()).toBe(1); expect(reflections).toBe(1);
+});
+
+test("reflection memory deltas preserve older contact notes when learning a new relationship preference", async () => {
+  const f = await fixture(replyOutput, async () => ({ id: "source-picker", async execute() { return { candidate: null, reason: "Add the new preference while preserving prior context", evidenceIds: [],
+    memoryUpdate: { remember: [{ id: "message", category: "shared-reference" }], forget: [] } }; } }));
+  const habitat = seedMemory(f, ["They prefer concise answers"], false);
+  await f.habitat.agent.compose(f.request);
+  f.habitat.submitted({ ...f.request, actions: [{ kind: "text", text: "A useful answer" }], messageIds: ["accepted"], at: f.now });
+  expect(habitat.needsEvaluation(f.now)).toBe(true);
+  f.habitat.schedule(f.request.contact); await f.habitat.idle();
+  expect(habitat.snapshot().evaluations.at(-1)?.memoryChanged).toBe(true);
+  expect(habitat.snapshot().memory?.map(value => [value.id, value.text, value.category])).toEqual([
+    ["memory-0", "They prefer concise answers", undefined], ["message", "butler help", "shared-reference"],
+  ]);
 });

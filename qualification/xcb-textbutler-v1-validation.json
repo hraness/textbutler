@@ -549,5 +549,9 @@
     "evidenceSha256": "6b61eb0e502c85f2c05115d20d3029bdbd18f0660a599d32cad99483f5fc7cd1",
     "logSha256": "f90a362cb29389c129e8bcd6445ed3e82b058b22fd9ef95b24bc64c0deb3e8b6",
     "scope": "Historical baseline evidence captured before this memory refresh. Its earlier test and review references remain historical and do not claim current live verification."
-  }
+  },
+  "currentValidation": "qualification/xcb-textbutler-v1-current-validation.json",
+  "currentValidationSha256": "255c6828f66fdd17e50f0fdc85e0865903838857f79ffdb0ecaa8298ee612ebb",
+  "historical": true,
+  "historicalNote": "This earlier memory-refresh qualification predates the current JavaScript and memory-search integration. Use currentValidation for current source and test evidence."
 }

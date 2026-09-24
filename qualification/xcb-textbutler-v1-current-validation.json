@@ -1,18 +1,52 @@
 {
   "version": 1,
-  "profiles": {
-    "classify": {
-      "id": "textbutler.classify",
-      "version": 1,
-      "digest": "72e5bfdffb7feed1b5c75ef202bc7e2cc007ff27a976dbeab870b94f5b801933"
-    },
-    "respond": {
-      "id": "textbutler.respond",
-      "version": 1,
-      "digest": "6a5110b4f5e3e433802586294e5a95667fdfea67569c92cbdd65759c29b8e98e"
-    }
+  "scope": "Current synthetic source validation of the 42-file TextButler XCB composition admission inventory, contact personality and owner tool configuration, additive relationship memory and retrieval, isolated JavaScript tool, build integrity and native startup/setup source. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation.",
+  "toolchain": "Bun 1.3.14",
+  "command": "bun run check:textbutler && bun test scripts/xcb-integration-admission.test.ts",
+  "result": {
+    "exitCode": 0,
+    "passed": 612,
+    "failed": 0,
+    "assertions": 5314,
+    "files": 52
   },
-  "sources": {
+  "invocations": [
+    {
+      "command": "bun run check:textbutler",
+      "scheduler": {
+        "command": "hra-host-run",
+        "mode": "heavy",
+        "lane": "compute"
+      },
+      "result": {
+        "exitCode": 0,
+        "passed": 605,
+        "failed": 0,
+        "assertions": 5278,
+        "files": 51
+      },
+      "log": "qualification/xcb-textbutler-v1-current-check.log"
+    },
+    {
+      "command": "bun test scripts/xcb-integration-admission.test.ts",
+      "scheduler": {
+        "command": "hra-host-run",
+        "mode": "heavy",
+        "lane": "compute"
+      },
+      "result": {
+        "exitCode": 0,
+        "passed": 7,
+        "failed": 0,
+        "assertions": 36,
+        "files": 1
+      },
+      "log": "qualification/xcb-textbutler-v1-current-check.log"
+    }
+  ],
+  "sourceInventoryCount": 42,
+  "sourceDigest": "0147383e065bc58ed525e2d29e7654ca8473ebeaac661a6a2349b8cc208e216b",
+  "sourceSha256": {
     "bun.lock": "a5617628434e7b00b9fc1afe126a6f3827224275e68af694d349ffc1eb65f194",
     "package.json": "9ae71d5f2bf678935e33601949fc1e4a76a256a17b37e40afa39f4f07c89c322",
     "packages/control/src/index.ts": "d16a84338c8a5d61e5a7ff5f577f1f534314fcb599cd614f3a351806f997e7a8",
@@ -56,8 +90,22 @@
     "scripts/build-textbutler.ts": "c4a9aa71929600fcf334fdb83aeb2f6684cb8a0c3dce8a5c7222693db8b286c6",
     "scripts/xcb-integration-admission.ts": "ecd15c2e67528106a2c7dd038af02bf420b6b595bd8de65095573d7744758cda"
   },
-  "validation": {
-    "command": "bun run check:textbutler && bun test scripts/xcb-integration-admission.test.ts",
-    "receiptSha256": "255c6828f66fdd17e50f0fdc85e0865903838857f79ffdb0ecaa8298ee612ebb"
-  }
+  "review": {
+    "artifact": "qualification/xcb-contact-personalities-review.json",
+    "sha256": "84c764abbff877b93ccf484c848cb0609458069c573e779e1aaf6b1e7819bdd4",
+    "kind": "independent-ai-source-review",
+    "result": "Fresh read-only follow-up review reports all findings resolved and no new blockers."
+  },
+  "log": {
+    "path": "qualification/xcb-textbutler-v1-current-check.log",
+    "bytes": 63796,
+    "sha256": "5fac2f0823d074e7f37aa183fb66236a90b64ce763c02a7340fee6bdfa947e71",
+    "note": "Retains complete scheduler wrapper and command output, including the initial HRA_HOST_ACCESS_REQUIRED response followed by the required successful identical reviewed-host retry."
+  },
+  "toolchainInputs": {
+    "bunVersion": "1.3.14",
+    "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
+    "unchangedAcrossValidation": true
+  },
+  "createdAt": "2026-09-24"
 }

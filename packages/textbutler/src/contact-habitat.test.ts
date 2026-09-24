@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { RunJournal } from "./journal.ts";
-import { ContactHabitat, DEFAULT_HABITAT_PLAN, HABITAT_LIMITS, habitatDigest, parseHabitatPlan, type HabitatObservation, type HabitatPlan, type HabitatReply } from "./contact-habitat.ts";
+import { ContactHabitat, DEFAULT_HABITAT_PLAN, HABITAT_LIMITS, habitatDigest, parseHabitatPlan, type HabitatMemory, type HabitatObservation, type HabitatPlan, type HabitatReply } from "./contact-habitat.ts";
 
 const at = Date.parse("2026-09-20T12:00:00.000Z");
 const message = (id: string, time = at, author: HabitatObservation["author"] = "contact"): HabitatObservation => ({ id, at: time, author, kind: "message", text: "A synthetic question", relatedMessageId: null });
@@ -105,7 +105,7 @@ test("only evidence-bound improvement with no case regressions promotes; rollbac
 
 test("evolution cannot flip egress flags; identical flags still promote", () => {
   const plan = { ...DEFAULT_HABITAT_PLAN, guidance: "Prefer concise explanations." };
-  for (const flip of [{ webSearch: true }, { memeSearch: false }]) {
+  for (const flip of [{ webSearch: true }, { memeSearch: false }, { javascript: true }, { memorySearch: false }]) {
     const journal = RunJournal.memory();
     try {
       const habitat = new ContactHabitat(journal, "contact-a");
@@ -275,11 +275,11 @@ test("owner configuration preserves rejection history and invalidates pending in
 test("source-backed memory persists separately per contact with codepoint-safe attribution", () => {
   const journal = RunJournal.memory();
   try {
-    const habitat = new ContactHabitat(journal, "contact-a"), source = { ...message("preference", at - 1000, "owner"), text: "é".repeat(255) + "😀tail" };
+    const habitat = new ContactHabitat(journal, "contact-a"), source = { ...message("preference", at - 1000, "owner"), text: "é".repeat(511) + "😀tail" };
     habitat.record({ ...reply(), trigger: source });
     expect(habitat.finish(habitat.claim(at)!, retain([source.id]))).toBe(false);
     const state = habitat.snapshot(), memory = state.memory![0]!;
-    expect(memory).toEqual({ id: source.id, at: source.at, author: "owner", text: "é".repeat(255), sourceDigest: habitatDigest(source), truncated: true });
+    expect(memory).toEqual({ id: source.id, at: source.at, author: "owner", text: "é".repeat(511), sourceDigest: habitatDigest(source), truncated: true });
     expect(Buffer.byteLength(memory.text)).toBeLessThanOrEqual(HABITAT_LIMITS.memoryTextBytes);
     expect(state.champion).toEqual(DEFAULT_HABITAT_PLAN); expect(state.evaluations.at(-1)?.memoryChanged).toBe(true);
     expect(new ContactHabitat(journal, "contact-a").snapshot().memory).toEqual(state.memory);
@@ -313,7 +313,7 @@ test("memory copies reconcile proven clipped views but reject same-ID source cha
     const clipped = { ...source, text: source.text.slice(0, 512), sourceDigest: habitatDigest(source), truncated: true };
     habitat.record({ ...reply(), trigger: source, context: [clipped] });
     habitat.finish(habitat.claim(at)!, retain([source.id]));
-    expect(habitat.snapshot().memory?.[0]).toMatchObject({ text: "s".repeat(512), sourceDigest: habitatDigest(source), truncated: true });
+    expect(habitat.snapshot().memory?.[0]).toMatchObject({ text: "s".repeat(900), sourceDigest: habitatDigest(source), truncated: false });
     habitat.record({ ...reply("run-2", at + 1000), context: [clipped] });
     habitat.finish(habitat.claim(at + 1000)!, retain([source.id, "trigger-run-2"]));
     expect(habitat.snapshot().memory).toHaveLength(2);
@@ -357,5 +357,151 @@ test("owner clear blocks in-flight and later resurrection while preserving perso
     expect(() => habitat.finish(next, retain([future.id]))).toThrow("unavailable");
     habitat.finish(next, retain(["trigger-run-2"])); expect(habitat.snapshot().memory?.map(value => value.id)).toEqual(["trigger-run-2"]);
     expect(() => habitat.clearMemory(before.revision, at + 40_000)).toThrow("conflict");
+  } finally { journal.close(); }
+});
+
+const archived = (index: number, text = "A synthetic remembered statement"): HabitatMemory => {
+  const source = { ...message(`memory-${index}`, at - 10_000 + index), text };
+  return { id: source.id, at: source.at, author: source.author, text, sourceDigest: habitatDigest(source), truncated: false };
+};
+const seedMemory = (journal: RunJournal, memory: HabitatMemory[]) => journal.writeHabitatState("contact-a", 0, JSON.stringify({ version: 1, revision: 1, champion: DEFAULT_HABITAT_PLAN, episodes: [], evaluations: [], lineage: [], ancestors: [], denied: [], memory }));
+
+test("categorized memory deltas accumulate beyond active recall and preserve unmentioned sources", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a");
+    for (let batch = 0; batch < 2; batch++) {
+      const context = Array.from({ length: 8 }, (_, i) => message(`source-${batch}-${i}`, at - 1000 + batch * 10 + i));
+      habitat.record({ ...reply(`run-${batch}`, at + batch * 1000), context });
+      habitat.finish(habitat.claim(at + batch * 1000)!, { ...retain(), memoryUpdate: { remember: context.map(entry => ({ id: entry.id, category: "shared-reference" })), forget: [] } });
+    }
+    const before = habitat.snapshot().memory!;
+    expect(before).toHaveLength(16); expect(before.every(entry => entry.category === "shared-reference")).toBe(true);
+    expect(new ContactHabitat(journal, "contact-a").snapshot().memory).toEqual(before);
+    expect(new ContactHabitat(journal, "contact-b").snapshot().memory).toBeUndefined();
+    habitat.record(reply("run-3", at + 3000));
+    habitat.finish(habitat.claim(at + 3000)!, { ...retain(), memoryUpdate: { remember: [{ id: before[0]!.id, category: "preference" }], forget: [before[1]!.id] } });
+    expect(habitat.snapshot().memory).toEqual([{ ...before[0]!, category: "preference" }, ...before.slice(2)]);
+  } finally { journal.close(); }
+});
+
+test("deltas upgrade proven shorter excerpts without changing provenance or losing category", () => {
+  const journal = RunJournal.memory();
+  try {
+    const source = { ...message("source", at - 1000, "owner"), text: "é".repeat(600) };
+    const old: HabitatMemory = { id: source.id, at: source.at, author: source.author, text: "é".repeat(256), sourceDigest: habitatDigest(source), truncated: true, category: "context" };
+    seedMemory(journal, [old]);
+    const habitat = new ContactHabitat(journal, "contact-a"); habitat.record({ ...reply(), trigger: source });
+    habitat.finish(habitat.claim(at)!, { ...retain(), memoryUpdate: { remember: [{ id: source.id, category: "open-loop" }], forget: [] } });
+    expect(habitat.snapshot().memory).toEqual([{ ...old, text: "é".repeat(512), category: "open-loop" }]);
+    habitat.record({ ...reply("run-2", at + 1000), context: [{ ...source, text: "é".repeat(256), sourceDigest: habitatDigest(source), truncated: true }] });
+    habitat.finish(habitat.claim(at + 1000)!, retain([source.id]));
+    expect(habitat.snapshot().memory?.[0]?.category).toBe("open-loop");
+  } finally { journal.close(); }
+});
+
+test("archive eviction is deterministic by source age and bounded by encoded JSON bytes", () => {
+  for (const escaped of [false, true]) {
+    const journal = RunJournal.memory();
+    try {
+      const original = Array.from({ length: 64 }, (_, i) => archived(i, "x".repeat(1024)));
+      seedMemory(journal, original);
+      const context = Array.from({ length: 8 }, (_, i) => ({ ...message(`new-${i}`, at - 100 + i), text: (escaped ? "\u0001" : "n").repeat(1024) }));
+      const habitat = new ContactHabitat(journal, "contact-a"); habitat.record({ ...reply(), context });
+      habitat.finish(habitat.claim(at)!, { ...retain(), memoryUpdate: { remember: context.map(entry => ({ id: entry.id, category: "context" })), forget: [] } });
+      const state = habitat.snapshot(), memory = state.memory!, evicted = state.evaluations.at(-1)!.memoryEvicted!;
+      expect(memory.length).toBeLessThanOrEqual(64); expect(Buffer.byteLength(JSON.stringify(memory))).toBeLessThanOrEqual(HABITAT_LIMITS.memoryBytes);
+      expect(evicted).toBeGreaterThanOrEqual(8); expect(escaped ? evicted > 8 : evicted === 8).toBe(true);
+      expect(memory.slice(0, -8)).toEqual(original.slice(evicted));
+      expect(memory.slice(-8).map(entry => entry.id)).toEqual(context.map(entry => entry.id));
+    } finally { journal.close(); }
+  }
+});
+
+test("memory deltas reject inventions, contradictory edits, extra text, and oversized changes atomically", () => {
+  const invalid = [
+    { remember: [{ id: "unknown", category: "context" }], forget: [] },
+    { remember: [], forget: ["unknown"] },
+    { remember: [{ id: "trigger-run-1", category: "context" }, { id: "trigger-run-1", category: "preference" }], forget: [] },
+    { remember: [{ id: "memory-0", category: "context" }], forget: ["memory-0"] },
+    { remember: [{ id: "trigger-run-1", category: "friendship" }], forget: [] },
+    { remember: [{ id: "trigger-run-1", category: "context", text: "Invented" }], forget: [] },
+    { remember: Array.from({ length: 9 }, (_, i) => ({ id: `memory-${i}`, category: "context" })), forget: [] },
+  ];
+  for (const memoryUpdate of invalid) {
+    const journal = RunJournal.memory();
+    try {
+      seedMemory(journal, [archived(0)]);
+      const habitat = new ContactHabitat(journal, "contact-a"); habitat.record(reply());
+      const checkpoint = habitat.claim(at)!, before = journal.habitatState("contact-a");
+      expect(() => habitat.finish(checkpoint, { ...retain(), memoryUpdate } as never)).toThrow();
+      expect(journal.habitatState("contact-a")).toEqual(before);
+    } finally { journal.close(); }
+  }
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"); habitat.record(reply());
+    expect(() => habitat.finish(habitat.claim(at)!, { ...retain([]), memoryUpdate: { remember: [], forget: [] } })).toThrow();
+  } finally { journal.close(); }
+});
+
+test("delta retention keeps source, owner, ledger, and clear-cutoff concurrency guards", () => {
+  for (const change of ["owner", "ledger", "source", "clear"] as const) {
+    const journal = RunJournal.memory();
+    try {
+      const habitat = new ContactHabitat(journal, "contact-a"); habitat.record(reply());
+      const checkpoint = habitat.claim(at)!;
+      if (change === "owner") habitat.configure(habitat.snapshot().revision, DEFAULT_HABITAT_PLAN);
+      else if (change === "source") habitat.observe(message("follow", at + 1), at + 1);
+      else if (change === "clear") habitat.clearMemory(habitat.snapshot().revision, at);
+      else { habitat.record(reply("run-2", at + 1000)); habitat.finish(habitat.claim(at + 1000)!, retain(["trigger-run-2"])); }
+      const before = habitat.snapshot().memory;
+      habitat.finish(checkpoint, { ...retain(), memoryUpdate: { remember: [{ id: "trigger-run-1", category: "preference" }], forget: [] } });
+      expect(habitat.snapshot().memory).toEqual(before); expect(habitat.snapshot().evaluations.find(entry => entry.key === checkpoint.key)?.memoryChanged).toBe(false);
+      if (change === "clear") {
+        habitat.record({ ...reply("run-3", at + 2000), context: [reply().trigger] });
+        expect(() => habitat.finish(habitat.claim(at + 2000)!, { ...retain(), memoryUpdate: { remember: [{ id: "trigger-run-1", category: "context" }], forget: [] } })).toThrow("unavailable");
+      }
+    } finally { journal.close(); }
+  }
+});
+
+test("expanded archives do not expand body snapshots or reference-only exposure limits", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), snapshot = Array.from({ length: 8 }, (_, i) => archived(i, "x".repeat(512)));
+    const priorMemory = Array.from({ length: 24 }, (_, i) => ({ id: `exposure-${i}`, sourceDigest: "a".repeat(64) }));
+    habitat.record({ ...reply(), memory: snapshot, priorMemory });
+    for (const fields of [{ memory: [...snapshot, archived(9)] }, { memory: [archived(0, "x".repeat(513))] }, { priorMemory: [...priorMemory, { id: "exposure-24", sourceDigest: "b".repeat(64) }] }, { priorMemory: [priorMemory[0]!, priorMemory[0]!] }]) {
+      expect(() => habitat.record({ ...reply("run-2"), ...fields })).toThrow();
+    }
+    expect(habitat.snapshot().episodes).toHaveLength(1);
+  } finally { journal.close(); }
+});
+
+test("owner soul anchors remain fixed while style adapts and legacy plan identities stay exact", () => {
+  const soulCore = { voice: "Brief and kind", relationshipContext: "The owner describes a working relationship", sharedContext: "A synthetic shared project", boundaries: "Ask before making commitments" };
+  for (const changeCore of [false, true]) {
+    const journal = RunJournal.memory();
+    try {
+      const habitat = new ContactHabitat(journal, "contact-a"), plan: HabitatPlan = { ...DEFAULT_HABITAT_PLAN, soulCore };
+      habitat.configure(0, plan);
+      const candidate: HabitatPlan = { ...plan, personality: { tone: "warm", formality: "casual" }, ...(changeCore ? { soulCore: { ...soulCore, relationshipContext: "Invented intimacy" } } : {}) };
+      expect(habitat.finish(followupCheckpoint(habitat), improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], candidate))).toBe(!changeCore);
+    } finally { journal.close(); }
+  }
+  const { javascript, memorySearch, ...legacy } = DEFAULT_HABITAT_PLAN;
+  expect(JSON.stringify(parseHabitatPlan(legacy))).toBe(JSON.stringify(legacy));
+  expect(JSON.stringify(parseHabitatPlan({ ...legacy, javascript: undefined, memorySearch: undefined, soulCore: undefined }))).toBe(JSON.stringify(legacy));
+  expect(() => parseHabitatPlan({ ...legacy, soulCore: { ...soulCore, voice: "é".repeat(257) } })).toThrow();
+});
+
+test("JavaScript tool evidence contains only a source digest while local memory search keeps bounded results", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a");
+    habitat.record({ ...reply(), tools: [{ kind: "javascript", query: `sha256:${"a".repeat(64)}`, result: "4" }, { kind: "memory-search", query: "shared project", result: "An attributed observation" }] });
+    expect(() => habitat.record({ ...reply("run-2"), tools: [{ kind: "javascript", query: "2 + 2", result: "4" }] })).toThrow();
+    expect(habitat.snapshot().episodes).toHaveLength(1);
   } finally { journal.close(); }
 });
