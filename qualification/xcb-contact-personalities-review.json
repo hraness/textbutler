@@ -8,7 +8,7 @@
   "sourceState": {
     "branch": "codex/contact-personalities",
     "baseCommit": "b9854673018ff0b3bac120cb8a1c2318a7d383a2",
-    "identity": "The base commit alone does not identify the reviewed changes; source digests bind the current follow-up review tree."
+    "identity": "Source digests identify the reviewed current feature and CI-repair working-tree bytes; the base commit alone does not identify them."
   },
   "scope": "Contact personality and owner tool configuration; owner control API and CLI; habitat proposals, evaluation, historical tool evidence and cancellation; bounded source-backed contact memory, owner clearing and historical memory snapshots; bounded host tools and journal state; source-inventory expansion for the existing composition admission gate.; expanded source-backed relationship memory, local memory retrieval, and isolated JavaScript calculation worker",
   "method": "Read-only inspection of the implementation, diffs, focused regression tests, admission validator and builder integration. Re-inspected repairs and measured exact source SHA-256 digests. No tests, builds, provider calls or live messaging checks were run by this reviewer. A follow-up read-only review rechecked the repaired findings, updated privacy checks, worker admission and watchdog lifecycle contract, build digest stability, registry limits, and corresponding focused regressions. The reviewer did not run tests or builds.",
@@ -114,7 +114,7 @@
     "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
     "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
     "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
-    "scripts/build-textbutler.ts": "c4a9aa71929600fcf334fdb83aeb2f6684cb8a0c3dce8a5c7222693db8b286c6",
+    "scripts/build-textbutler.ts": "896c6e0c2f571e6702f7634fb684e0a61ee24e1fbe92d82eead45a19c8faf9a5",
     "scripts/xcb-integration-admission.ts": "ecd15c2e67528106a2c7dd038af02bf420b6b595bd8de65095573d7744758cda"
   },
   "limitations": [
