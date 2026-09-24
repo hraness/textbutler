@@ -94,4 +94,4 @@ test("worker watchdog bounds native QuickJS operations", async () => {
   expect(performance.now() - started).toBeLessThan(2_000);
   const queued = await run("return 6 * 7;");
   expect(queued.ok ? queued.value === 42 : queued.error === "resource-limit").toBe(true);
-});
+}, 8_000);

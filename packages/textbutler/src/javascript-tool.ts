@@ -5,7 +5,7 @@ import type { JsonValue } from "@hraness/algal";
 
 export const JAVASCRIPT_LIMITS = Object.freeze({ codeBytes: 8192, inputBytes: 16_384, outputBytes: 4096,
   memoryBytes: 8 * 1024 * 1024, stackBytes: 256 * 1024, cpuMs: 50, workerMs: 250, startupMs: 2000,
-  queueWaitMs: 1000, queuedWorkers: 4, interruptChecks: 5000, jsonDepth: 16, jsonNodes: 1024 });
+  queueWaitMs: 5000, queuedWorkers: 16, interruptChecks: 5000, jsonDepth: 16, jsonNodes: 1024 });
 export type JavascriptResult = { ok: true; value: JsonValue } | { ok: false; error: "invalid-input" | "execution-failed" | "resource-limit" | "invalid-output" };
 let activeWorker: Worker | undefined;
 let workerSlotBusy = false;

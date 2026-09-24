@@ -39,7 +39,7 @@
     }
   ],
   "sourceInventoryCount": 42,
-  "sourceDigest": "c08e14d626cf010cc3c03b01438b9ddb6bc518b1faf1c66f0c2ebec9c3c8463c",
+  "sourceDigest": "fa66438b6be6a1941463ba39f21bef3bb3f42e3c3aacbfc00c52616f300e4eab",
   "sourceSha256": {
     "bun.lock": "a5617628434e7b00b9fc1afe126a6f3827224275e68af694d349ffc1eb65f194",
     "package.json": "9ae71d5f2bf678935e33601949fc1e4a76a256a17b37e40afa39f4f07c89c322",
@@ -56,7 +56,7 @@
     "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
     "packages/textbutler/src/host-config.ts": "ce53265541564c0ef0ebeeb6c3c8fbb2af0e065656aa6f871eef8ec14d742b7d",
     "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
-    "packages/textbutler/src/javascript-tool.ts": "e764c42ea055d2d7437d3e50d5094f69adc42d08bfb80864ae99dd5b09cb4fa6",
+    "packages/textbutler/src/javascript-tool.ts": "6ae01458d0eb16c44c5a5c06e7d4790245ed592cb0885d81c4f6a8d082a66ad7",
     "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
     "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
     "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
@@ -86,15 +86,15 @@
   },
   "review": {
     "artifact": "qualification/xcb-contact-personalities-review.json",
-    "sha256": "38dd89e1e031b86dddb94dd1e8c4874503023e48910a457d38f74ec78a617624",
+    "sha256": "6dfc47b57a2165ce96e59f009c9751826ec25ba1153143ab77ac3093eff4fda1",
     "kind": "independent-ai-source-review",
-    "result": "Independent read-only source review reports no remaining findings, including the final JavaScript worker abort/slot-release race and immediate/queued cancellation regressions."
+    "result": "Independent read-only follow-up review found no remaining queue or cancellation issues after the bounded admission change and test timeout adjustment."
   },
   "log": {
     "path": "qualification/xcb-textbutler-v1-current-check.log",
-    "bytes": 132031,
-    "sha256": "2eb91bdbabfc4c3a498e29679aac88639d5894dfe16b51e6e9466721a5791ba4",
-    "note": "Complete current successful HRA wrapper and bun run check output, including repository and package suites, standalone isolation/build, static checks, and chained TypeScript checks."
+    "bytes": 132025,
+    "sha256": "14b1a373a071862605f7c1b4ebd8cad20babc1e019c65316e395d5f3c176ad3e",
+    "note": "Complete successful HRA-scheduled bun run check output for the final source, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks. Scheduler telemetry records exit code 0 for textbutler-final-check-retry at 2026-09-24T15:27:26.542Z."
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",

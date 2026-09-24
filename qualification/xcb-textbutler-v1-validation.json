@@ -551,7 +551,7 @@
     "scope": "Historical baseline evidence captured before this memory refresh. Its earlier test and review references remain historical and do not claim current live verification."
   },
   "currentValidation": "qualification/xcb-textbutler-v1-current-validation.json",
-  "currentValidationSha256": "6e6b122e6b228392852d0289c1cd603b437f706ba183e5989da4e8e2c96b4f74",
+  "currentValidationSha256": "8157cc66280b838b3d3cfe9ccf749cb14206a51c909f93ec9d134c12c81b6d56",
   "historical": true,
   "historicalNote": "Historical TextButler memory-refresh validation. The current full repository validation is recorded at currentValidation."
 }

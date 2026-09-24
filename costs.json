@@ -13,7 +13,7 @@
     },
     "local:contact-javascript-tool": {
       "kind": "derived", "retention": "ephemeral", "source": "owner-enabled calculation request for one contact", "owner": "packages/textbutler/src/javascript-tool.ts",
-      "budget": { "activeWorkers": 1, "queuedWorkers": 4, "queueWaitMs": 1000, "codeBytes": 8192, "inputBytes": 16384, "outputBytes": 4096, "quickjsHeapBytes": 8388608, "stackBytes": 262144, "workerDeadlineMs": 250 },
+      "budget": { "activeWorkers": 1, "queuedWorkers": 16, "queueWaitMs": 5000, "codeBytes": 8192, "inputBytes": 16384, "outputBytes": 4096, "quickjsHeapBytes": 8388608, "stackBytes": 262144, "workerDeadlineMs": 250 },
       "note": "fresh QuickJS heap per calculation, no host APIs, modules, IO or credentials; watchdog requests worker termination and queue admission remains reserved until worker exit is confirmed"
     },
     "local:habitat-evidence": {
