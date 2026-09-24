@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test';
 import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
   deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, isSyntheticConsentRegion, routeTasks } from './browser-contract.mjs';
 
-test('the native matrix covers four separate surfaces, both themes and touch', () => {
+test('the native matrix covers six separate surfaces, both themes and touch', () => {
   const cases = browserCases();
-  expect(cases).toHaveLength(16);
-  expect(new Set(cases.map((item) => `${item.width}/${item.theme}${item.path}`)).size).toBe(16);
+  expect(cases).toHaveLength(24);
+  expect(new Set(cases.map((item) => `${item.width}/${item.theme}${item.path}`)).size).toBe(24);
 });
 
 test('media fixtures isolate host transparency while preserving theme and reduced motion', () => {
@@ -167,7 +167,7 @@ test('presentation admission rejects missing atoms, fallback fonts, collection a
     workspaceBackground: 'rgb(255, 253, 249)', frameBackground: 'rgb(255, 253, 249)',
     actionHeights: [42, 42, 42, 42, 42], actionRadii: ['12px'], fieldBackground: 'url("/grain.svg"), repeating-conic-gradient(from 45deg, red, transparent), radial-gradient(red, blue), linear-gradient(red, blue)', fieldBackgroundSize: '64px 64px, 24px 24px, 100% 100%, 100% 100%' };
   expect(() => assertPresentation(valid, sample)).not.toThrow();
-  for (const path of ['/docs', '/sources', '/preview']) {
+  for (const path of ['/docs', '/sources', '/preview', '/blog', '/blog/introducing-textbutler']) {
     const preview = path === '/preview';
     const document = { ...valid, preset: null, renderedFonts: [{ isCustomFont: true, glyphCount: 9, postScriptName: 'NebulaSans-Medium' }],
       forms: preview ? 0 : 8, appearanceControls: preview ? [] : valid.appearanceControls, headers: preview ? 0 : 1, footers: preview ? 0 : 1, askAi: preview ? 0 : 1 };

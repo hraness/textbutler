@@ -172,7 +172,7 @@ try {
     let primary;
     let verifiedCsp = false;
     let authoredAssets = [];
-    const name = `${sample.width}-${sample.theme}-${sample.path.slice(1) || 'home'}`;
+    const name = `${sample.width}-${sample.theme}-${sample.path.slice(1).replaceAll('/', '-') || 'home'}`;
     const unexpected = [];
     const failures = [];
     const failedRequests = [];

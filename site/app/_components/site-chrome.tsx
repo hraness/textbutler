@@ -55,6 +55,7 @@ export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
           { href: '/about', label: 'About' },
           { href: '/sources', label: 'Legacy history tools' },
           { href: '/docs', label: 'Docs' },
+          { href: '/blog', label: 'Blog' },
           { href: GITHUB_URL, label: 'GitHub' },
         ]}
         name="Textbutler"

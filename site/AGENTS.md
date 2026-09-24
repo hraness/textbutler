@@ -17,6 +17,9 @@ below until their reviewed publication-identity migration is complete.
 
 - `app/` – the public Textbutler project page, its legacy Message Like Me pages,
   metadata, and visual system.
+- `content/blog/` – blog post bodies in Markdown. Post metadata lives in
+  `app/_lib/blog-posts.ts` and each post's review record in
+  `app/_lib/blog-admissions.ts`; `bun run sync:readme` renders the bodies.
 - `public/` – finite site-wide images and browser assets.
 - `package.json`, `next.config.ts`, `postcss.config.mjs`, and `bun.lock` – the
   checked native Next.js build deployed from this directory to Vercel.
