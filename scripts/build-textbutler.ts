@@ -28,7 +28,7 @@ export async function buildTextbutler(options: { outdir?: string } = {}): Promis
   const desktopClient = join(desktopRoot, "dist/src/client.js");
   const inputs = new Map<string, string>([["package.json", sha256(packageBytes)], ["bun.lock", sha256(lockfile)], ["desktop-foundation/release-manifest.json", sha256(companionManifest)]]);
   for (const input of ["scripts/build-textbutler.ts", "scripts/textbutler-distribution.ts", "scripts/support-runtime-policy.ts", "scripts/xcb-integration-admission.ts", XCB_INTEGRATION_RECEIPT, "LICENSE", "docs/support-foundation-notice.md"]) inputs.set(input, sha256(await readFile(join(ROOT, input))));
-  const completePlugin: Bun.Plugin = { name: "textbutler-complete-local-artifact", setup(builder) {
+  const completePlugin: Bun.BunPlugin = { name: "textbutler-complete-local-artifact", setup(builder) {
       builder.onLoad({ filter: /\.(?:[cm]?js|[cm]?ts|tsx|json)$/u }, async args => {
         const path = resolve(args.path), label = relative(ROOT, path);
         if (label.startsWith("../") || label === "..") throw new Error("The Textbutler build tried to read outside its checkout.");

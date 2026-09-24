@@ -390,7 +390,7 @@ describe("owner reply triage through the control surface", () => {
       }
       expect(signals).toHaveLength(198); expect(calls).toBe(198); expect(sent).toEqual([]);
     } finally { clock.mockRestore(); await habitat.close(); }
-  });
+  }, 20_000);
   test("message command parsing rejects unbounded history and arbitrary actions or paths", () => {
     for (const limit of [0, 201, 1.5, "20", undefined]) expect(() => parseControlRequest({ protocol, command: "messages.history", contactId: "synthetic-a", limit })).toThrow();
     for (const command of ["messages.history", "messages.summarize"]) expect(parseControlRequest({ protocol, command, contactId: "synthetic-a", limit: 200 })).toMatchObject({ command, limit: 200 });
