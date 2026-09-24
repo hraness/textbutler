@@ -23,14 +23,14 @@ remain visible in setup and must be resolved before that claim is made.
 
 ## Interface direction
 
-XCB is a useful interaction reference: a clear status view, filtered pickers,
+xcb is a useful interaction reference: a clear status view, filtered pickers,
 contextual choices, complete review and clean cancellation. Textbutler follows
 that separation with a thin terminal client over its owner control protocol.
 All permission, account, contact, grant and dispatch checks remain in the daemon.
 
 The native menu already uses the shared Rust desktop foundation. A new Rust
 runtime is not required to make these controls usable. If the terminal grows
-into a full-screen workspace, XCB's Ratatui/Crossterm interface is an appropriate
+into a full-screen workspace, xcb's Ratatui/Crossterm interface is an appropriate
 reference. The subscription connection uses xcb's dedicated zero-tool `generate`
 contract. It does not use the workspace coding command or inherit its tools and
 sessions.

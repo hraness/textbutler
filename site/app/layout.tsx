@@ -9,6 +9,9 @@ import {
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_ORIGIN,
+  SITE_STATUS_LABEL,
+  SITE_TITLE,
+  SOCIAL_IMAGE_ALT,
 } from './_lib/site';
 import '@hraness/design-kit/fonts.css';
 import './globals.css';
@@ -18,7 +21,7 @@ const initialPalette = getDesignPaletteTheme('gruvbox', 'light');
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),
   title: {
-    default: 'Textbutler — Your personal message butler for Mac',
+    default: SITE_TITLE,
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
@@ -27,7 +30,7 @@ export const metadata: Metadata = {
   creator: SITE_NAME,
   publisher: SITE_NAME,
   category: 'developer tools',
-  keywords: ['Textbutler', 'Mac message assistant', 'personal message butler', 'coding agent', 'contact memory', 'Ghostget', 'iMessage', 'WhatsApp', 'Claude API'],
+  keywords: ['Textbutler', 'Mac message assistant', 'personal message butler', 'coding agent', 'contact memory', 'Ghostget', 'iMessage', 'WhatsApp'],
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [{ url: '/icon.png', type: 'image/png' }],
@@ -47,7 +50,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
-    title: 'Textbutler — Your personal message butler for Mac',
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     images: [
       {
@@ -55,17 +58,17 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: `${SITE_NAME} — your personal message butler for Mac.`,
+        alt: SOCIAL_IMAGE_ALT,
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Textbutler — Your personal message butler for Mac',
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     images: [{
       url: absoluteUrl('/opengraph-image'),
-      alt: `${SITE_NAME} — your personal message butler for Mac.`,
+      alt: SOCIAL_IMAGE_ALT,
     }],
   },
 };
@@ -123,7 +126,7 @@ const structuredData = {
       name: SITE_NAME,
       description: SITE_DESCRIPTION,
       codeRepository: GITHUB_URL,
-      creativeWorkStatus: 'In development; explicit messaging and agent setup required; CLI and menu companion',
+      creativeWorkStatus: SITE_STATUS_LABEL,
       programmingLanguage: 'TypeScript',
       runtimePlatform: 'Bun 1.3.14 or newer on macOS',
       license: 'https://opensource.org/license/mit',

@@ -1,7 +1,7 @@
-# Use TextButler from an agent
+# Use Textbutler from an agent
 
-TextButler's CLI returns JSON for conversation reads, summaries, drafts and
-sends. Run it as the signed-in Mac user with the TextButler daemon running.
+Textbutler's CLI returns JSON for conversation reads, summaries, drafts and
+sends. Run it as the signed-in Mac user with the Textbutler daemon running.
 Connect iMessage and your AI subscription using the [setup guide](getting-started.md).
 Explicit owner commands work while automatic replies are paused and the
 selected contact is disabled.
@@ -105,7 +105,7 @@ workspace. The daemon validates targets, capabilities and imported media.
 The current connector supports ordinary text and media on a Mac with the
 required permissions. Standard reactions, stickers, rich links and polls
 require its separately configured Messages bridge and the corresponding
-advertised capability. TextButler does not install that bridge or change macOS
+advertised capability. Textbutler does not install that bridge or change macOS
 security settings. Outgoing threaded reply targeting, App Clips and experiences
 are unsupported by the iMessage connector. The CLI does not turn a requested
 thread reply into an ordinary message. Incoming reply relationships remain

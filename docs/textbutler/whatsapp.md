@@ -8,7 +8,7 @@ credentials, synchronization and send implementation. Textbutler never runs
 ```mermaid
 flowchart LR
   App[Textbutler menu companion] --> Butler[Textbutler daemon]
-  Butler --> Agents[Agentrouter]
+  Butler --> Xcb[xcb]
   Butler --> Ghostget[Ghostget owner process]
   Ghostget --> Messages[iMessage helper]
   Ghostget --> WhatsApp[Pinned wacli linked device]

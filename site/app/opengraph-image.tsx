@@ -4,9 +4,9 @@ import {
   socialImageSize as size,
 } from "@hraness/web-discovery/social-image";
 
-import { SITE_DESCRIPTION, SITE_NAME } from "./_lib/site";
+import { SITE_DESCRIPTION, SITE_NAME, SOCIAL_IMAGE_ALT } from "./_lib/site";
 
-export const alt = `${SITE_NAME} — your personal message butler for Mac.`;
+export const alt = SOCIAL_IMAGE_ALT;
 export { contentType, size };
 
 function TextbutlerMark() {

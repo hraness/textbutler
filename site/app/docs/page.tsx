@@ -3,7 +3,7 @@ import { GITHUB_URL, pageMetadata } from '../_lib/site';
 import { readmeHtml } from '../readme.generated';
 
 const description =
-  'Start with the guided Textbutler terminal, connect messaging, and let your agent read, draft and answer selected conversations. The source CLI keeps AI replies unavailable; a verified installed bundle adds them through xcb. Legacy history contracts follow separately.';
+  'Set up Textbutler, connect your messaging apps, and let your coding agent draft and answer the chats you choose. Also covers the legacy Message Like Me tools.';
 
 export const metadata = pageMetadata({
   title: 'Documentation',
@@ -20,7 +20,7 @@ export default function DocsPage() {
       path="/docs"
       html={readmeHtml}
       sourceUrl={`${GITHUB_URL}/blob/main/README.md`}
-      dateModified="2026-09-19"
+      dateModified="2026-09-23"
       sourceOwnsHeading
     />
   );

@@ -57,14 +57,14 @@ export function DocumentPage({
         {sourceOwnsHeading ? (
           <div className="document-hero document-source-chrome">
             <p className="eyebrow">{eyebrow}</p>
-            <a href={sourceUrl}>View the checked source ↗</a>
+            <a href={sourceUrl}>View on GitHub ↗</a>
           </div>
         ) : (
           <header className="document-hero">
             <p className="eyebrow">{eyebrow}</p>
             <h1>{title}</h1>
             <p>{summary}</p>
-            <a href={sourceUrl}>View the checked source ↗</a>
+            <a href={sourceUrl}>View on GitHub ↗</a>
           </header>
         )}
         {legacyNote && <p className="legacy-note">{legacyNote}</p>}
