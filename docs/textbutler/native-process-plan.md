@@ -29,7 +29,7 @@ repository's layout. This change does not activate a provider backend.
   application work or turn the operation into success.
 - The existing contact task profile still requires `noCommandTools`, exact tool
   inventory, read/write isolation, isolated configuration, authentication outside
-  the workspace and `hostBrokerOnly`. Oompa's persistent coding session is a
+  the workspace and `hostBrokerOnly`. xcb's persistent coding session is a
   separate explicit profile. It cannot reuse the contact task policy unchanged.
 
 ## 1. Package-local process seam
@@ -186,7 +186,7 @@ admission and application factory wiring remain pending:
   confinement, relay and account-generation checks retain their existing owners.
 - Keep the current unqualified task paths unavailable until each exact runtime,
   configuration and effective tool inventory has relevant evidence. Add a
-  separate persistent coding profile for Oompa, with its own application
+  separate persistent coding profile for xcb, with its own application
   authority and lifecycle, rather than widening contact task capabilities.
 
 Acceptance requires migration of actual consumers and removal of replaced
