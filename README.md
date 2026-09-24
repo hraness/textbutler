@@ -2,37 +2,35 @@
 
 [![skills.sh](https://skills.sh/b/hraness/message-like-me)](https://skills.sh/hraness/message-like-me)
 
-Textbutler is a personal message butler for macOS. Connect your coding agent —
-a Claude Code or Codex subscription through
-[xcb](https://github.com/hraness/xcb) — and it reads selected iMessage,
-WhatsApp and Beeper conversations, keeps each contact's context in files you
-can read and edit, and answers when you let it: clearly disclosed and under
-your pause. A guided terminal and menu-bar companion keep setup, review and
-control on your Mac.
+Textbutler is a message butler for your Mac. Connect your coding agent, a
+Claude Code or Codex subscription through [xcb](https://github.com/hraness/xcb),
+and it reads the iMessage, WhatsApp, and Beeper conversations you choose, keeps
+each contact's context in files you can read and edit, and answers when you let
+it. The butler's own replies are marked by default, and you can pause it at any
+time. Its guided terminal and menu bar companion keep setup, review, and control
+on your Mac.
 
-**Current status: source pilot.** Messaging setup, conversation selection,
-private contact memory, inbox review and replies you write yourself are
-implemented, and automatic replies are verified working end-to-end on iMessage
-on the reference install. AI replies require a verified Textbutler bundle with reviewed
-composition admission and connect to a separately installed
-[xcb](https://github.com/hraness/xcb) native runtime with an explicit subscription
-account and model. Textbutler is an MIT-licensed reference application for xcb's
-zero-tool generation API; xcb keeps provider credentials and custody. Account
-setup, current runtime admission and live verification on your chosen messaging
-account and recipient are required before relying on automatic replies. See the
-[subscription guide](docs/textbutler/native-subscription.md).
+**Status:** In development. Textbutler runs from source on a Mac; there is no
+app to download and no published Textbutler package. Without an AI account you
+can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox,
+and send replies you write yourself. AI replies also need a local build of
+Textbutler and a Claude Code or Codex subscription connected through
+[xcb](https://github.com/hraness/xcb). Automatic replies have worked end to end
+over iMessage in testing by the developer. Try them on your own account,
+especially over WhatsApp or Beeper, before you rely on them.
 
 Start with the [guided setup](docs/textbutler/getting-started.md) and
 [messaging app support](docs/textbutler/messaging-apps.md). Beeper can connect
-apps such as Signal, Telegram and Instagram through Ghostget's current text
-automation adapter. Its linked apps and account permissions determine what is
-available. The [architecture](docs/textbutler/architecture.md) records the
-runtime boundaries and remaining qualification work.
+apps such as Signal, Telegram, and Instagram through Ghostget, for text only;
+its linked apps and account permissions decide what is available. The
+[subscription guide](docs/textbutler/native-subscription.md) covers AI replies,
+and the [architecture](docs/textbutler/architecture.md) describes how the parts
+fit together and what still needs live testing.
 
 Agents can use the [JSON CLI](docs/textbutler/agent-cli.md) to list
 conversations, read and summarize history, prepare text or media drafts, and
-send an explicitly authorized message — the same staged actions the butler uses
-on its own. Each connection reports its available actions.
+send an explicitly authorized message, using the same staged actions the butler
+uses on its own. Each connection reports its available actions.
 
 ## Open the guided terminal
 
@@ -51,12 +49,16 @@ contacts have automatic replies off. Setup and conversation selection never
 send a message.
 
 For AI replies, build and install with `bun run textbutler:install`, then run
-`~/.local/bin/textbutler`. The builder requires the reviewed composition receipt
-to match current source bytes and both contact capability profiles. A source
-daemon has no embedded composition admission and cannot enable subscription
-inference. Source commands remain useful for setup and manual reply controls.
+`~/.local/bin/textbutler`. The installer refuses to build unless the source
+files it checks and both contact permission profiles match the reviewed record
+in `qualification/`. Running from source never writes AI replies; source
+commands handle setup and the replies you write yourself. xcb keeps your AI
+sign-in, and the model gets no tools of its own. Before you rely on automatic
+replies, finish account setup and test with a recipient you trust on the
+messaging account you'll use.
 
-Textbutler's source is MIT licensed and its new packages remain unpublished.
+Textbutler's source is MIT licensed, and it also serves as an example app for
+developers building on xcb's generation API. Its new packages are unpublished.
 The published Message Like Me package documented below installs the legacy
 history tools, not Textbutler. The website at
 [textbutler.app](https://textbutler.app) is informational and receives no private
@@ -64,9 +66,9 @@ messages or contact folders.
 
 ## Run the Textbutler menu companion
 
-The native companion downloads and verifies a pinned prebuilt
-desktop-foundation runner on first start. No local Rust build is needed. Start
-it from the terminal's **Menu bar companion** action or run:
+On first start, the menu bar companion downloads a prebuilt desktop-foundation
+runner and checks it against a pinned hash, so you don't need a local Rust
+build. Start it from the terminal's **Menu bar companion** action or run:
 
 ```sh
 bun run textbutler menubar start
@@ -126,9 +128,10 @@ sends plain text. The review shows the actual outgoing text. The send journal
 retains provider acceptance IDs when available; see the messaging guide for
 connection-specific attribution and delivery limits.
 
-Automatic replies remain a separate choice: they require a qualified agent,
-a ready messaging connection, explicit contact activation and global resume.
-Keep them paused until those requirements and the relevant live checks pass.
+Automatic replies are a separate step. They need an AI account that passes
+`providers check`, a working messaging connection, the contact turned on with
+`contacts enable`, and the butler resumed with `resume`. Leave them paused until
+all of that works and you've tested with a real recipient.
 
 ## Legacy Message Like Me history tools
 
@@ -915,8 +918,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change.
 The canonical repository is
 [`hraness/textbutler`](https://github.com/hraness/textbutler).
 The informational project page is
-[`messagelikeme.com`](https://messagelikeme.com). The CLI does not connect to
-the site, and the site never receives message or contact data.
+[textbutler.app](https://textbutler.app). The CLI does not connect to the site,
+and the site never receives message or contact data.
 
 ## License
 

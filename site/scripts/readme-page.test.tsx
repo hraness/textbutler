@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import DocsPage from '../app/docs/page.tsx';
 import MethodologyPage from '../app/methodology/page.tsx';
 import ResearchPage from '../app/research/page.tsx';
+import { SITE_STATUS } from '../app/_lib/site.ts';
+
+const text = (html: string) => html.replace(/<\/?(?:a|code|em|strong)\b[^>]*>/gu, '').replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ');
 
 test('renders the complete README with one source-owned heading and working anchors', async () => {
   const html = renderToStaticMarkup(<DocsPage />);
@@ -24,7 +27,7 @@ test('renders the complete README with one source-owned heading and working anch
     'Message Like Me receives no provider credentials, never calls Ghostget or a Beeper operation, and never sends',
   );
   expect(html).toContain('"headline":"Textbutler"');
-  expect(html).toContain('"dateModified":"2026-09-19"');
+  expect(html).toContain('"dateModified":"2026-09-23"');
   expect(css).toContain('.readme-prose img { height: auto; max-width: 100%; }');
 });
 
@@ -33,11 +36,13 @@ test('puts guided setup and complete draft review before the legacy installation
   expect(html).toContain('<h2 id="open-the-guided-terminal">Open the guided terminal</h2>');
   expect(html).toContain('bun run textbutler tui');
   expect(html).toContain('docs/textbutler/getting-started.md');
-  expect(html).toContain('source pilot');
-  expect(html).toContain('verified Textbutler bundle with reviewed');
-  expect(html).toContain('composition admission and connect to a separately installed');
+  // README.md repeats SITE_STATUS word for word, so the site and the README
+  // state one development status.
+  expect(text(html)).toContain(SITE_STATUS.replace(/\s+/gu, ' '));
+  expect(html).toContain('bun run textbutler:install');
   expect(html).toContain('href="https://github.com/hraness/xcb"');
-  expect(html).toMatch(/source\s+daemon has no embedded composition admission and cannot enable subscription\s+inference/u);
+  expect(text(html)).toContain('Running from source never writes AI replies');
+  expect(text(html)).toContain('match the reviewed record in qualification/');
   expect(html).toContain('bun run textbutler replies show DRAFT');
   expect(html).toContain('bun run textbutler replies send DRAFT DIGEST');
   expect(html.indexOf('id="open-the-guided-terminal"')).toBeLessThan(html.indexOf('id="install-and-first-run"'));
@@ -52,6 +57,6 @@ test.each([
   expect(/<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1]).toBe(heading);
   expect(html).toContain(`"headline":"${heading}"`);
   expect(html).toContain('"dateModified":"2026-08-27"');
-  expect(html).toContain('This is legacy Message Like Me research');
-  expect(html).toContain('does not document the new daemon’s live messaging capabilities');
+  expect(html).toContain('This page comes from Message Like Me, Textbutler’s predecessor.');
+  expect(html).toContain('not Textbutler’s live messaging');
 });

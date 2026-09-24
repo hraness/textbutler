@@ -63,7 +63,8 @@ notarization remain outside this local installation scope.
   and the separately admitted production-ref writer.
 - `README.md`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, and `LICENSE` –
   standalone public documentation, release history, policy, and terms.
-- `STYLE.md` – the public and reader-facing prose contract.
+- `STYLE.md` and `WRITING.md` – the public prose and internal writing guides,
+  synced from hraness/.github.
 - `package.json`, `tsconfig.json`, and `bun.lock` – Bun package, build, and
   verification configuration.
 
@@ -71,9 +72,11 @@ notarization remain outside this local installation scope.
 
 - Use Bun 1.3.14 and run `bun run check` before handing off a change. Do not add
   another package manager or lockfile.
-- Keep the public description exact: “A local-first CLI and Agent Skill for
-  studying private messaging history and drafting messages that sound like
-  you.”
+- Keep the legacy `@hraness/message-like-me` package description exact: “A
+  local-first CLI and Agent Skill for studying private messaging history and
+  drafting messages that sound like you.” It describes the published history
+  tools, not Textbutler; take Textbutler's own description from the portfolio
+  registry and its status from `SITE_STATUS` in `site/app/_lib/site.ts`.
 - Follow `STYLE.md` for public site, documentation, README, release, and
   Agent Skill prose.
 - Follow the shared [Hraness README guidelines](https://github.com/hraness/.github/blob/main/README_GUIDELINES.md).
@@ -128,8 +131,8 @@ notarization remain outside this local installation scope.
   `message-like-me`, and the Agent Skill name `message-like-me`. The canonical
   GitHub repository is `hraness/textbutler` with unchanged numeric ID
   `1342143606`; follow the version-neutral identity migration in the publishing
-  runbook. Treat `messagelikeme.com` as an informational project page, never as
-  a data plane.
+  runbook. Treat `textbutler.app` as an informational project page, never as
+  a data plane; `messagelikeme.com` redirects there.
 - Keep CLI commands namespaced as `ingest imessage|x-archive|contacts|bundle`,
   `sources list|show`,
   `contacts list|show|resolve`,
@@ -234,6 +237,13 @@ notarization remain outside this local installation scope.
   App-authored terminal `error`; it never moves a ref or creates restart
   authority. Require owner-admin before/after proof of empty ruleset bypasses,
   and treat every incomplete cleanup receipt as continued quarantine.
+
+<!-- hraness-public-copy:start -->
+- Public copy (websites, READMEs, docs, package and GitHub descriptions, CLI help, `llms.txt`, generated pages) follows `STYLE.md`, synced from hraness/.github. Text a model writes for publication also follows `GENERATION_STYLE.md`.
+- The delivery vocabulary in this file (admission, qualification, custody, receipt, bounded, lane, gate, surface, projection) is internal. Translate it into what the reader gets.
+- Take one-line product and sibling descriptions from the portfolio registry and versions from the release record. Tests pin facts, not prose.
+- Run `bun run check:copy` before handoff when the repository has it.
+<!-- hraness-public-copy:end -->
 
 <!-- oompa-local-efficiency:start -->
 - Treat the user's request to change this repository as standing authorization for routine task-owned commits, pushes, pull requests, merges, releases, deployments, and production verification after the gates applicable to that action pass. Do not ask for duplicate confirmation. Build confidence through relevant automated checks, bounded diagnostics, and independent review, not another human approval. Passing checks does not expand task scope or authority.

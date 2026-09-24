@@ -1,15 +1,16 @@
 # Start using Textbutler
 
-Textbutler is a local Mac assistant for selected conversations. Start with its
-inbox and replies you write yourself. Automatic replies stay paused until you
-choose a ready agent and explicitly enable a contact.
+Textbutler is a message assistant for the conversations you choose on your Mac.
+Start with its inbox and replies you write yourself. Automatic replies stay
+paused until you choose a ready agent account, turn them on for a contact, and
+resume the butler.
 
-AI replies require a verified Textbutler bundle with reviewed composition
-admission and use a separately installed [xcb](https://github.com/hraness/xcb)
-native runtime and an explicitly connected subscription account. This local
-pilot requires current xcb admission and a successful account check. Installation
-does not enable replies, and live messaging still needs verification with your
-chosen recipient. Claude API retains a separate trusted runtime admission gate.
+AI replies need a local build of Textbutler and a Claude Code or Codex
+subscription connected through [xcb](https://github.com/hraness/xcb). The account
+also has to pass `providers check`. Installing doesn't turn replies on, and you
+should test live messaging with a recipient you trust. The Claude API route
+needs a separately reviewed runtime that neither the source checkout nor the
+local build supplies.
 
 ## Open the guided terminal
 
@@ -27,11 +28,11 @@ bun run textbutler:install
 ~/.local/bin/textbutler
 ```
 
-The installer builds a self-contained local pilot, checks the reviewed
-composition receipt against current source and contact profiles, and verifies
-its contents and exact Bun runtime before use. Missing or stale composition
-evidence blocks the build. Source daemon startup carries no such admission and
-keeps subscription inference unavailable. It starts no services and connects no accounts.
+The installer builds a self-contained local copy, checks your source files and
+both contact permission profiles against the reviewed record in
+`qualification/`, and verifies its contents and exact Bun runtime before use. If
+the source doesn't match the reviewed record, the build stops. A daemon started
+from source never runs AI replies. The installer starts no services and connects no accounts.
 An existing, different `textbutler` command is preserved. This is a local build,
 not a signed public release. Connect xcb separately for AI replies. Keep the same
 Bun runtime installed. To upgrade a verified existing installation, stop its
@@ -100,9 +101,9 @@ source service is installed.
 See [messaging app support](messaging-apps.md) for Beeper limitations and native
 alternatives, including requirements that affect Telegram AI processing.
 
-## Give TextButler access to iMessage
+## Give Textbutler access to iMessage
 
-Use the native app when you want macOS Full Disk Access to belong to TextButler.
+Use the native app when you want macOS Full Disk Access to belong to `TextButler.app`.
 The app supervises its pinned runtime and background service. Build it from an
 already installed, verified payload on your Mac:
 

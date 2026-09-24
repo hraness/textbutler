@@ -9,6 +9,7 @@ import {
   WHATSAPP_COMPATIBILITY,
 } from '../_lib/sources';
 import {
+  GETTING_STARTED_URL,
   GITHUB_URL,
   pageMetadata,
   SOFTWARE_VERSION,
@@ -17,7 +18,7 @@ import {
 export const metadata = pageMetadata({
   title: 'Legacy history sources',
   description:
-    'Legacy Message Like Me history-reader inputs: the exact Apple Messages, X archive, Beeper, native WhatsApp, and macOS Contacts inputs supported by Message Like Me.',
+    'The message histories that Message Like Me, Textbutler’s predecessor, can import, and the tool and format versions each history reader accepts.',
   path: '/sources',
 });
 
@@ -50,7 +51,7 @@ export default function SourcesPage() {
       <main className="document-page sources-page" id="main-content" tabIndex={-1}>
         <header className="document-hero sources-hero">
           <h1>Legacy history sources</h1>
-          <p className="legacy-note">These are the published Message Like Me history readers. Their import capabilities are separate from Textbutler’s planned live Messages transport, which remains disabled pending qualification.</p>
+          <p className="legacy-note">These are the published Message Like Me history readers. They only import old messages and are separate from Textbutler’s live iMessage, WhatsApp, and Beeper connections, which the <a href={GETTING_STARTED_URL}>setup guide</a> covers.</p>
           <p>
             Message Like Me supports {MESSAGING_HISTORY_SOURCES.length} messaging-history
             inputs and one optional Contacts enrichment source. The messaging inputs
@@ -65,8 +66,8 @@ export default function SourcesPage() {
             <p className="eyebrow">Legacy reader support in v{SOFTWARE_VERSION}</p>
             <h2 id="source-directory-title">The source is part of the evidence.</h2>
             <p>
-              These labels describe observed inputs—not account connections, complete
-              histories, or permission to operate a messaging service.
+              “Supported” means Message Like Me can import that source. It doesn’t
+              connect to the account, promise a complete history, or send anything.
             </p>
           </div>
           <div className="source-grid source-grid-full">
