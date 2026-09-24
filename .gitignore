@@ -21,3 +21,6 @@ site/.browser-artifacts/
 *.ensoul-source.json
 *.person-model.json
 /.message-like-me/
+
+# Generated same-origin appearance bootstrap.
+/site/public/theme-bootstrap.js

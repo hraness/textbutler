@@ -25,12 +25,21 @@ export function isSyntheticBadge(request) {
     && request.method === 'GET' && request.resourceType === 'image';
 }
 
+// The shared footer asks this public endpoint whether its consent control is
+// required. Offline checks supply a declared response; no account call escapes.
+export function isSyntheticConsentRegion(request) {
+  return request.url === 'https://account.hraness.com/api/consent/region'
+    && request.method === 'GET' && request.resourceType === 'fetch'
+    && request.cookie === undefined && request.authorization === undefined
+    && request.body === null;
+}
+
 export function isPreviewPolicyBlock(request, { path, origin, verifiedCsp, authoredAssets }) {
   if (path !== '/preview' || !verifiedCsp || !request.mainFrame || request.method !== 'GET' || request.error !== 'csp'
     || !authoredAssets.includes(request.url)) return false;
   const url = new URL(request.url);
   if (url.origin !== origin || url.search || url.hash) return false;
-  return (request.resourceType === 'script' && /^\/_next\/static\/chunks\/[\w./-]+\.js$/u.test(url.pathname))
+  return (request.resourceType === 'script' && (/^\/_next\/static\/chunks\/[\w./-]+\.js$/u.test(url.pathname) || url.pathname === '/theme-bootstrap.js'))
     || (['manifest', 'other'].includes(request.resourceType) && url.pathname === '/manifest.webmanifest');
 }
 
@@ -124,11 +133,24 @@ export function browserOwner({ launch, close, stopServer }) {
 
 export function assertPresentation(value, sample) {
   assert.equal(value.paper, 'paper');
-  assert.equal(value.background, sample.theme === 'light' ? 'rgb(248, 247, 244)' : 'rgb(18, 16, 15)');
+  assert.equal(value.background, sample.theme === 'light' ? 'rgb(251, 241, 199)' : 'rgb(40, 40, 40)');
   assert.match(value.bodyFont, /Nebula Sans/u);
   assert.equal(value.coarse, sample.width < 500);
   assert.ok(value.overflow <= 1, `Horizontal overflow: ${value.overflow}px`);
-  assert.equal(value.forms, 0, 'The informational site must not collect private data.');
+  const controls = value.appearanceControls;
+  assert.ok(Array.isArray(controls));
+  assert.equal(value.forms, controls.length, 'Only finite appearance radios may be present; no data collection fields.');
+  assert.equal(controls.length, sample.path === '/preview' ? 0 : 8);
+  if (controls.length) {
+    const palettes = controls.filter(control => control.legend === 'Theme');
+    const modes = controls.filter(control => control.legend === 'Appearance');
+    assert.deepEqual(palettes.map(control => control.value).sort(), ['catppuccin', 'gruvbox', 'paper', 'rose-pine', 'tokyo-night']);
+    assert.deepEqual(modes.map(control => control.value).sort(), ['dark', 'light', 'system']);
+    assert.ok(palettes.every(control => control.name === palettes[0].name));
+    assert.ok(modes.every(control => control.name === modes[0].name));
+    assert.match(palettes[0].name, /^.+-palette$/u);
+    assert.equal(modes[0].name, palettes[0].name.replace(/-palette$/u, '-mode'));
+  }
   assert.equal(value.footers, sample.path === '/preview' ? 0 : 1);
   assert.equal(value.headers, sample.path === '/preview' ? 0 : 1);
   assert.equal(value.askAi, sample.path === '/preview' ? 0 : 1);
@@ -137,22 +159,22 @@ export function assertPresentation(value, sample) {
   }
   for (const weight of ['400', '500', '600', '700']) assert.ok(value.fontWeights.includes(weight), `Nebula Sans ${weight} missing.`);
   assert.equal(value.preset, sample.path === '/' ? 'editorial' : null);
-  assert.equal(value.material, sample.path === '/' ? 'lantern' : null);
+  assert.equal(value.material, 'lantern');
   const expectedFont = sample.path === '/' ? /InstrumentSerif/iu : /Nebula/iu;
   assert.ok(value.renderedFonts.some((font) => font.isCustomFont && font.glyphCount > 0
     && expectedFont.test(font.postScriptName || font.familyName)), 'The heading rendered with a fallback font.');
   if (sample.path === '/') {
-    const h1Size = Math.min(64, Math.max(44, sample.width * 0.051));
+    const h1Size = Math.min(88, Math.max(48, 33.6 + sample.width * 0.042));
     assert.ok(Math.abs(value.headingSize - h1Size) < 0.1, `Editorial H1 size: ${value.headingSize}px`);
-    assert.ok(Math.abs(value.headingLeading - h1Size * 1.06) < 0.1, `Editorial H1 leading: ${value.headingLeading}px`);
+    assert.ok(Math.abs(value.headingLeading - h1Size * 1.02) < 0.1, `Editorial H1 leading: ${value.headingLeading}px`);
     assert.ok(Math.abs(value.headingTracking + h1Size * 0.025) < 0.01);
     assert.equal(value.headingWeight, '400');
-    assert.equal(value.headerMinHeight, '72px');
+    assert.equal(value.headerMinHeight, '52px');
     assert.equal(value.headerWidth, Math.min(1216, sample.width));
     assert.equal(value.gutter, sample.width < 761 ? '20px' : '32px');
-    assert.deepEqual(value.heroPadding, sample.width < 761 ? ['44px', '72px'] : ['56px', '64px']);
-    const h2Size = Math.min(52, Math.max(38.4, sample.width * 0.04));
-    assert.equal(value.sections.length, 7);
+    assert.deepEqual(value.heroPadding, sample.width < 761 ? ['56px', '72px'] : [String(Math.min(112, Math.max(64, sample.width * .08))) + 'px', String(Math.min(128, Math.max(72, sample.width * .09))) + 'px']);
+    const h2Size = Math.min(56, Math.max(34, 23.2 + sample.width * 0.026));
+    assert.equal(value.sections.length, 9);
     for (const section of value.sections) {
       assert.match(section.font, /Instrument Serif/u);
       assert.equal(section.weight, '400');
@@ -160,19 +182,19 @@ export function assertPresentation(value, sample) {
       assert.ok(Math.abs(section.leading - h2Size * 1.08) < 0.1);
       assert.ok(Math.abs(section.tracking + h2Size * 0.02) < 0.01);
     }
-    assert.equal(value.summarySize, sample.width < 761 ? 16 : 17);
-    assert.ok(Math.abs(value.summaryLeading - value.summarySize * 1.6) < 0.1);
+    assert.equal(value.summarySize, sample.width < 761 ? 16 : Math.min(20, Math.max(17, 16 + sample.width * .0035)));
+    assert.ok(Math.abs(value.summaryLeading - value.summarySize * 1.65) < 0.1);
     assert.equal(value.workspaceInk, value.bodyInk, 'The Paper file tree must not inherit inverse-surface ink.');
     assert.notEqual(value.workspaceBackground, 'rgba(0, 0, 0, 0)');
     assert.notEqual(value.frameBackground, 'rgba(0, 0, 0, 0)');
     assert.ok(value.actionHeights.length >= 5, 'The header, hero and closing actions must all remain styled.');
     assert.ok(value.actionHeights.every((height) => height >= (sample.width < 500 ? 44 : 42)));
-    assert.ok(value.actionRadii.every((radius) => radius === '8px'), 'Material controls retain their shared 8px radius.');
+    assert.ok(value.actionRadii.every((radius) => radius === '12px'), 'Material controls retain their shared 12px radius.');
     assert.equal(value.headerBackdrop, 'blur(20px) saturate(1.1)');
-    assert.equal((value.fieldBackground.match(/gradient\(/gu) ?? []).length, 2);
-    assert.equal((value.fieldBackground.match(/url\(/gu) ?? []).length, 2);
-    assert.ok(!value.fieldBackground.includes('repeating-linear-gradient('), 'Wall seams come from the shaded cells.');
-    const tile = sample.width < 761 ? 576 : 768;
-    assert.equal(value.fieldBackgroundSize, `64px 64px, ${tile}px ${tile}px, 100% 100%, 100% 100%`);
+    assert.equal((value.fieldBackground.match(/gradient\(/gu) ?? []).length, 3);
+    assert.equal((value.fieldBackground.match(/url\(/gu) ?? []).length, 1);
+    assert.ok(value.fieldBackground.includes('repeating-conic-gradient(from 45deg,'), 'The Gruvbox field uses the shared weave.');
+    assert.ok(!value.fieldBackground.includes('repeating-linear-gradient('));
+    assert.equal(value.fieldBackgroundSize, '64px 64px, 24px 24px, 100% 100%, 100% 100%');
   }
 }

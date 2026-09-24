@@ -11,6 +11,7 @@ import {
 } from '@hraness/design-kit/react/server';
 import Link from 'next/link';
 
+import { ConversationField } from './_components/conversation-field';
 import { SiteFooter, SiteHeader } from './_components/site-chrome';
 import {
   ARCHITECTURE_URL,
@@ -124,6 +125,7 @@ export default function Home() {
         <MarketingPage className="mlm-page textbutler-page">
           <div className="hraness-material-wall">
           <ProductHero
+            backdrop={<ConversationField />}
             actions={[{ href: '#development', label: 'See what’s ready' }, { href: GETTING_STARTED_URL, label: 'Start guided setup' }]}
             boundary={HERO_FOOTNOTE}
             className="mlm-marketing-hero"
