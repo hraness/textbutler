@@ -9,7 +9,7 @@ export const SITE_DESCRIPTION =
 // status; README.md repeats it word for word and a site test keeps them equal.
 export const SITE_STATUS_LABEL = 'In development';
 export const SITE_STATUS =
-  `${SITE_STATUS_LABEL}. Textbutler runs from source on a Mac; there is no app to download and no published Textbutler package. Without an AI account you can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox, and send replies you write yourself. AI replies also need a local build of Textbutler and a Claude Code or Codex subscription connected through xcb. Automatic replies have worked end to end over iMessage on the reference install; test them on your own account before you rely on them.`;
+  `${SITE_STATUS_LABEL}. Textbutler runs from source on a Mac; there is no app to download and no published Textbutler package. Without an AI account you can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox, and send replies you write yourself. AI replies also need a local build of Textbutler and a Claude Code or Codex subscription connected through xcb. Automatic replies have worked end to end over iMessage in testing by the developer. Try them on your own account, especially over WhatsApp or Beeper, before you rely on them.`;
 export const SOCIAL_IMAGE_ALT = 'The Textbutler mark and the words “Your personal message butler for Mac” on a light card.';
 export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;

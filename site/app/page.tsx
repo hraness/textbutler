@@ -186,7 +186,7 @@ export default function Home() {
           </MarketingSection>
 
           <MarketingQuestionList className="mlm-marketing-questions" heading="A few things to know" headingId="questions-title" id="questions" label="" questions={HOME_QUESTIONS.map(({ answer, question }) => ({ answer: <p>{answer}</p>, question }))} />
-          <MarketingRelated heading="From the same workshop" headingId="related-title" label="Related" summary="Each Hraness product owns one private domain and gives your agent the same kind of access: local, bounded, and inspectable." groups={[
+          <MarketingRelated heading="From the same workshop" headingId="related-title" label="Related" summary="Each Hraness product owns one private domain and gives your agent the same kind of access: local, limited, and open to inspection." groups={[
             {
               heading: "The personal apps",
               headingId: "related-apps",
@@ -195,13 +195,13 @@ export default function Home() {
                   name: "PeopleBlade",
                   href: "https://peopleblade.com",
                   role: "A private contact book for you and your agent",
-                  relationship: "Textbutler drafts what you'd say; PeopleBlade keeps who they are — a unified local book with notes, history, and reviewable identity.",
+                  relationship: "Textbutler drafts what you'd say, and PeopleBlade keeps track of who each person is, in one local contact book with notes, history, and identity details you can review.",
                 },
                 {
                   name: "Soulscrape",
                   href: "https://soulscrape.com",
                   role: "A dated, cited dossier on a person",
-                  relationship: "When a reply needs more than memory, a Soulscrape dossier gives the conversation a cited, bounded model of the person.",
+                  relationship: "When a reply needs more than memory, a Soulscrape dossier gives the conversation a cited profile of the person.",
                 },
                 {
                   name: "Wordcell",
@@ -214,13 +214,13 @@ export default function Home() {
             {
               heading: "The agent platform",
               headingId: "related-tools",
-              summary: "The layer your agent runs through — sessions, accounts, web reads, and the models behind them.",
+              summary: "The tools your agent runs through, covering sessions, accounts, web reads, and the models behind them.",
               items: [
                 {
                   name: "Ghostget",
                   href: "https://ghostget.com",
-                  role: "A bounded bridge to provider data",
-                  relationship: "Ghostget gives an agent bounded, attested reads on the accounts and pages a draft might reference — never a driven browser.",
+                  role: "A bridge between your agent and your accounts",
+                  relationship: "Ghostget connects Textbutler to iMessage, WhatsApp, and Beeper, and gives an agent limited reads of the accounts and pages a draft might reference.",
                 },
                 {
                   name: "Gobstopper",
@@ -232,13 +232,13 @@ export default function Home() {
                   name: "xcb",
                   href: "https://xcb.sh",
                   role: "A metaharness for agent subscriptions",
-                  relationship: "xcb runs the agents the butler hands drafts to — one workspace with account custody and visible token spend.",
+                  relationship: "xcb runs the agents the butler hands drafts to, in one workspace that keeps your account sign-ins and shows token spend.",
                 },
                 {
                   name: "Aicharts",
                   href: "https://aicharts.io",
                   role: "AI model benchmarks and usage inspection",
-                  relationship: "Aicharts compares the models your drafts run on — and shows what a reply actually cost.",
+                  relationship: "Aicharts compares the models your drafts run on and shows what a reply cost.",
                 },
               ],
             },

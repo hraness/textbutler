@@ -16,8 +16,8 @@ can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox,
 and send replies you write yourself. AI replies also need a local build of
 Textbutler and a Claude Code or Codex subscription connected through
 [xcb](https://github.com/hraness/xcb). Automatic replies have worked end to end
-over iMessage on the reference install; test them on your own account before
-you rely on them.
+over iMessage in testing by the developer. Try them on your own account,
+especially over WhatsApp or Beeper, before you rely on them.
 
 Start with the [guided setup](docs/textbutler/getting-started.md) and
 [messaging app support](docs/textbutler/messaging-apps.md). Beeper can connect
