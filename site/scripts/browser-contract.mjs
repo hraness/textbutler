@@ -150,7 +150,7 @@ export function assertPresentation(value, sample) {
   }
   for (const weight of ['400', '500', '600', '700']) assert.ok(value.fontWeights.includes(weight), `Nebula Sans ${weight} missing.`);
   assert.equal(value.preset, sample.path === '/' ? 'editorial' : null);
-  assert.equal(value.material, sample.path === '/' ? 'lantern' : null);
+  assert.equal(value.material, 'lantern');
   const expectedFont = sample.path === '/' ? /InstrumentSerif/iu : /Nebula/iu;
   assert.ok(value.renderedFonts.some((font) => font.isCustomFont && font.glyphCount > 0
     && expectedFont.test(font.postScriptName || font.familyName)), 'The heading rendered with a fallback font.');

@@ -155,6 +155,13 @@ test('presentation admission rejects missing atoms, fallback fonts, collection a
     workspaceBackground: 'rgb(255, 253, 249)', frameBackground: 'rgb(255, 253, 249)',
     actionHeights: [42, 42, 42, 42, 42], actionRadii: ['12px'], fieldBackground: 'url("/grain.svg"), repeating-conic-gradient(from 45deg, red, transparent), radial-gradient(red, blue), linear-gradient(red, blue)', fieldBackgroundSize: '64px 64px, 24px 24px, 100% 100%, 100% 100%' };
   expect(() => assertPresentation(valid, sample)).not.toThrow();
+  for (const path of ['/docs', '/sources', '/preview']) {
+    const preview = path === '/preview';
+    const document = { ...valid, preset: null, renderedFonts: [{ isCustomFont: true, glyphCount: 9, postScriptName: 'NebulaSans-Medium' }],
+      forms: preview ? 0 : 8, appearanceControls: preview ? [] : valid.appearanceControls, headers: preview ? 0 : 1, footers: preview ? 0 : 1, askAi: preview ? 0 : 1 };
+    expect(() => assertPresentation(document, { ...sample, path })).not.toThrow();
+    expect(() => assertPresentation({ ...document, material: null }, { ...sample, path })).toThrow();
+  }
   for (const change of [{ layers: [] }, { renderedFonts: [] }, { fontWeights: [] }, { forms: 9 }, { appearanceControls: [] }, { appearanceControls: valid.appearanceControls.map((control, index) => index === 0 ? {...control, value: 'email'} : control) },
     { appearanceControls: valid.appearanceControls.map((control, index) => index === 0 ? {...control, name: 'contact'} : control) },
     { appearanceControls: valid.appearanceControls.map((control, index) => index === 0 ? {...control, legend: 'Private data'} : control) },
