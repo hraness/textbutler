@@ -7,16 +7,16 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
-  deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
+  deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, isSyntheticConsentRegion, routeTasks } from './browser-contract.mjs';
 
 // This gate serves only the built informational website. It never runs the CLI,
 // Mac application, messaging providers, account checks, or personal-data readers.
 
-// Immutable design-kit v0.8.0 assets, checked independently of the current build.
+// Reviewed design-kit source d38d13c07d7956d02ddfbca8d32aa2066d88fbd3 assets,
+// checked independently of the current build.
 async function assertWallAssets(context, background, origin) {
   const expected = [
     ['grain', 152319, 'b40c33a0e382c8e9d0518b4720321b5c262a929c28d40a190a902d07acd06553'],
-    ['cells', 17102, 'be9b12eefeae91772f024ed24ccda5be6173fb626921374b7e5270c298611b01'],
   ];
   const urls = [...background.matchAll(/url\("([^"]+)"\)/gu)].map(match => new URL(match[1], origin));
   assert.equal(urls.length, expected.length);
@@ -184,12 +184,24 @@ try {
     try {
       const assets = new Set();
       item.syntheticAssets = [];
+      item.syntheticConsent = [];
+      item.consoleErrors = [];
+      item.cspViolations = [];
+      await context.exposeBinding('__textbutlerCsp', (_source, event) => item.cspViolations.push(event));
+      await context.addInitScript(() => document.addEventListener('securitypolicyviolation', event => {
+        void globalThis.__textbutlerCsp({ uri: event.blockedURI, directive: event.effectiveDirective });
+      }));
       await deadline(context.route('**/*', (route) => routes.run(async () => {
         const request = route.request();
         const url = new URL(request.url());
+        const headers = await request.allHeaders();
         if (isSyntheticBadge({ url: request.url(), method: request.method(), resourceType: request.resourceType() })) {
           item.syntheticAssets.push('Repository fixture: README skills.sh badge (no external request).');
           await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: badgeFixture });
+        } else if (isSyntheticConsentRegion({ url: request.url(), method: request.method(), resourceType: request.resourceType(),
+          cookie: headers.cookie, authorization: headers.authorization, body: request.postData() })) {
+          item.syntheticConsent.push({ url: request.url(), method: request.method(), body: { required: true } });
+          await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': origin }, body: '{"required":true}' });
         } else if ((url.origin === origin || ['data:', 'blob:'].includes(url.protocol)) && ['GET', 'HEAD'].includes(request.method())) {
           await route.continue();
         } else {
@@ -206,6 +218,9 @@ try {
       page.setDefaultTimeout(10_000);
       page.setDefaultNavigationTimeout(15_000);
       page.on('pageerror', (error) => failures.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error') item.consoleErrors.push({ message: message.text(), url: message.location().url });
+      });
       page.on('request', (request) => { pendingRequests.add(request); activity += 1; });
       page.on('requestfinished', (request) => { pendingRequests.delete(request); activity += 1; });
       page.on('requestfailed', (request) => {
@@ -264,6 +279,7 @@ try {
           coarse: matchMedia('(pointer: coarse)').matches,
           overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth,
           forms: document.querySelectorAll('form,input,textarea').length,
+          appearanceControls: [...document.querySelectorAll('.hraness-marketing-header details[data-hraness-appearance-menu] fieldset input[type=radio]')].filter(input => input.form === null).map(input => ({name: input.name, value: input.value, legend: input.closest('fieldset').querySelector('legend')?.textContent})),
           headers: document.querySelectorAll('.hraness-marketing-header').length,
           footers: document.querySelectorAll('.hraness-marketing-footer').length,
           askAi: document.querySelectorAll('.message-like-me-ask-ai').length,
@@ -328,7 +344,7 @@ try {
           fieldBackground: getComputedStyle(document.querySelector('.hraness-material-wall')).backgroundImage,
         })), 'Restored transparency metrics');
         assert.deepEqual(restored, { matches: false, headerBackdrop: metrics.headerBackdrop, fieldBackground: metrics.fieldBackground });
-        const summary = page.locator('details summary').first();
+        const summary = page.locator('.hraness-marketing-question > summary').first();
         await summary.focus();
         await summary.press('Enter');
         await page.locator('details[open]').first().waitFor({ state: 'visible' });
@@ -379,6 +395,11 @@ try {
           }
           if (sample.path === '/preview') assert.ok(item.policyBlocks.length > 0, 'Native CSP enforcement must be observed.');
           assert.equal(pendingRequests.size, 0, 'Every request must settle before accepting the case.');
+          if (sample.path !== '/preview') {
+            assert.equal(item.syntheticConsent.length, 1, 'The shared footer must settle its exact public consent query.');
+            assert.deepEqual(item.consoleErrors, [], 'Ordinary pages must emit no console errors.');
+            assert.deepEqual(item.cspViolations, [], 'Ordinary pages must emit no CSP violations.');
+          } else assert.deepEqual(item.syntheticConsent, [], 'The inert preview must not query consent.');
           assert.deepEqual(unexpected, [], 'The isolated browser must not send external requests or writes.');
           assert.deepEqual(failures, [], 'Browser and asset failures must remain visible.');
         },

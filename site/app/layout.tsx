@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import { getDesignPaletteTheme } from '@hraness/design-kit';
+import { Providers } from './providers';
 
 import {
   absoluteUrl,
@@ -11,9 +13,10 @@ import {
   SITE_TITLE,
   SOCIAL_IMAGE_ALT,
 } from './_lib/site';
-import { FoilController } from './_components/foil-controller';
 import '@hraness/design-kit/fonts.css';
 import './globals.css';
+
+const initialPalette = getDesignPaletteTheme('gruvbox', 'light');
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),
@@ -73,8 +76,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: 'light dark',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f8f7f4' },
-    { media: '(prefers-color-scheme: dark)', color: '#12100f' },
+    { media: '(prefers-color-scheme: light)', color: '#fbf1c7' },
+    { media: '(prefers-color-scheme: dark)', color: '#282828' },
   ],
 };
 
@@ -139,14 +142,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html data-hraness-theme="paper" lang="en">
+    <html className={initialPalette.className} data-hraness-theme="paper" data-hraness-material="lantern" data-hraness-pattern="weave" data-palette="gruvbox" lang="en" suppressHydrationWarning>
+      <head>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="/theme-bootstrap.js" />
+      </head>
       <body>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
         />
-        {children}
-        <FoilController />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

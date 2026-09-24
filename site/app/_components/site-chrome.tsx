@@ -1,3 +1,4 @@
+import { ThemeMenuButton } from '@hraness/design-kit/react';
 import { HranessSiteFooter } from '@hraness/site-footer/react';
 import { MarketingSiteFooter, MarketingSiteHeader } from '@hraness/design-kit/react/server';
 import { AskAiAboutThis } from '@hraness/ui';
@@ -24,6 +25,7 @@ export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>)
         brandLabel="Textbutler home"
         brandMark="/marks/message-like-me.svg"
         className={lantern ? "site-header hraness-material-chrome" : "site-header"}
+        trailing={<ThemeMenuButton aria-label="Appearance" />}
         links={[
           { href: '/#how-it-works', label: 'How it works' },
           { href: '/docs', label: 'Docs' },

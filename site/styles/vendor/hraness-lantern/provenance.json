@@ -3,13 +3,13 @@
   "contractVersion": 1,
   "source": {
     "repository": "https://github.com/hraness/design-kit",
-    "commit": "a89034f457cfe2a09297610c74a8ce9d82ae8a5a",
+    "commit": "d38d13c07d7956d02ddfbca8d32aa2066d88fbd3",
     "export": "@hraness/design-kit/lantern-material.css"
   },
   "files": {
     "lantern-material.css": {
       "path": "src/lantern-material.css",
-      "sha256": "a97642b50e373ab0648e46ef54e18ca475065e6dc2b17e1bc85a2af9c6ee6be6"
+      "sha256": "fc456d2c7b51b37b51d6b086be90f102ca856c07849a0d7487b2e74e8981f8ac"
     },
     "check.mjs": {
       "path": "scripts/check-lantern-material-snapshot.mjs",

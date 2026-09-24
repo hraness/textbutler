@@ -7,8 +7,9 @@
 @import '../styles/vendor/hraness-paper/paper-theme.css';
 @import '../styles/vendor/hraness-marketing/product-marketing-preset.css';
 @import '../styles/vendor/hraness-lantern/lantern-material.css';
+@import "@hraness/design-kit/palettes.css";
 
-/* Product roles alias the shared Paper theme. Message examples retain their
+/* Product roles alias the shared palette. Message examples retain their
  * incoming/outgoing distinction without a separate site color system. */
 :root {
   --paper: var(--background);
@@ -29,7 +30,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: "Nebula Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-text);
   font-synthesis: none;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -72,7 +73,7 @@ body {
 
 /* Only the public landing opts into the released editorial preset. Compiled
  * v0.6.3 atoms outrank the snapshot's legacy layer, so bridge its role variables
- * here without changing the immutable snapshot. Docs keep their Paper styles. */
+ * here without changing the immutable snapshot. Docs retain their quiet reading surfaces. */
 .textbutler-marketing {
   --gutter: var(--hraness-marketing-gutter);
   --measure: var(--hraness-marketing-content-measure);
@@ -259,7 +260,7 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 0.625rem;
-  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
 }
 .source-kind {
@@ -285,8 +286,8 @@ body {
   font-weight: 500;
 }
 .source-badges span:first-child {
-  border-color: color-mix(in oklch, var(--primary) 32%, transparent);
-  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 32%, transparent);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
   color: var(--primary);
 }
 .source-summary {
@@ -620,12 +621,12 @@ nav.message-like-me-ask-ai + footer {
   background: var(--inverse);
   color: var(--inverse-foreground);
 }
-.beeper-workflow + .beeper-workflow { border-top: 1px solid color-mix(in oklch, var(--inverse-foreground) 16%, transparent); }
+.beeper-workflow + .beeper-workflow { border-top: 1px solid color-mix(in srgb, var(--inverse-foreground) 16%, transparent); }
 .beeper-workflow h2,
 .beeper-workflow h3 { color: inherit; }
 .beeper-workflow .eyebrow,
 .beeper-workflow-intro > p:last-child,
-.workflow-steps p { color: color-mix(in oklch, var(--inverse-foreground) 74%, transparent); }
+.workflow-steps p { color: color-mix(in srgb, var(--inverse-foreground) 74%, transparent); }
 .beeper-workflow-intro { max-width: 40rem; }
 .workflow-steps { list-style: none; margin: 2.5rem 0 0; padding: 0; }
 .workflow-steps > li {
@@ -633,9 +634,9 @@ nav.message-like-me-ask-ai + footer {
   gap: 1.5rem;
   grid-template-columns: 2.5rem minmax(0, 1fr);
   padding: 1.75rem 0;
-  border-top: 1px solid color-mix(in oklch, var(--inverse-foreground) 20%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--inverse-foreground) 20%, transparent);
 }
-.workflow-steps > li:last-child { border-bottom: 1px solid color-mix(in oklch, var(--inverse-foreground) 20%, transparent); }
+.workflow-steps > li:last-child { border-bottom: 1px solid color-mix(in srgb, var(--inverse-foreground) 20%, transparent); }
 .workflow-steps > li > span {
   padding-top: 0.3rem;
   color: var(--accent-on-inverse);
@@ -664,9 +665,9 @@ nav.message-like-me-ask-ai + footer {
   margin-top: 2rem;
   max-width: 46rem;
   padding: 1.25rem 1.5rem;
-  border: 1px solid color-mix(in oklch, var(--inverse-foreground) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--inverse-foreground) 24%, transparent);
   border-radius: 0.875rem;
-  color: color-mix(in oklch, var(--inverse-foreground) 80%, transparent);
+  color: color-mix(in srgb, var(--inverse-foreground) 80%, transparent);
   font-size: 0.95rem;
   line-height: 1.55;
 }
@@ -812,7 +813,7 @@ nav.message-like-me-ask-ai + footer {
   font-size: var(--hraness-paper-summary-size);
 }
 
-/* Textbutler expands the incumbent Paper surface with a contact workspace. */
+/* Textbutler pairs the shared palette with a contact workspace. */
 .textbutler-page .hraness-marketing-hero__eyebrow:empty,
 .textbutler-page .hraness-marketing-section__label:empty,
 .textbutler-page .hraness-marketing-label:empty { display: none; }
@@ -849,7 +850,7 @@ html { scrollbar-color: var(--muted) var(--paper); }
   .architecture-rows > div { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
 }
 
-/* Lantern adds material to the public landing. Paper owns the palette and the
+/* Lantern adds material to the public landing. The shared palette owns color and the
  * existing message bubbles; documents and the inert preview remain unchanged. */
 .textbutler-marketing .hraness-material-wall > .hraness-marketing-hero {
   padding-inline: var(--hraness-marketing-gutter);
@@ -869,3 +870,57 @@ html { scrollbar-color: var(--muted) var(--paper); }
 
 /* Decorative topic icons (agent-generated line art, public/icons/). */
 .textbutler-topic-icon { display: block; width: 88px; height: 88px; margin: 0 0 18px; }
+
+/* A warm notebook treatment carries through reference and product surfaces. */
+:where(.readme-prose, .workspace-example, .hero-visual, .butler-frame, .butler-context, .message-stage) { min-inline-size: 0; }
+:where(.readme-prose, .workspace-example) pre { max-inline-size: 100%; overscroll-behavior-inline: contain; }
+.readme-prose { max-inline-size: 70ch; line-height: 1.75; }
+.readme-prose :is(h1, h2, h3) { text-wrap: balance; line-height: 1.2; }
+.readme-prose :is(p, li) { text-wrap: pretty; }
+.readme-prose h2 { border: 0; padding-block-start: 0.5rem; }
+.readme-prose pre, .workspace-example pre { border: 0; border-radius: var(--radius-md); box-shadow: var(--hraness-material-inset); }
+.readme-prose :not(pre) > code { overflow-wrap: anywhere; }
+.butler-context { border: 0; background: var(--hraness-material-warm-plane); box-shadow: var(--hraness-material-inset); }
+.contact-initials { box-shadow: var(--hraness-material-lift); }
+.hero-visual, .workflow-callout { border: 0; box-shadow: var(--hraness-material-lift); }
+.architecture-rows > div, .development-status > div { border: 0; }
+.development-status > div { padding: clamp(1.25rem, 3vw, 2rem); border-radius: var(--radius-lg); background: var(--hraness-material-plane); box-shadow: var(--hraness-material-lift); }
+@media (forced-colors: active) {
+  .readme-prose pre, .workspace-example pre, .hero-visual, .workflow-callout, .development-status > div { border: 1px solid CanvasText; box-shadow: none; }
+}
+
+/* The hero is a desk of conversations, with a clear reading well at its center. */
+.conversation-field { position: absolute; inset: 0; overflow: clip; pointer-events: none; }
+.conversation-field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 48% 64% at 50% 38%, var(--background), color-mix(in srgb, var(--background) 86%, transparent) 58%, transparent 100%);
+}
+.conversation-slip {
+  position: absolute;
+  inline-size: clamp(9rem, 18vw, 14rem);
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--hraness-material-plane);
+  box-shadow: var(--hraness-material-lift);
+  color: var(--foreground);
+  opacity: calc(0.24 + var(--hraness-hero-proximity, 0) * 0.48);
+  transform: translate(var(--hraness-hero-drift-x, 0px), var(--hraness-hero-drift-y, 0px));
+}
+.conversation-slip > span { color: var(--muted); display: block; font: 500 0.65rem/1.5 var(--font-mono); letter-spacing: 0.03em; margin-block-end: 0.65rem; }
+.conversation-slip strong { font: 500 1rem/1.25 var(--font-text); }
+.conversation-slip p { font-size: 0.85rem; line-height: 1.5; margin: 0.65rem 0 0; }
+.conversation-slip i { color: var(--muted); display: block; font-size: 0.68rem; font-style: normal; margin-block-start: 0.8rem; }
+.conversation-slip--message { border-end-start-radius: 0.35rem; background: var(--hraness-material-warm-plane); }
+.conversation-slip:nth-child(1) { inset: 8% auto auto 2%; rotate: -7deg; }
+.conversation-slip:nth-child(2) { inset: 6% 2% auto auto; rotate: 6deg; }
+.conversation-slip:nth-child(3) { inset: 36% auto auto -4%; rotate: 3deg; }
+.conversation-slip:nth-child(4) { inset: 36% -3% auto auto; rotate: -4deg; }
+.conversation-slip:nth-child(5) { inset: auto auto 9% 5%; rotate: -4deg; }
+.conversation-slip:nth-child(6) { inset: auto 4% 7% auto; rotate: 5deg; }
+@media (width < 45rem) {
+  .conversation-slip { inline-size: 10rem; opacity: 0.18; }
+  .conversation-slip:nth-child(n + 5) { display: none; }
+}
+@media (forced-colors: active), print { .conversation-field { display: none; } }

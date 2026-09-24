@@ -10,17 +10,18 @@
     "check:theme": "bun scripts/check-paper-theme.mjs",
     "sync:readme": "bun scripts/sync-readme.ts",
     "test": "bun run check:theme && bun test scripts",
-    "dev": "bun run sync:readme && next dev --webpack",
-    "build": "next build --webpack",
+    "dev": "bun run sync:readme && bun run build:theme && next dev --webpack",
+    "build": "bun run build:theme && next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "check": "bun run sync:readme && bun run test && bun run lint && bun run typecheck && bun run build"
+    "check": "bun run sync:readme && bun run test && bun run lint && bun run typecheck && bun run build",
+    "build:theme": "bun scripts/build-theme-bootstrap.ts"
   },
   "dependencies": {
-    "@hraness/design-kit": "github:hraness/design-kit#v0.15.0",
+    "@hraness/design-kit": "github:hraness/design-kit#v0.16.3",
     "@hraness/site-footer": "github:hraness/site-footer#v0.15.0",
-    "@hraness/ui": "github:hraness/ui#v0.5.16",
+    "@hraness/ui": "github:hraness/ui#v0.5.18",
     "@hraness/web-discovery": "github:hraness/web-discovery#v0.6.0",
     "next": "16.2.12",
     "react": "19.2.6",
