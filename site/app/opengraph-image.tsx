@@ -25,10 +25,10 @@ export default function OpenGraphImage() {
     eyebrow: SITE_NAME,
     mark: <TextbutlerMark />,
     theme: {
-      accent: "#755A94",
-      background: "#F8F7F4",
-      foreground: "#1C1A18",
-      muted: "#6A655E",
+      accent: "#065968",
+      background: "#FBF1C7",
+      foreground: "#393533",
+      muted: "#584F48",
     },
     title: "Your personal message butler for Mac",
   });

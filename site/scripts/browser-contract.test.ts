@@ -45,9 +45,10 @@ test('only the exact external README image receives a recorded synthetic fixture
 test('only preview script and manifest blocks from the verified restrictive CSP are expected', () => {
   const origin = 'http://127.0.0.1:3210';
   const policy = { path: '/preview', origin, verifiedCsp: true,
-    authoredAssets: [origin + '/_next/static/chunks/app/page-123.js', origin + '/manifest.webmanifest'] };
+    authoredAssets: [origin + '/_next/static/chunks/app/page-123.js', origin + '/manifest.webmanifest', origin + '/theme-bootstrap.js'] };
   const valid = { url: policy.authoredAssets[0]!, method: 'GET', resourceType: 'script', error: 'csp', mainFrame: true };
   expect(isPreviewPolicyBlock(valid, policy)).toBe(true);
+  expect(isPreviewPolicyBlock({ ...valid, url: origin + '/theme-bootstrap.js' }, policy)).toBe(true);
   expect(isPreviewPolicyBlock({ ...valid, resourceType: 'manifest', url: policy.origin + '/manifest.webmanifest' }, policy)).toBe(true);
   expect(isPreviewPolicyBlock({ ...valid, resourceType: 'other', url: policy.origin + '/manifest.webmanifest' }, policy)).toBe(true);
   for (const change of [{ method: 'POST' }, { error: 'net::ERR_ABORTED' }, { error: 'net::ERR_FAILED' }, { mainFrame: false },
@@ -143,7 +144,7 @@ test('browser waits have a bounded deadline', async () => {
 
 test('presentation admission rejects missing atoms, fallback fonts, collection and preset leaks', () => {
   const sample = { width: 1440, theme: 'light', path: '/' };
-  const valid = { paper: 'paper', background: 'rgb(248, 247, 244)', bodyFont: '"Nebula Sans", sans-serif', coarse: false, overflow: 0,
+  const valid = { paper: 'paper', background: 'rgb(251, 241, 199)', bodyFont: '"Nebula Sans", sans-serif', coarse: false, overflow: 0,
     forms: 0, headers: 1, footers: 1, askAi: 1, preset: 'editorial', material: 'lantern', headerBackdrop: 'blur(20px) saturate(1.1)',
     layers: ['components.hraness-ui.priority1', 'components.hraness-design-kit.priority1'],
     fontWeights: ['400', '500', '600', '700'], renderedFonts: [{ isCustomFont: true, glyphCount: 9, postScriptName: 'InstrumentSerif-Regular' }],

@@ -27,10 +27,10 @@ console.log("Paper theme snapshots verified.");
 // Keep the opt-in marketing assets pinned independently of the Paper palette.
 const { checkMarketingSnapshot } = await import("../styles/vendor/hraness-marketing/check.mjs");
 const marketing = await checkMarketingSnapshot();
-assert.equal(marketing.source.commit, "a89034f457cfe2a09297610c74a8ce9d82ae8a5a");
-console.log("Marketing preset v0.15.0 snapshot verified.");
+assert.equal(marketing.source.commit, "b0326108cf58268827ee69007414188ee27e2963");
+console.log("Marketing preset b0326108 snapshot verified.");
 
 const { checkLanternMaterialSnapshot } = await import("../styles/vendor/hraness-lantern/check.mjs");
 const lantern = await checkLanternMaterialSnapshot();
-assert.equal(lantern.source.commit, "a89034f457cfe2a09297610c74a8ce9d82ae8a5a");
-console.log("Lantern v0.15.0 snapshot verified.");
+assert.equal(lantern.source.commit, "b0326108cf58268827ee69007414188ee27e2963");
+console.log("Lantern b0326108 snapshot verified.");

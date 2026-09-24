@@ -30,7 +30,7 @@ export function isPreviewPolicyBlock(request, { path, origin, verifiedCsp, autho
     || !authoredAssets.includes(request.url)) return false;
   const url = new URL(request.url);
   if (url.origin !== origin || url.search || url.hash) return false;
-  return (request.resourceType === 'script' && /^\/_next\/static\/chunks\/[\w./-]+\.js$/u.test(url.pathname))
+  return (request.resourceType === 'script' && (/^\/_next\/static\/chunks\/[\w./-]+\.js$/u.test(url.pathname) || url.pathname === '/theme-bootstrap.js'))
     || (['manifest', 'other'].includes(request.resourceType) && url.pathname === '/manifest.webmanifest');
 }
 
@@ -124,7 +124,7 @@ export function browserOwner({ launch, close, stopServer }) {
 
 export function assertPresentation(value, sample) {
   assert.equal(value.paper, 'paper');
-  assert.equal(value.background, sample.theme === 'light' ? 'rgb(248, 247, 244)' : 'rgb(18, 16, 15)');
+  assert.equal(value.background, sample.theme === 'light' ? 'rgb(251, 241, 199)' : 'rgb(40, 40, 40)');
   assert.match(value.bodyFont, /Nebula Sans/u);
   assert.equal(value.coarse, sample.width < 500);
   assert.ok(value.overflow <= 1, `Horizontal overflow: ${value.overflow}px`);

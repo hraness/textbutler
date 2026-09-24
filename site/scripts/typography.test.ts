@@ -16,7 +16,7 @@ describe("site typography", () => {
     };
 
     expect(manifest.dependencies?.["@hraness/design-kit"])
-      .toBe("github:hraness/design-kit#v0.15.0");
+      .toBe("github:hraness/design-kit#v0.16.1");
     expect(layout).toContain("import '@hraness/design-kit/fonts.css';");
     expect(layout.indexOf("@hraness/design-kit/fonts.css"))
       .toBeLessThan(layout.indexOf("./globals.css"));
@@ -25,7 +25,7 @@ describe("site typography", () => {
     expect(css).not.toContain("@import 'tail" + "windcss';");
     expect(css.indexOf("@import '@hraness/ui/stylex.css';"))
       .toBeLessThan(css.indexOf("@import '@hraness/design-kit/styles.css';"));
-    expect(css).toContain('font-family: "Nebula Sans", ui-sans-serif, system-ui');
+    expect(css).toContain('font-family: var(--font-text);');
     expect(css).not.toContain("font-family: Inter");
   });
 

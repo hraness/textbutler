@@ -100,9 +100,9 @@ test('binds Design Kit v0.15.0 to the portable Paper palette', async () => {
   };
 
   expect(manifest.dependencies?.['@hraness/design-kit'])
-    .toBe('github:hraness/design-kit#v0.15.0');
+    .toBe('github:hraness/design-kit#v0.16.1');
   expect(manifest.dependencies?.['@hraness/ui'])
-    .toBe('github:hraness/ui#v0.5.16');
+    .toBe('github:hraness/ui#v0.5.17');
   expect(css).toContain("@import '@hraness/design-kit/styles.css';");
   expect(layout).toContain("colorScheme: 'light dark'");
   expect(layout).toContain('data-hraness-theme="paper"');

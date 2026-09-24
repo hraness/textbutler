@@ -12,11 +12,12 @@ import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, br
 // This gate serves only the built informational website. It never runs the CLI,
 // Mac application, messaging providers, account checks, or personal-data readers.
 
-// Immutable design-kit v0.8.0 assets, checked independently of the current build.
+// Reviewed design-kit source b0326108cf58268827ee69007414188ee27e2963 assets,
+// checked independently of the current build.
 async function assertWallAssets(context, background, origin) {
   const expected = [
     ['grain', 152319, 'b40c33a0e382c8e9d0518b4720321b5c262a929c28d40a190a902d07acd06553'],
-    ['cells', 17102, 'be9b12eefeae91772f024ed24ccda5be6173fb626921374b7e5270c298611b01'],
+    ['cells', 17102, '2391e9b3ee964e1178fedc55c766d12ac43bfeda92cfa44aab16c64a15f9d712'],
   ];
   const urls = [...background.matchAll(/url\("([^"]+)"\)/gu)].map(match => new URL(match[1], origin));
   assert.equal(urls.length, expected.length);
