@@ -7,7 +7,7 @@
     "exitCode": 0,
     "passed": 1087,
     "failed": 0,
-    "assertions": 13300,
+    "assertions": 13301,
     "files": 105
   },
   "invocations": [
@@ -31,7 +31,7 @@
           "exitCode": 0,
           "passed": 606,
           "failed": 0,
-          "assertions": 5282,
+          "assertions": 5283,
           "files": 51
         }
       },
@@ -92,9 +92,9 @@
   },
   "log": {
     "path": "qualification/xcb-textbutler-v1-current-check.log",
-    "bytes": 132027,
-    "sha256": "92bff46c2011ccf4d24bce172eeedf4536bfb4a48b89079cf852dd1a9ea067c4",
-    "note": "Complete successful HRA-scheduled bun run check output after the synthetic macOS child-readiness repair, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
+    "bytes": 132146,
+    "sha256": "d7dcd7bc399abe94d5705d20805d8c7832317695493509b858bfcbea590f99de",
+    "note": "Complete successful HRA-scheduled bun run check output after isolating the native JavaScript watchdog stress test, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",

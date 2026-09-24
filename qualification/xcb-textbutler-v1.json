@@ -58,6 +58,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "f149cd3b07a221d395af5c6eae0c1d80f6da6d03b04d6943be35662096ee365c"
+    "receiptSha256": "d31c6a7bbc983acf2c38a3c3f596e1caf0fff2ea09d552aa09377daca2aff8b1"
   }
 }

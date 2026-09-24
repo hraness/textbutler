@@ -89,9 +89,29 @@ test("the embedded interpreter bundles into one runtime without external assets 
 });
 
 test("worker watchdog bounds native QuickJS operations", async () => {
-  const started = performance.now();
-  expect(await run("return new Array(1_000_000_000) + ''; ")).toEqual({ ok: false, error: "resource-limit" });
-  expect(performance.now() - started).toBeLessThan(2_000);
-  const queued = await run("return 6 * 7;");
-  expect(queued.ok ? queued.value === 42 : queued.error === "resource-limit").toBe(true);
-}, 8_000);
+  // Native operations may outlive Worker.terminate() on a loaded runner. Keep
+  // that intentionally fenced worker in a child process so later tests still
+  // exercise a fresh JavaScript slot.
+  const source = `import { runJavascriptTool } from ${JSON.stringify(new URL("./javascript-tool.ts", import.meta.url).href)};
+const run = code => runJavascriptTool(code, null, new AbortController().signal);
+const started = performance.now();
+const result = await run("return new Array(1_000_000_000) + ''; ");
+const elapsed = performance.now() - started;
+const queued = await run("return 6 * 7;");
+process.stdout.write(JSON.stringify({ result, elapsed, queued }));`;
+  const child = Bun.spawn([process.execPath, "--no-env-file", "-e", source], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const exitCode = await Promise.race([child.exited, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { child.kill("SIGKILL"); reject(Error("Watchdog fixture did not exit")); }, 9_000);
+    })]);
+    expect(exitCode).toBe(0);
+    const outcome = JSON.parse(await new Response(child.stdout).text()) as { result: unknown; elapsed: number; queued: { ok: boolean; value?: unknown; error?: string } };
+    expect(outcome.result).toEqual({ ok: false, error: "resource-limit" });
+    expect(outcome.elapsed).toBeLessThan(2_000);
+    expect(outcome.queued.ok ? outcome.queued.value === 42 : outcome.queued.error === "resource-limit").toBe(true);
+  } finally {
+    clearTimeout(timer);
+    if (child.exitCode === null) { child.kill("SIGKILL"); await child.exited; }
+  }
+}, 12_000);
