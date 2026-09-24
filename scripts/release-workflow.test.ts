@@ -57,6 +57,7 @@ test("CI runs the standalone package on Ubuntu and only synthetic local-data fix
   // The complete gate is split across parallel Linux jobs; every command of `bun run check`
   // must still run somewhere in the workflow.
   const checkScript = (JSON.parse(packageManifest) as { scripts: Record<string, string> }).scripts.check;
+  if (checkScript === undefined) throw new Error("package.json has no check script");
   for (const command of checkScript.split(" && ")) {
     expect(workflow).toContain(command);
   }
