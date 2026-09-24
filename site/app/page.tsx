@@ -44,11 +44,15 @@ const HERO_FOOTNOTE = `${SITE_STATUS_LABEL} · macOS · iMessage, WhatsApp, and 
 const HOME_QUESTIONS = [
   {
     question: 'Can I use Textbutler today?',
-    answer: 'Yes, from source on a Mac. The guided terminal helps you connect your messaging apps through Ghostget, add a conversation, check your inbox, and send replies you write yourself. That needs no AI account, and new installations start paused. There is no app to download; you start the menu bar companion from the terminal.',
+    answer: 'Yes, from source on a Mac. The guided terminal helps you connect your messaging apps through Ghostget, add a conversation, check your inbox, and send replies you write yourself. That needs no AI account, and new installations start paused. A local build with a connected coding agent adds the butler: it reads the conversations you turn on, drafts replies, and can send them on its own. There is no app to download; you start the menu bar companion from the terminal.',
   },
   {
-    question: 'Can Textbutler draft a message for me?',
-    answer: 'Yes, with some setup. Out of the box you draft each reply yourself in the guided inbox, read the complete text, and choose when to send, with no AI account. With a local build and a Claude Code or Codex subscription connected through xcb, the butler can also suggest replies for you to review. For contacts you turn on, after you resume it, it can send its own replies, marked by default.',
+    question: 'Can it answer messages for me?',
+    answer: 'Yes, with some setup. With a local build and a Claude Code or Codex subscription connected through xcb, the butler writes and sends replies, marked by default, to the contacts you turn on, once you resume it. It can also suggest replies for you to review. Without an AI account, you draft each reply yourself in the guided inbox, read the complete text, and choose when to send. Running from source never writes AI replies.',
+  },
+  {
+    question: 'Can my agent use it directly?',
+    answer: 'Yes. The JSON CLI is built for agents. It can list conversations, read and summarize history, write drafts, and send messages you have explicitly authorized. These are the same staged actions the butler uses, and they stay within what each contact you turn on allows.',
   },
   {
     question: 'Will it interrupt my conversations?',
@@ -125,24 +129,34 @@ export default function Home() {
             className="mlm-marketing-hero"
             eyebrow=""
             frame={<ButlerFrame />}
-            heading="A message butler for your Mac"
+            heading="Your agent in your messaging apps"
             headingId="textbutler-title"
             name="Textbutler"
-            summary="Bring the iMessage, WhatsApp, and Beeper conversations you choose into one inbox on your Mac. Draft a reply, read it through, and send it when you’re ready."
+            summary="Connect your coding agent to iMessage, WhatsApp, and Beeper. It reads each conversation you choose, keeps a folder of notes you can open and edit, and answers when you let it. Its replies are marked, and you can pause it at any time."
           />
           </div>
 
-          <MarketingSection heading="A butler for each relationship" headingId="contacts-title" id="how-it-works" label="" summary="You choose which contacts the butler can help, and each one gets its own notes. You can pause one conversation or all of them at any time.">
+          <MarketingSection heading="A butler for each relationship" headingId="contacts-title" id="how-it-works" label="" summary="You choose which contacts your agent can help, and each one gets its own notes. You can pause one conversation or all of them at any time.">
             <TopicIcon slug="butler" />
             <MarketingFlow ariaLabel="How contact-based assistance is designed to work" steps={[
               { label: 'Choose a contact', detail: 'Pick one direct conversation from a connected app. New contacts start with the butler off, and by default up to five contacts can have it on at once.' },
               { label: 'Give it context', detail: 'Optionally import recent history as context. Guidance, preferences, and dated memories live in an ordinary folder you can read and edit.' },
-              { label: 'Draft your reply', detail: 'Use the inbox to find unanswered messages. Draft a reply and review the complete text before sending. No AI account is needed.' },
+              { label: 'Let your agent work', detail: 'It reads new messages, sums up what needs an answer, and drafts replies within what that contact allows. You can review everything in the inbox.' },
               { label: 'Turn on automatic replies later', detail: 'Automatic replies stay off until you connect an AI account that passes its check, turn replies on for this contact, and resume the butler. They need a local build. Running from source never writes AI replies.' },
             ]} />
           </MarketingSection>
 
-          <MarketingSection heading="Memory you can read and change" headingId="memory-title" id="memory" label="" layout="split" summary="The butler’s context belongs in ordinary files. Add what it should know, correct an assumption, or remove a stale note. It is designed to learn from conversation without turning its guesses into facts.">
+          <MarketingSection heading="It answers when you let it" headingId="replies-title" id="replies" label="" summary="With a local build and a connected subscription, the butler can answer the contacts you turn on by itself. Its replies are marked, paced, and kept within limits you set.">
+            <TopicIcon slug="control" />
+            <dl className="architecture-rows">
+              <div><dt>Identified by default</dt><dd>Every automatic reply is wrapped in the contact’s disclosure symbols, shown as 🤖{'{ … }'}. You can change or clear each symbol per contact.</dd></div>
+              <div><dt>Paced, not instant</dt><dd>Replies wait through bursts of messages, hold back after you’ve just written, and check the conversation again right before sending.</dd></div>
+              <div><dt>Limits it can’t raise</dt><dd>You turn each contact on separately, a cap limits how many are on at once, and hourly reply limits and a confidence threshold apply. The butler can choose to stay silent; it can’t raise its own limits.</dd></div>
+              <div><dt>A pause that is always yours</dt><dd>Pause one conversation or the whole butler at any time. New installations and new contacts start paused.</dd></div>
+            </dl>
+          </MarketingSection>
+
+          <MarketingSection heading="It learns each relationship" headingId="memory-title" id="memory" label="" layout="split" summary="The butler keeps each contact’s context in ordinary files it maintains itself: guidance it can read and revise, dated memories with sources, and the corrections you make. It is designed to learn from conversation without turning its guesses into facts.">
             <TopicIcon slug="memory" />
             <div className="workspace-example"><pre aria-label="Example contact workspace"><code>{`contact/\n├── AGENTS.md\n├── ABOUT.md\n├── MEMORY.md\n├── STYLE.md\n├── history/\n├── notes/\n├── attachments/\n└── outbox/`}</code></pre><p>Each contact gets a folder like this. Your settings, sign-ins, and permissions live elsewhere, where the butler can’t edit them.</p><a href={`${ARCHITECTURE_URL}#contact-data`}>How contact folders work</a></div>
           </MarketingSection>
@@ -150,7 +164,7 @@ export default function Home() {
           <MarketingSection heading="Small parts with clear jobs" headingId="architecture-title" id="architecture" label="" summary="A background service on your Mac does the work, and the menu bar companion gives you the controls. Developers can extend it with hooks and adapters without handing the AI model unrestricted access.">
             <TopicIcon slug="architecture" />
             <dl className="architecture-rows">
-              <div><dt>Textbutler</dt><dd>Contacts, response timing, visible disclosure, scoped memory, pause, and action policy.</dd></div>
+              <div><dt>Textbutler</dt><dd>Contacts, response timing, visible disclosure, evolving memory, pause, action policy, and the send journal.</dd></div>
               <div><dt>Ghostget</dt><dd>iMessage, WhatsApp and Beeper connections, account permissions, conversation identity, and available message actions.</dd></div>
               <div><dt><a href="https://github.com/hraness/xcb">xcb</a></dt><dd>Runs the butler’s replies on your own Claude Code or Codex subscription and keeps that sign-in out of Textbutler. The model gets no tools of its own; it proposes actions for Textbutler to check. Textbutler’s MIT-licensed source also serves as an example app for developers building on xcb.</dd></div>
               <div><dt>Your hooks</dt><dd>Developer-authored extensions for context and response decisions. Trusted executable hooks stay separate from the agent’s editable memory.</dd></div>
@@ -160,7 +174,8 @@ export default function Home() {
 
           <MarketingTrustBoundary className="mlm-marketing-trust" heading="What the butler can see and send" headingId="boundaries-title" id="boundaries" label="" summary="Contact folders stay on your Mac. The AI provider you connect sees the context it needs to write a reply. This website has no access to any of it." items={[
             { label: 'Marked replies', detail: 'By default the butler’s replies look like 🤖{ hello this is my response }. You can change or clear the three symbols. When you send or approve a reply yourself, you see its complete text first.' },
-            { label: 'One conversation at a time', detail: 'The butler can read and edit one contact’s folder, fetch public web pages, and propose messages for that conversation. It can’t run commands on your Mac.' },
+            { label: 'One conversation at a time', detail: 'The butler can read and edit one contact’s folder, fetch public web pages, and propose messages for that conversation. It can’t run commands on your Mac, and your sign-ins and permissions live outside its files.' },
+            { label: 'Every send is recorded', detail: 'The background service logs each send with the messaging app’s confirmation. A send whose outcome is unclear stays blocked until it is resolved, and it is never retried silently.' },
             { label: 'Only what the connection supports', detail: 'Anything beyond text depends on the messaging app and its permissions. Features Textbutler can’t use, such as mini apps, show as unavailable.' },
           ]} />
 
@@ -228,7 +243,7 @@ export default function Home() {
               ],
             },
           ]} />
-          <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation, and send a reply you’ve read through. Turn on automatic replies only after your account passes its check and you’ve tested with the person you chose." />
+          <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation, and watch your agent work. Turn on automatic replies only after your account passes its check and you’ve tested with the person you chose." />
         </MarketingPage>
       </main>
       <SiteFooter path="/" />

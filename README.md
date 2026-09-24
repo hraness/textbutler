@@ -2,18 +2,22 @@
 
 [![skills.sh](https://skills.sh/b/hraness/message-like-me)](https://skills.sh/hraness/message-like-me)
 
-Textbutler is a message assistant for your Mac. Its guided terminal and menu
-bar companion help you connect the iMessage, WhatsApp, and Beeper conversations
-you choose, see what needs an answer, and draft and review replies before you
-send them. It keeps private notes for each contact, and the butler's own
-replies are marked by default.
+Textbutler is a message butler for your Mac. Connect your coding agent, a
+Claude Code or Codex subscription through [xcb](https://github.com/hraness/xcb),
+and it reads the iMessage, WhatsApp, and Beeper conversations you choose, keeps
+each contact's context in files you can read and edit, and answers when you let
+it. The butler's own replies are marked by default, and you can pause it at any
+time. Its guided terminal and menu bar companion keep setup, review, and control
+on your Mac.
 
 **Status:** In development. Textbutler runs from source on a Mac; there is no
 app to download and no published Textbutler package. Without an AI account you
 can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox,
 and send replies you write yourself. AI replies also need a local build of
 Textbutler and a Claude Code or Codex subscription connected through
-[xcb](https://github.com/hraness/xcb).
+[xcb](https://github.com/hraness/xcb). Automatic replies have worked end to end
+over iMessage on the reference install; test them on your own account before
+you rely on them.
 
 Start with the [guided setup](docs/textbutler/getting-started.md) and
 [messaging app support](docs/textbutler/messaging-apps.md). Beeper can connect
@@ -23,9 +27,10 @@ its linked apps and account permissions decide what is available. The
 and the [architecture](docs/textbutler/architecture.md) describes how the parts
 fit together and what still needs live testing.
 
-Agents can use the [JSON CLI](docs/textbutler/agent-cli.md) to read and summarize
-one conversation, prepare text or media drafts, and send an explicitly
-authorized message. Each connection reports its available actions.
+Agents can use the [JSON CLI](docs/textbutler/agent-cli.md) to list
+conversations, read and summarize history, prepare text or media drafts, and
+send an explicitly authorized message, using the same staged actions the butler
+uses on its own. Each connection reports its available actions.
 
 ## Open the guided terminal
 

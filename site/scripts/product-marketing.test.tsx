@@ -48,7 +48,7 @@ function textBeforeRelated(html: string): string {
 test('renders Textbutler with the shared grammar and one development status', () => {
   const html = renderToStaticMarkup(<Home />);
   expect(html.match(/<h1\b/gu)).toHaveLength(1);
-  expect(/<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1]).toMatch(/butler/iu);
+  expect(/<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1]).toBe('Your agent in your messaging apps');
   for (const role of ['header', 'hero', 'proof-frame', 'section', 'flow', 'trust', 'questions', 'cta', 'footer']) {
     expect(html).toContain(`data-hraness-marketing="${role}"`);
   }
