@@ -5,7 +5,7 @@ import { AskAiAboutThis } from '@hraness/ui';
 
 import {
   absoluteUrl,
-  type CanonicalPagePath,
+  type SitePath,
   GITHUB_URL,
   ARCHITECTURE_URL,
 } from '../_lib/site';
@@ -37,7 +37,7 @@ export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>)
   );
 }
 
-export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
+export function SiteFooter({ path }: Readonly<{ path?: SitePath }>) {
   return (
     <>
       {path === undefined ? null : (

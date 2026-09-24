@@ -465,7 +465,7 @@ nav.message-like-me-ask-ai + footer {
   padding: clamp(2rem, 5vw, 3.5rem) var(--gutter) clamp(4rem, 8vw, 6rem);
 }
 .blog-page .plain-publication__article-body pre { max-width: 100%; overflow-x: auto; }
-.blog-feed-link { margin: 2rem 0 0; }
+.blog-feed-link { margin: 2rem auto 0; max-width: 43rem; }
 .document-page h1,
 .not-found h1 {
   margin: 0;

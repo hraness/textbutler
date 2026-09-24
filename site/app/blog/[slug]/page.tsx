@@ -22,6 +22,7 @@ import {
   BLOG_SITE,
   BLOG_TITLE,
   blogPostBySlug,
+  blogPostPath,
   bodyFor,
   isIndexablePost,
   provenanceFor,
@@ -106,7 +107,7 @@ export default async function BlogPostPage({ params }: Readonly<{ params: Promis
           <div dangerouslySetInnerHTML={{ __html: body.html }} />
         </MarketingArticle>
       </main>
-      <SiteFooter />
+      <SiteFooter path={blogPostPath(post)} />
     </>
   );
 }

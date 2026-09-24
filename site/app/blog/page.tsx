@@ -63,7 +63,7 @@ export default function BlogIndexPage() {
         />
         <p className="blog-feed-link"><a href={BLOG_FEED_PATH}>Subscribe with the Atom feed</a></p>
       </main>
-      <SiteFooter />
+      <SiteFooter path={BLOG_PATH} />
     </>
   );
 }
