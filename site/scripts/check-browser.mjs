@@ -12,7 +12,7 @@ import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, br
 // This gate serves only the built informational website. It never runs the CLI,
 // Mac application, messaging providers, account checks, or personal-data readers.
 
-// Reviewed design-kit source b0326108cf58268827ee69007414188ee27e2963 assets,
+// Reviewed design-kit source d38d13c07d7956d02ddfbca8d32aa2066d88fbd3 assets,
 // checked independently of the current build.
 async function assertWallAssets(context, background, origin) {
   const expected = [

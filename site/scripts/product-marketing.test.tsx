@@ -158,8 +158,8 @@ test('binds Design Kit v0.15.0 to the portable Paper palette', async () => {
 
 test('admits the released finite marketing snapshot and scopes it to the landing', async () => {
   const snapshot = await checkMarketingSnapshot();
-  expect(snapshot.source.commit).toBe('a89034f457cfe2a09297610c74a8ce9d82ae8a5a');
-  expect(snapshot.files['product-marketing-preset.css'].sha256).toBe('791e604faa5f5771e5f5e9ec9d4a41d4d657ed7e3f665d7ace620a347edaa15e');
+  expect(snapshot.source.commit).toBe('d38d13c07d7956d02ddfbca8d32aa2066d88fbd3');
+  expect(snapshot.files['product-marketing-preset.css'].sha256).toBe('ab78b17a454385c190e36172ea660aa396cd08e7ef371e249b91342ec411044d');
   const html = renderToStaticMarkup(<Home />);
   // React hoists the product icon's preload ahead of the document root.
   expect(html.replace(/^(?:<link\b[^>]*>\s*)+/u, ''))
