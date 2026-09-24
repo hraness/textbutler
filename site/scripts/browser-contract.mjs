@@ -25,6 +25,15 @@ export function isSyntheticBadge(request) {
     && request.method === 'GET' && request.resourceType === 'image';
 }
 
+// The shared footer asks this public endpoint whether its consent control is
+// required. Offline checks supply a declared response; no account call escapes.
+export function isSyntheticConsentRegion(request) {
+  return request.url === 'https://account.hraness.com/api/consent/region'
+    && request.method === 'GET' && request.resourceType === 'fetch'
+    && request.cookie === undefined && request.authorization === undefined
+    && request.body === null;
+}
+
 export function isPreviewPolicyBlock(request, { path, origin, verifiedCsp, authoredAssets }) {
   if (path !== '/preview' || !verifiedCsp || !request.mainFrame || request.method !== 'GET' || request.error !== 'csp'
     || !authoredAssets.includes(request.url)) return false;

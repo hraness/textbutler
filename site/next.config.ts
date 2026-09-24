@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
-  "connect-src 'self'",
+  "connect-src 'self' https://account.hraness.com/api/consent/region",
   "font-src 'self' data:",
   "form-action 'none'",
   "img-src 'self' data: https://raw.githubusercontent.com https://skills.sh https://www.skills.sh",

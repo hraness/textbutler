@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
-  deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
+  deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, isSyntheticConsentRegion, routeTasks } from './browser-contract.mjs';
 
 test('the native matrix covers four separate surfaces, both themes and touch', () => {
   const cases = browserCases();
@@ -39,6 +39,18 @@ test('only the exact external README image receives a recorded synthetic fixture
     { resourceType: 'fetch' }, { url: valid.url + '?other=1' }, { url: valid.url + '/other' },
     { url: valid.url.replace('skills.sh', 'example.com') }]) {
     expect(isSyntheticBadge({ ...valid, ...change })).toBe(false);
+  }
+});
+
+test('only the credential-free public consent GET receives a synthetic response', () => {
+  const valid = { url: 'https://account.hraness.com/api/consent/region', method: 'GET', resourceType: 'fetch',
+    cookie: undefined, authorization: undefined, body: null };
+  expect(isSyntheticConsentRegion(valid)).toBe(true);
+  for (const change of [{ method: 'POST' }, { method: 'HEAD' }, { resourceType: 'document' },
+    { resourceType: 'image' }, { cookie: 'synthetic' }, { authorization: 'synthetic' }, { body: '' },
+    { url: valid.url + '?other=1' }, { url: valid.url + '/other' },
+    { url: valid.url.replace('account.hraness.com', 'example.com') }]) {
+    expect(isSyntheticConsentRegion({ ...valid, ...change })).toBe(false);
   }
 });
 

@@ -7,7 +7,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { assertBuildJoin, assertPresentation, assertServerExit, browserCases, browserEnvironment, browserMediaFeatures, browserOwner,
-  deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, routeTasks } from './browser-contract.mjs';
+  deadline, finishBrowserCase, isPreviewPolicyBlock, isSyntheticBadge, isSyntheticConsentRegion, routeTasks } from './browser-contract.mjs';
 
 // This gate serves only the built informational website. It never runs the CLI,
 // Mac application, messaging providers, account checks, or personal-data readers.
@@ -184,12 +184,24 @@ try {
     try {
       const assets = new Set();
       item.syntheticAssets = [];
+      item.syntheticConsent = [];
+      item.consoleErrors = [];
+      item.cspViolations = [];
+      await context.exposeBinding('__textbutlerCsp', (_source, event) => item.cspViolations.push(event));
+      await context.addInitScript(() => document.addEventListener('securitypolicyviolation', event => {
+        void globalThis.__textbutlerCsp({ uri: event.blockedURI, directive: event.effectiveDirective });
+      }));
       await deadline(context.route('**/*', (route) => routes.run(async () => {
         const request = route.request();
         const url = new URL(request.url());
+        const headers = await request.allHeaders();
         if (isSyntheticBadge({ url: request.url(), method: request.method(), resourceType: request.resourceType() })) {
           item.syntheticAssets.push('Repository fixture: README skills.sh badge (no external request).');
           await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: badgeFixture });
+        } else if (isSyntheticConsentRegion({ url: request.url(), method: request.method(), resourceType: request.resourceType(),
+          cookie: headers.cookie, authorization: headers.authorization, body: request.postData() })) {
+          item.syntheticConsent.push({ url: request.url(), method: request.method(), body: { required: true } });
+          await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': origin }, body: '{"required":true}' });
         } else if ((url.origin === origin || ['data:', 'blob:'].includes(url.protocol)) && ['GET', 'HEAD'].includes(request.method())) {
           await route.continue();
         } else {
@@ -206,6 +218,9 @@ try {
       page.setDefaultTimeout(10_000);
       page.setDefaultNavigationTimeout(15_000);
       page.on('pageerror', (error) => failures.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error') item.consoleErrors.push({ message: message.text(), url: message.location().url });
+      });
       page.on('request', (request) => { pendingRequests.add(request); activity += 1; });
       page.on('requestfinished', (request) => { pendingRequests.delete(request); activity += 1; });
       page.on('requestfailed', (request) => {
@@ -380,6 +395,11 @@ try {
           }
           if (sample.path === '/preview') assert.ok(item.policyBlocks.length > 0, 'Native CSP enforcement must be observed.');
           assert.equal(pendingRequests.size, 0, 'Every request must settle before accepting the case.');
+          if (sample.path !== '/preview') {
+            assert.equal(item.syntheticConsent.length, 1, 'The shared footer must settle its exact public consent query.');
+            assert.deepEqual(item.consoleErrors, [], 'Ordinary pages must emit no console errors.');
+            assert.deepEqual(item.cspViolations, [], 'Ordinary pages must emit no CSP violations.');
+          } else assert.deepEqual(item.syntheticConsent, [], 'The inert preview must not query consent.');
           assert.deepEqual(unexpected, [], 'The isolated browser must not send external requests or writes.');
           assert.deepEqual(failures, [], 'Browser and asset failures must remain visible.');
         },
