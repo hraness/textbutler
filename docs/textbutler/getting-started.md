@@ -101,6 +101,35 @@ source service is installed.
 See [messaging app support](messaging-apps.md) for Beeper limitations and native
 alternatives, including requirements that affect Telegram AI processing.
 
+## Shape a contact's butler
+
+Contact habitats keep a small owner-authored `soulCore` (voice, relationship
+context, shared context and boundaries) separate from the butler's learned tone
+and formality. The contact-local memory archive can retain 64 sourced notes;
+each reply sees only a small snapshot, and the butler can search older notes
+locally for relevant preferences or open topics. Inspect or clear it with
+`habitats show CONTACT` or `habitats memory-clear CONTACT REVISION`.
+
+Search and memory are contact-scoped. JavaScript is separately disabled by
+default; enable it only for a contact whose butler should receive the pure-data
+tool. It runs code in a fresh QuickJS WebAssembly runtime without network,
+filesystem, timers or host APIs, under strict CPU and memory budgets. Exa web
+search remains separately owner-controlled and can send public queries to the
+search provider, so leave it off when that is not wanted.
+
+Configure an individual plan while the daemon is paused, using the exact
+revision reported by `habitats show CONTACT`:
+
+```sh
+textbutler habitats configure CONTACT REVISION '{"version":1,"guidance":"Be considerate and remember useful shared context without assuming familiarity.","contextMessages":12,"maxReplyCharacters":640,"humor":"match","webSearch":false,"memeSearch":true,"javascript":true,"memorySearch":true,"soulCore":{"voice":"Warm and concise","relationshipContext":"Longtime friend","sharedContext":"They are planning a trip together","boundaries":"Do not make plans or commitments for the owner"}}'
+```
+
+Replace the contact ID and plan values with what you want for that conversation.
+The learned style can evolve from sourced feedback, but it cannot rewrite the
+owner-authored `soulCore` or change tool grants. Tool output is evidence, never
+permission to send a message. See [contact calculation and memory tools](javascript-tools.md)
+for the runtime limits and memory-search behavior.
+
 ## Give Textbutler access to iMessage
 
 Use the native app when you want macOS Full Disk Access to belong to `TextButler.app`.

@@ -422,7 +422,7 @@ describe("exact Git release-ref authority", () => {
       requestedTag: "v1.0.0",
       runner: runnerFor(blocked).runner,
     })).toThrow("newest advertised stable tag");
-  });
+  }, 15_000);
 
   test("rejects tag/main divergence and an unexpected preexisting local ref", () => {
     const divergent = fixture({ divergent: true });

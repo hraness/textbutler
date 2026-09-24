@@ -28,13 +28,13 @@ export async function buildTextbutler(options: { outdir?: string } = {}): Promis
   const desktopClient = join(desktopRoot, "dist/src/client.js");
   const inputs = new Map<string, string>([["package.json", sha256(packageBytes)], ["bun.lock", sha256(lockfile)], ["desktop-foundation/release-manifest.json", sha256(companionManifest)]]);
   for (const input of ["scripts/build-textbutler.ts", "scripts/textbutler-distribution.ts", "scripts/support-runtime-policy.ts", "scripts/xcb-integration-admission.ts", XCB_INTEGRATION_RECEIPT, "LICENSE", "docs/support-foundation-notice.md"]) inputs.set(input, sha256(await readFile(join(ROOT, input))));
-  const result = await Bun.build({ entrypoints: [join(ROOT, "packages/textbutler/src/runtime-entry.ts")], target: "bun", format: "esm", minify: true, splitting: false,
-    define: { "import.meta.url": "__TEXTBUTLER_ARTIFACT_URL", __TEXTBUTLER_XCB_ADMISSION: JSON.stringify(xcbAdmission) },
-    plugins: [{ name: "textbutler-complete-local-artifact", setup(builder) {
+  const completePlugin: Bun.BunPlugin = { name: "textbutler-complete-local-artifact", setup(builder) {
       builder.onLoad({ filter: /\.(?:[cm]?js|[cm]?ts|tsx|json)$/u }, async args => {
         const path = resolve(args.path), label = relative(ROOT, path);
         if (label.startsWith("../") || label === "..") throw new Error("The Textbutler build tried to read outside its checkout.");
-        const original = await readFile(path, "utf8"); inputs.set(label, sha256(original));
+        const original = await readFile(path, "utf8"), digest = sha256(original), prior = inputs.get(label);
+        if (prior !== undefined && prior !== digest) throw new Error(`TextButler build input changed between bundle passes: ${label}`);
+        inputs.set(label, digest);
         let contents = original;
         if (path === desktopClient) {
           const source = "await readFile(new URL('../../release-manifest.json', import.meta.url))";
@@ -45,7 +45,17 @@ export async function buildTextbutler(options: { outdir?: string } = {}): Promis
         const loader: Bun.Loader = extension === ".json" ? "json" : extension === ".tsx" ? "tsx" : extension.endsWith("ts") ? "ts" : "js";
         return { contents, loader };
       });
-    } }],
+    } };
+  const workerResult = await Bun.build({ entrypoints: [join(ROOT, "packages/textbutler/src/javascript-worker-entry.ts")], target: "bun", format: "iife", minify: true, splitting: false, plugins: [completePlugin] });
+  if (!workerResult.success || workerResult.outputs.length !== 1) throw new AggregateError(workerResult.logs, "Textbutler JavaScript worker must build as one complete source bundle.");
+  const workerBundle = Buffer.from(await workerResult.outputs[0]!.arrayBuffer());
+  if (workerBundle.length < 1 || workerBundle.length > MAX_RUNTIME_BYTES) throw new Error("Textbutler JavaScript worker exceeds the artifact limit.");
+  const workerImports = new Bun.Transpiler({ loader: "js" }).scan(workerBundle).imports;
+  const workerExternal = workerImports.filter(item => !item.path.startsWith("node:") && !item.path.startsWith("bun:") && !builtinModules.includes(item.path));
+  if (workerExternal.length) throw new Error(`Textbutler JavaScript worker contains external code imports: ${workerExternal.map(item => item.path).slice(0, 8).join(", ")}`);
+  const result = await Bun.build({ entrypoints: [join(ROOT, "packages/textbutler/src/runtime-entry.ts")], target: "bun", format: "esm", minify: true, splitting: false,
+    define: { "import.meta.url": "__TEXTBUTLER_ARTIFACT_URL", __TEXTBUTLER_XCB_ADMISSION: JSON.stringify(xcbAdmission), __TEXTBUTLER_JAVASCRIPT_WORKER_SOURCE: JSON.stringify(workerBundle.toString("utf8")) },
+    plugins: [completePlugin],
   });
   if (!result.success || result.outputs.length !== 1) throw new AggregateError(result.logs, "Textbutler must build as one complete runtime bundle.");
   const bundle = Buffer.from(await result.outputs[0]!.arrayBuffer());

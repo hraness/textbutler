@@ -12,9 +12,8 @@ if (authId === "slow") {
   await Bun.sleep(10_000);
 }
 if (authId === "graceful" && !args.includes("--projection-identity-only")) {
-  const child = spawn(process.execPath, ["--no-env-file", "-e", "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"], { detached: true, stdio: "ignore", env: { PATH: "/usr/bin:/bin" } });
-  await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
-  await Bun.sleep(100);
+  const child = spawn(process.execPath, ["--no-env-file", "-e", "process.on('SIGTERM',()=>{});process.stdout.write('ready\\n');setInterval(()=>{},1000)"], { detached: true, stdio: ["ignore", "pipe", "ignore"], env: { PATH: "/usr/bin:/bin" } });
+  await new Promise<void>((resolve, reject) => { child.stdout!.once("data", () => resolve()); child.once("error", reject); child.once("exit", () => reject(Error("Detached fixture exited before readiness"))); });
   writeFileSync(join(directory, "descendant.json"), JSON.stringify({ pid: child.pid }), { mode: 0o600 });
   await new Promise<void>(resolve => process.once("SIGTERM", () => {
     process.kill(-child.pid!, "SIGTERM");

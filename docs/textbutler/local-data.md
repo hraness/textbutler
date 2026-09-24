@@ -24,9 +24,22 @@ directory until completion or rollback is proven. Keep both locations intact
 while an upgrade is unresolved.
 
 When habitats are enabled, the run journal additionally keeps per-contact
-habitat state (the promoted reply plan, bounded reply episodes, observed
-follow-up windows, evaluation records and rollback lineage), replayable
-inference receipts for each evaluation, and a global daily table of API
+habitat state (personality and tool configuration, owner-authored soul anchors,
+learned excerpts, reply episodes, observed follow-up windows, evaluation records
+and rollback history). A reply episode can include up to two tool queries and
+results shortened to 4 KiB each, plus the kinds of actions submitted. Learned
+memory holds up to 64 source-backed 1 KiB excerpts under a 96 KiB encoded archive
+limit, with categories, source message IDs, authors, dates, source digests and
+truncation flags. Digests cover the bounded canonical observations used by
+learning. Episodes retain at most eight 512-byte excerpts shown while composing
+the final reply, plus up to 24 IDs and digests for excerpts exposed only by tool
+steps. Clearing learned memory removes the active excerpts and prevents older
+observations from restoring them; retained episodes, inference records and
+`MEMORY.md` are separate records. JavaScript tool evidence stores a code digest,
+not executable source, and a bounded result.
+Habitat state is limited to 512 KiB per
+contact. The journal keeps the latest 32 replayable inference records per
+contact and a global daily table of API
 usage reservations with their provider-cost settlements. Gateway and other
 provider credentials live under `state/provider-credentials` with owner-only
 permissions; they never enter contact workspaces or journal evidence.

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CONTROL_PROTOCOL, type ControlRequest, type ControlResponse, type DesktopSnapshot } from "../../control/src/index.ts";
 import { awaitOwnerJob, handleOwnerCommand, OwnerCliError, pendingJobOutput, resolveOwnerContact } from "./owner-cli.ts";
+import { DEFAULT_HABITAT_PLAN } from "./contact-habitat.ts";
 
 function snapshot(): DesktopSnapshot {
   return { protocol: CONTROL_PROTOCOL, revision: 19, connection: "connected", detail: "Synthetic owner state",
@@ -107,6 +108,44 @@ describe("owner CLI commands", () => {
     const f = fixture(snapshot(), () => ({ protocol: CONTROL_PROTOCOL, ok: false, code: "conflict", message: "Settings changed. Reload before saving." }));
     expect(await f.run(["contacts", "enable", "Alice"])).toBe(1);
     expect(f.calls).toHaveLength(2);
+    expect(f.output[0]).toMatchObject({ ok: false, code: "conflict" });
+  });
+
+  test("habitat configuration resolves one contact and sends the complete plan at its observed habitat revision", async () => {
+    const plan = { ...DEFAULT_HABITAT_PLAN, guidance: "Give one useful example.", personality: { tone: "warm" as const, formality: "casual" as const }, webSearch: true };
+    const f = fixture();
+    expect(await f.run(["habitats", "configure", "Alice", "0", JSON.stringify(plan)])).toBe(0);
+    expect(f.calls).toEqual([{ protocol: CONTROL_PROTOCOL, command: "snapshot" }, {
+      protocol: CONTROL_PROTOCOL, command: "habitat.configure", contactId: "contact-1", expectedRevision: 0, plan,
+    }]);
+    const read = fixture(); await read.run(["habitats", "show", "contact-1"]);
+    expect(read.calls[1]).toEqual({ protocol: CONTROL_PROTOCOL, command: "habitat.read", contactId: "contact-1" });
+    const rollback = fixture(); await rollback.run(["habitats", "rollback", "Alice", "7"]);
+    expect(rollback.calls[1]).toEqual({ protocol: CONTROL_PROTOCOL, command: "habitat.rollback", contactId: "contact-1", expectedRevision: 7 });
+    const clear = fixture(); await clear.run(["habitats", "memory-clear", "Alice", "7"]);
+    expect(clear.calls[1]).toEqual({ protocol: CONTROL_PROTOCOL, command: "habitat.memory.clear", contactId: "contact-1", expectedRevision: 7 });
+  });
+
+  test("malformed habitat plans and revisions fail before reading state", async () => {
+    const f = fixture();
+    for (const plan of ["{", "null", "[]", "{}", JSON.stringify({ ...DEFAULT_HABITAT_PLAN, tools: ["shell"] }),
+      JSON.stringify({ ...DEFAULT_HABITAT_PLAN, personality: { tone: "intense", formality: "casual" } }),
+      JSON.stringify({ ...DEFAULT_HABITAT_PLAN, personality: { tone: "warm", formality: "casual", account: "other" } }),
+      JSON.stringify({ ...DEFAULT_HABITAT_PLAN, guidance: "x".repeat(8193) })]) {
+      await expect(f.run(["habitats", "configure", "Alice", "0", plan])).rejects.toBeInstanceOf(OwnerCliError);
+    }
+    for (const revision of ["-1", "1.5", "01", "9007199254740992"]) {
+      await expect(f.run(["habitats", "configure", "Alice", revision, JSON.stringify(DEFAULT_HABITAT_PLAN)])).rejects.toBeInstanceOf(OwnerCliError);
+      await expect(f.run(["habitats", "memory-clear", "Alice", revision])).rejects.toBeInstanceOf(OwnerCliError);
+    }
+    await expect(f.run(["habitats", "configure", "Alice", "0"])).rejects.toBeInstanceOf(OwnerCliError);
+    expect(f.calls).toEqual([]);
+  });
+
+  test("a stale habitat revision is reported without retry or a settings mutation", async () => {
+    const f = fixture(snapshot(), () => ({ protocol: CONTROL_PROTOCOL, ok: false, code: "conflict", message: "Read the current habitat before saving." }));
+    expect(await f.run(["habitats", "configure", "Alice", "3", JSON.stringify(DEFAULT_HABITAT_PLAN)])).toBe(1);
+    expect(f.calls.map(call => call.command)).toEqual(["snapshot", "habitat.configure"]);
     expect(f.output[0]).toMatchObject({ ok: false, code: "conflict" });
   });
 

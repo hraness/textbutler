@@ -12,10 +12,11 @@ import { createRoutedButlerAgent } from "./routed-agent.ts";
 import { ContactWorkspace } from "./workspace.ts";
 import { createHabitatAgent } from "./habitat-agent.ts";
 import { createHabitatEvolutionExecutor } from "./habitat-evolution.ts";
+import { boundHabitatObservation } from "./contact-habitat.ts";
 import type { HabitatHostConfig } from "./host-config.ts";
 import type { FastDriver } from "./fast-driver.ts";
 
-type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "notePending"> & { setReplyAgent?: (agent: ButlerAgent) => void };
+type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "onHabitatChanged" | "notePending"> & { setReplyAgent?: (agent: ButlerAgent) => void };
 type ContactLoop = { binding: AutomationBinding; settingsRevision: number; initialized: boolean; runtime: ButlerRuntime; pending?: MessageEvent; pendingFirstAt: number | null; blocked?: string; running: boolean; runningPinned: boolean; lastOwnerAt: number | null; historyRevision: number | null; syncFailures: number; runFailures: number };
 const RECONCILE_DETAIL = "A previous send needs reconciliation. Check Messages, then run `textbutler replies reconcile`.";
 const SYNC_FAILURE_THRESHOLD = 3;
@@ -75,6 +76,10 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     }
   };
   const unsubscribe = service.onSettingsChanged(next => { settingsEpoch++; changed(next); habitat?.settingsChanged(); });
+  const unsubscribeHabitat = service.onHabitatChanged(id => {
+    contacts.get(id)?.runtime.cancelContact(id);
+    habitat?.invalidateContact(id);
+  });
   async function snapshot(contact: ContactSettings, state: ContactLoop): Promise<ConversationSnapshot> {
     const enrollment = await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
     const page = await client.history(state.binding.enrollmentId, 200); assertAutomationBinding(state.binding, page.enrollment);
@@ -106,8 +111,8 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   function receive(contact: ContactSettings, state: ContactLoop, event: AutomationEvent): void {
     const who = author(event.message, contact);
     if (habitat && (who === "owner" || who === "contact") && (event.message.kind === "message" || event.message.kind === "reaction")) {
-      try { habitat.observe(contact.id, { id: event.message.id, at: Date.parse(event.message.occurredAt), author: who, kind: event.message.kind,
-        text: [...(event.message.text ?? "")].slice(0, 512).join(""), relatedMessageId: event.message.relatedMessageId }); } catch {}
+      try { habitat.observe(contact.id, boundHabitatObservation({ id: event.message.id, at: Date.parse(event.message.occurredAt), author: who, kind: event.message.kind,
+        text: event.message.text ?? "", relatedMessageId: event.message.relatedMessageId })); } catch {}
     }
     if (who === "self" || who === "butler") {
       if (state.pending && Number(event.revision) > Number(state.pending.revision)) state.pending = { ...state.pending, revision: String(event.revision) };
@@ -231,7 +236,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   const schedule = () => { if (!closed) timer = setTimeout(() => { void tick().finally(schedule); }, 1000); };
   if (options.automatic !== false) schedule();
   return { tick, async idle() { await ticking; await Promise.allSettled([...work]); }, async close() {
-    if (closed) return; closed = true; if (timer) clearTimeout(timer); unsubscribe();
+    if (closed) return; closed = true; if (timer) clearTimeout(timer); unsubscribe(); unsubscribeHabitat();
     await ticking;
     // In-flight dispatches settle while the transport is still alive; pause
     // only covers whatever the bounded grace cannot wait out.

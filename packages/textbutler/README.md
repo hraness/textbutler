@@ -200,6 +200,71 @@ See [the architecture](../../docs/textbutler/architecture.md) for the complete
 folder contract, background lifecycle, rich action rules, provider seam,
 and remaining live acceptance criteria.
 
+## Configure a contact personality
+
+With the habitat driver enabled in `state/host.json`, each enrolled conversation
+keeps its own response plan and learning history. Pause automatic replies, then
+inspect the contact's current plan and revision:
+
+```sh
+textbutler pause
+textbutler habitats show CONTACT
+```
+
+Use the returned habitat revision with `habitats configure CONTACT REVISION JSON`.
+The JSON replaces the full plan. For a new habitat whose reported revision is `0`:
+
+```sh
+textbutler habitats configure CONTACT 0 '{"version":1,"guidance":"Give one useful example when explaining something.","contextMessages":12,"maxReplyCharacters":640,"humor":"light","webSearch":false,"memeSearch":true,"personality":{"tone":"warm","formality":"casual"}}'
+```
+
+Replace `CONTACT` with an exact contact ID or a unique name. Tone accepts `neutral`,
+`warm`, `playful`, or `direct`; formality accepts `casual`, `balanced`, or `formal`.
+Personality is optional. Guidance allows up to 4,096 UTF-8 bytes, context includes
+4–32 messages, reply length allows 80–1,600 characters, and humor accepts `off`,
+`light`, or `match`. The complete JSON must fit within 8,192 bytes.
+
+The owner sets `webSearch` and `memeSearch`. Learning can improve the personality
+and response guidance from observed follow-ups, but cannot change these tool
+flags. Web search also requires a gateway driver. Meme images require attachment
+support in that conversation. Changing a plan cancels that contact's unfinished
+composition and evolution; a send already dispatched keeps its recorded outcome.
+It does not enable the contact or change its messaging grant.
+
+Run `habitats show CONTACT` to inspect the resulting plan, learned memory,
+evaluations, lineage, owner revision and recent tool outcomes. The inspector reports any omitted older
+entries when the response reaches its size limit.
+Use `habitats rollback CONTACT REVISION` while paused to undo a learned promotion.
+Saving an owner plan establishes a new baseline and clears earlier rollback
+ancestors while retaining rejected-plan history. Resume automatic replies with
+`textbutler resume` when ready.
+
+### Learn contact memory
+
+Background reflection can remember up to eight useful message excerpts from that
+conversation, each limited to 512 bytes. It selects source message IDs; trusted
+code copies the excerpt, author and time. These are attributed statements, not
+verified facts. The model can drop outdated excerpts when it learns a correction.
+Remembering an excerpt does not require a personality promotion or another model
+call. Drafts and failed sends do not create learning episodes.
+
+Future replies receive this memory alongside the contact's existing `MEMORY.md`.
+Historical comparisons use the excerpts shown when composing the final reply,
+so later feedback cannot leak into an earlier case. If an earlier tool step saw
+additional excerpts, the episode records their IDs and digests separately.
+Learning leaves `MEMORY.md` unchanged.
+
+To clear learned excerpts, pause replies, read the current revision, then run:
+
+```sh
+textbutler habitats memory-clear CONTACT REVISION
+```
+
+This cancels pending learning and starts fresh with newer observations. It clears
+the active learned memory, while existing notes, conversation history and retained
+evaluation records remain available. Personality rollback changes the response
+plan; it does not restore or clear learned memory.
+
 ## Write a hook
 
 Extensions are trusted owner-installed application code. The daemon loads only
@@ -248,8 +313,8 @@ The API offers lifecycle observation and vetoes. `memory.updated` includes the
 changed file path and committed revision; notification failure cannot undo a
 committed write. Modules and their imports run with the daemon's full authority;
 this is not an untrusted plugin sandbox. Keep executable extensions outside
-contact folders. An agent can evolve `AGENTS.md`, `MEMORY.md`,
-and the other workspace context files; those edits never install executable
+contact folders. A routed agent can revise `ABOUT.md`, `MEMORY.md`,
+and `STYLE.md`; `AGENTS.md` remains read-only. Those edits never install executable
 hooks or change activation, account, recipient, or send authority.
 
 ## Verify

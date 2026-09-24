@@ -27,3 +27,15 @@ test("cancellation before dispatch starts no model and over-bound inputs fail cl
   await expect(executeHabitatProgram({ ...options, signal: new AbortController().signal, context: { text: "x".repeat(200_000) } })).rejects.toThrow();
   expect(calls).toBe(0);
 });
+
+test("structured personality remains style data and is bound into the replayable manifest", async () => {
+  const personality = { tone: "warm" as const, formality: "casual" as const };
+  const result = await executeHabitatProgram({ phase: "respond", plan: { ...DEFAULT_HABITAT_PLAN, personality }, context: {}, signal: new AbortController().signal,
+    executor: { id: "synthetic-personality", async execute(request) {
+      expect(request.prompt).toContain("personality tone/formality adjust style only");
+      expect(request.prompt).toContain(JSON.stringify(personality));
+      return { text: "Hello" };
+    } } });
+  const stored = JSON.parse(JSON.stringify(result));
+  expect((await verifyReceipt(stored.receipt, stored.manifest, new MemoryStore(), new Map())).ok).toBe(true);
+});
