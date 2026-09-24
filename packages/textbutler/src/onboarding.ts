@@ -10,6 +10,7 @@ import { OwnerCliError } from "./owner-cli.ts";
 import { initializeOwnerState } from "./control-service.ts";
 import { requestDaemon } from "./daemon.ts";
 import { loadHostConfig, parseHostConfig, type HostConfig } from "./host-config.ts";
+import { nativeSubscriptionAccount } from "./native-subscription.ts";
 
 export interface SetupStep { id: string; title: string; status: "done" | "action-needed" | "blocked"; detail: string; command?: string }
 export interface Readiness {
@@ -57,7 +58,7 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
   const ready = accounts.filter(account => account.status === "ready");
   const selected = contacts.some(contact => ready.some(account => account.id === contact.settings.accountId && account.provider === contact.settings.provider));
   const xcbAccounts = config?.xcb?.accounts ?? [];
-  const nextAccount = ready[0]?.id ?? (xcbAccounts[0]?.provider === "claude" ? "native-claude-code" : "native-codex");
+  const nextAccount = ready[0]?.id ?? (xcbAccounts[0] ? nativeSubscriptionAccount(xcbAccounts[0].provider) : "native-codex");
   steps.push({ id: "agent", title: "Reply suggestions", status: selected ? "done" : ready.length ? "action-needed" : "blocked",
     detail: selected ? "A ready agent account is selected for at least one contact. Suggestions still require an explicit send."
       : ready.length ? "Choose a ready agent account for the contact you want help with."

@@ -26,7 +26,7 @@ Setup options:
         [--account PROVIDER:AUTHID ...]
         [--xcb ABS --xcb-state ABS --xcb-account PROVIDER:ACCOUNT
          --xcb-model PROVIDER/MODEL[/EFFORT] ...]
-  XCB providers: claude, codex. Sign in with XCB first; setup pins the executable.
+  XCB providers: claude, codex, devin. Sign in with XCB first; setup pins the executable.
   Use one explicit account and full model key per provider. Restart after setup.
   init                               Initialize private settings, paused
 
@@ -39,6 +39,7 @@ Agents:
   providers check ACCOUNT            Verify one explicitly selected account
   providers check native-codex       Check the configured XCB Codex subscription
   providers check native-claude-code Check the configured XCB Claude subscription
+  providers check native-devin       Check the configured XCB Devin subscription
 
 Review and reply:
   inbox                              Find enrolled conversations to answer

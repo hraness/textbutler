@@ -3,7 +3,7 @@ import type { ProviderAccountDiagnostic } from "../../control/src/index.ts";
 import { contactCapabilityIdentity, type ButlerPurpose } from "./contact-capabilities.ts";
 import { selectButlerModel, type ProviderSelection } from "./routed-agent.ts";
 
-export type NativeSubscriptionAccount = "native-codex" | "native-claude-code";
+export type NativeSubscriptionAccount = "native-codex" | "native-claude-code" | "native-devin";
 export type NativeSubscriptionSelection = Extract<ProviderSelection, { kind: "managed" }>;
 export type NativeSubscriptionChoice = Pick<NativeSubscriptionSelection, "route" | "modelCatalog" | "defaultReplyModel">;
 export type NativeSubscriptionAdmission = Readonly<{ leases: AccountLeaseStore; now(): number }>;
@@ -22,8 +22,13 @@ const hosts = new WeakSet<object>();
 export function assertNativeSubscriptionHost(value: NativeSubscriptionHost): void {
   if (!hosts.has(value)) throw Error("NATIVE_SUBSCRIPTION_HOST_REQUIRED");
 }
-export function nativeSubscriptionProvider(accountId: string): "codex" | "claude" | null {
-  return accountId === "native-codex" ? "codex" : accountId === "native-claude-code" ? "claude" : null;
+export const NATIVE_SUBSCRIPTION_PROVIDERS = ["claude", "codex", "devin"] as const;
+export type NativeSubscriptionProvider = (typeof NATIVE_SUBSCRIPTION_PROVIDERS)[number];
+export function nativeSubscriptionProvider(accountId: string): NativeSubscriptionProvider | null {
+  return accountId === "native-codex" ? "codex" : accountId === "native-claude-code" ? "claude" : accountId === "native-devin" ? "devin" : null;
+}
+export function nativeSubscriptionAccount(provider: NativeSubscriptionProvider): NativeSubscriptionAccount {
+  return provider === "claude" ? "native-claude-code" : provider === "codex" ? "native-codex" : "native-devin";
 }
 function account(value: string): NativeSubscriptionAccount {
   if (nativeSubscriptionProvider(value) === null) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_INVALID");
@@ -50,8 +55,8 @@ export function createNativeSubscriptionHost(options: Readonly<{
   now?: () => number;
 }>): NativeSubscriptionHost {
   const adapters = Object.freeze([...options.adapters]), now = options.now ?? Date.now;
-  if (adapters.length > 4 || new Set(adapters.map(adapter => adapter.route.id)).size !== adapters.length
-    || adapters.some(adapter => adapter.route.authentication !== "subscription" || !["claude", "codex"].includes(adapter.route.provider)))
+  if (adapters.length > NATIVE_SUBSCRIPTION_PROVIDERS.length * 2 || new Set(adapters.map(adapter => adapter.route.id)).size !== adapters.length
+    || adapters.some(adapter => adapter.route.authentication !== "subscription" || !(NATIVE_SUBSCRIPTION_PROVIDERS as readonly string[]).includes(adapter.route.provider)))
     throw Error("NATIVE_SUBSCRIPTION_ADAPTER_INVALID");
   const observe = options.accounts.bind(options), check = options.check.bind(options), choose = options.selection.bind(options), close = options.close.bind(options);
   const ready = new Map<string, NativeSubscriptionSelection>(), pending = new Set<Promise<unknown>>();

@@ -28,7 +28,7 @@ export interface ProviderHost {
   /** Trusted managed execution only; the runtime owns its sole account lease. */
   runManagedTask(request: AgentTaskRequest, broker: CapabilityBroker): Promise<AgentTaskResult>;
   selection(contact: ContactSettings, purpose?: "classify" | "respond"): Promise<ProviderSelection>;
-  validateAccountChange(previous: ContactSettings, next: { provider: "claude" | "codex"; accountId?: string }): void;
+  validateAccountChange(previous: ContactSettings, next: { provider: "claude" | "codex" | "devin"; accountId?: string }): void;
   close(): Promise<void>;
 }
 type Dependencies = {
@@ -64,8 +64,12 @@ export function createProviderHost(options: {
   const accounts: readonly ProviderAccountConfig[] = [
     { id: "native-codex", label: "Codex", route: "codex" },
     { id: "native-claude-code", label: "Claude Code", route: "claude-code" },
+    { id: "native-devin", label: "Devin", route: "devin" },
     ...(options.config.providerAccounts ?? []),
   ], now = options.now ?? Date.now;
+  /** Every non-API route maps to the subscription provider it drives. */
+  const providerOf = (route: ProviderAccountConfig["route"]): "claude" | "codex" | "devin" =>
+    route === "codex" ? "codex" : route === "devin" ? "devin" : "claude";
   const shutdown = new AbortController(), pending = new Set<Promise<unknown>>();
   const managed = new Map<string, ManagedCodexAccountController>();
   const managedFailures = new Set<string>();
@@ -200,9 +204,9 @@ export function createProviderHost(options: {
     finally { pending.delete(task); checking.delete(accountId); }
   };
   return {
-    router: new AgentMixer({ adapters: [route, unqualifiedAdapter("codex")], leases: options.leases, now }),
+    router: new AgentMixer({ adapters: [route, unqualifiedAdapter("codex"), unqualifiedAdapter("devin")], leases: options.leases, now }),
     accounts() { return accounts.map(account => {
-      const provider = account.route === "codex" ? "codex" as const : "claude" as const;
+      const provider = providerOf(account.route);
       if (nativeAccount(account.id)) {
         const diagnostic = native!.accounts().find(row => row.id === account.id);
         if (diagnostic) return shutdown.signal.aborted || managedFailures.has(account.id) ? { ...diagnostic, status: "unavailable" as const,
@@ -302,7 +306,7 @@ export function createProviderHost(options: {
     },
     validateAccountChange(previous, next) {
       const id = next.accountId ?? previous.accountId, account = accounts.find(value => value.id === id);
-      if (next.accountId !== undefined && ((!account && id !== previous.accountId) || account && (account.route === "codex" ? "codex" : "claude") !== next.provider)) throw new Error("Choose a configured account for this provider.");
+      if (next.accountId !== undefined && ((!account && id !== previous.accountId) || account && providerOf(account.route) !== next.provider)) throw new Error("Choose a configured account for this provider.");
       if (account?.route === "claude-api" && next.accountId === undefined && previous.provider !== next.provider) throw new Error("Choose the Claude API account explicitly; changing provider alone does not authorize API billing.");
     },
     close() {

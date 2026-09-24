@@ -211,8 +211,8 @@ bun run textbutler setup \
   --xcb-model FULL_MODEL_KEY
 ```
 
-For Codex, use `--xcb-account codex:ACCOUNT_ID` and a matching observed model.
-Repeat setup to add a second account. The command pins the executable bytes and
+For Codex or Devin, use `--xcb-account codex:ACCOUNT_ID` or `--xcb-account devin:ACCOUNT_ID`
+and a matching observed model. Repeat setup to add another provider's account. The command pins the executable bytes and
 explicit routing; it does not activate a contact. Setup refuses changes to an
 existing binary or account/model binding. After an xcb upgrade, stop the daemon
 and review its private `state/host.json` binding before updating the executable

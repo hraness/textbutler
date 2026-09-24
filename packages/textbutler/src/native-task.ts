@@ -85,7 +85,7 @@ export function createNativeTaskAdapter(options: Readonly<{
 }>): AgentTaskAdapter {
   const route = Object.freeze({ ...options.route }), runtime = Object.freeze({ ...options.runtime });
   identifier(route.id); boundedText(runtime.version, 160);
-  if (!["claude", "codex"].includes(route.provider) || route.authentication !== "subscription" || !/^[a-f0-9]{64}$/u.test(runtime.digest)) throw new Error("TEXTBUTLER_NATIVE_ROUTE_INVALID");
+  if (!["claude", "codex", "devin"].includes(route.provider) || route.authentication !== "subscription" || !/^[a-f0-9]{64}$/u.test(runtime.digest)) throw new Error("TEXTBUTLER_NATIVE_ROUTE_INVALID");
   const qualification: TaskRuntimeQualification = options.qualification === undefined
     ? Object.freeze({ status: "unqualified", reason: "A qualified native supervisor and exact installed-runtime evidence are required." })
     : Object.freeze(JSON.parse(JSON.stringify(options.qualification)) as TaskRuntimeQualification);

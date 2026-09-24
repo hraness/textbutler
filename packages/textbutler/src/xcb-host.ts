@@ -2,14 +2,16 @@ import { createHash } from "node:crypto";
 import type { AccountLease, AgentTaskAdapter, AgentTaskExecutionRequest, TaskRuntimeQualification } from "@hraness/agentmixer";
 import type { ProviderAccountDiagnostic } from "../../control/src/index.ts";
 import { contactCapabilityIdentity, type ButlerPurpose } from "./contact-capabilities.ts";
-import type { XcbHostConfig } from "./host-config.ts";
-import { createNativeSubscriptionHost, type NativeSubscriptionAccount, type NativeSubscriptionHost } from "./native-subscription.ts";
+import type { XcbHostConfig, XcbProvider } from "./host-config.ts";
+import { createNativeSubscriptionHost, nativeSubscriptionAccount, type NativeSubscriptionAccount, type NativeSubscriptionHost } from "./native-subscription.ts";
 import { createNativeTaskAdapter, type NativeTaskController } from "./native-task.ts";
 import { bundledXcbIntegrationAdmission, validXcbIntegrationAdmission, type XcbIntegrationAdmission } from "./xcb-integration.ts";
 import { createXcbClient, parseXcbJson, XcbCapabilitiesError, XcbNotStarted, type XcbAccount, type XcbCapabilities, type XcbCapabilityFailure, type XcbClient, type XcbResult } from "./xcb-client.ts";
 
 const sha = (input: unknown): string => createHash("sha256").update(JSON.stringify(input)).digest("hex");
-const localId = (provider: "claude" | "codex"): NativeSubscriptionAccount => provider === "claude" ? "native-claude-code" : "native-codex";
+const localId = (provider: XcbProvider): NativeSubscriptionAccount => nativeSubscriptionAccount(provider);
+const ROUTES: Readonly<Record<XcbProvider, ProviderAccountDiagnostic["route"]>> = Object.freeze({ claude: "claude-code", codex: "codex", devin: "devin" });
+const LABELS: Readonly<Record<XcbProvider, string>> = Object.freeze({ claude: "Claude Code via XCB", codex: "Codex via XCB", devin: "Devin via XCB" });
 const controls = Object.freeze({ noCommandTools: true, exactToolInventory: true, workspaceReadIsolation: true,
   workspaceWriteIsolation: true, isolatedConfiguration: true, authOutsideWorkspace: true, hostBrokerOnly: true } as const);
 const CAPABILITY_FAILURE_DETAILS: Readonly<Record<XcbCapabilityFailure, string>> = Object.freeze({
@@ -133,8 +135,8 @@ export async function createXcbSubscriptionHost(config: XcbHostConfig,
   }));
   const accounts = (): readonly ProviderAccountDiagnostic[] => config.accounts.map(account => {
     const a = observed(account), ready = admitted(account);
-    return { id: localId(account.provider), provider: account.provider, route: account.provider === "claude" ? "claude-code" : "codex",
-      label: account.provider === "claude" ? "Claude Code via XCB" : "Codex via XCB",
+    return { id: localId(account.provider), provider: account.provider, route: ROUTES[account.provider],
+      label: LABELS[account.provider],
       status: ready ? "ready" : a && !a.connected ? "setup-required" : "unavailable",
       detail: ready ? "XCB subscription connection is ready. Textbutler controls contact access and reply approval."
         : !validXcbIntegrationAdmission(integration) ? "Install a Textbutler bundle with reviewed XCB contact-profile evidence. Source integrity alone does not admit AI replies."

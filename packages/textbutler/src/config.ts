@@ -1,4 +1,4 @@
-export type Provider = "codex" | "claude";
+export type Provider = "codex" | "claude" | "devin";
 export type ReplyMode = "smart" | "keyword";
 export type Disclosure = Readonly<{ character: string; begin: string; end: string }>;
 export type ContactSettings = Readonly<{
@@ -87,7 +87,7 @@ export function parseContact(value: unknown): ContactSettings {
   if (typeof input.enabled !== "boolean") throw new Error("Invalid enabled flag");
   if (input.selfChat !== undefined && typeof input.selfChat !== "boolean") throw new Error("Invalid self conversation flag");
   if (input.mode !== "smart" && input.mode !== "keyword") throw new Error("Invalid reply mode");
-  if (input.provider !== "codex" && input.provider !== "claude") throw new Error("Invalid provider");
+  if (input.provider !== "codex" && input.provider !== "claude" && input.provider !== "devin") throw new Error("Invalid provider");
   const disclosure = parseDisclosure(input.disclosure);
   // A cleared wrap leaves a self chat unable to tell its own inbound reply
   // echoes from new owner text, which could answer itself forever.

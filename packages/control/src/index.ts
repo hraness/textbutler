@@ -14,7 +14,7 @@ export interface ContactSettings {
   selfChat?: boolean;
   responseMode: "smart" | "keyword";
   keyword: string;
-  provider: "codex" | "claude";
+  provider: "codex" | "claude" | "devin";
   accountId?: string;
   disclosure: { character: string; begin: string; end: string };
 }
@@ -34,7 +34,7 @@ export interface Contact { id: string; name: string; subtitle: string; settings:
 export interface Activity { id: string; at: string; contactId: string | null; title: string; detail: string }
 export type ConversationDiscoveryDiagnostic = AutomationFailure & Readonly<{ provider: AutomationProvider }>;
 export interface ProviderAccountDiagnostic {
-  id: string; label: string; provider: "claude" | "codex"; route: "claude-api" | "claude-code" | "codex";
+  id: string; label: string; provider: "claude" | "codex" | "devin"; route: "claude-api" | "claude-code" | "codex" | "devin";
   status: "ready" | "setup-required" | "unavailable"; detail: string; defaultReplyModel: string | null; classifierModel: string | null;
   managedAccount?: { state: "unchecked" | "signed-out" | "signing-in" | "signed-in" | "unavailable" | "recovery-required" | "closed"; generation: number; modelCount: number; pendingLoginId: string | null };
 }

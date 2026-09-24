@@ -39,7 +39,7 @@ export function selectButlerModel(selection: ProviderSelection, contact: Pick<Co
   if (selection.kind === "managed") {
     const q = selection.qualification, expected = contactCapabilityIdentity(purpose);
     identifier(selection.route.id);
-    if (!managedAvailable || contact.provider !== "codex" && contact.provider !== "claude"
+    if (!managedAvailable || contact.provider !== "codex" && contact.provider !== "claude" && contact.provider !== "devin"
     || selection.route.provider !== contact.provider || selection.route.authentication !== "subscription"
     || q.status !== "qualified" || !Number.isSafeInteger(q.expiresAt) || q.expiresAt < at + TASK_LIMITS.maxRunMs + TASK_LIMITS.maxCleanupMs
     || typeof q.runtimeDigest !== "string" || !/^[a-f0-9]{64}$/u.test(q.runtimeDigest)
