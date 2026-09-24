@@ -32,6 +32,13 @@ conversations, read and summarize history, prepare text or media drafts, and
 send an explicitly authorized message, using the same staged actions the butler
 uses on its own. Each connection reports its available actions.
 
+Textbutler keeps each contact's context in files you can read and edit, marks
+its own replies by default, and answers only after you turn a contact on and
+resume the butler: the design every Hraness project shares. [The thread through
+hraness](https://hraness.com/writing/the-thread-through-hraness) follows that
+design across the projects, and the [ALGAL
+vision](https://algal.computer/docs/vision/) states the bet behind it.
+
 ## Open the guided terminal
 
 From a Textbutler checkout on your Mac, with Bun 1.3.14:
