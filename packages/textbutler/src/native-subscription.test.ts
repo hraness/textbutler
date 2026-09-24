@@ -10,8 +10,8 @@ import { RunJournal } from "./journal.ts";
 const NOW = 1_000_000, cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; };
-function fixture(provider: "claude" | "codex" = "claude", withManagedCodex = false) {
-  const id: NativeSubscriptionAccount = provider === "codex" ? "native-codex" : "native-claude-code";
+function fixture(provider: "claude" | "codex" | "devin" = "claude", withManagedCodex = false) {
+  const id: NativeSubscriptionAccount = provider === "codex" ? "native-codex" : provider === "devin" ? "native-devin" : "native-claude-code";
   let managedChecks = 0;
   const journal = RunJournal.memory(), leases = journal.accountLeases(), runs: AgentTaskExecutionRequest[] = [], stops: AgentTaskExecutionRequest[] = [];
   let checks = 0, closes = 0, signedIn = true, clock = NOW, failStop = false, acquired = 0;
@@ -43,7 +43,7 @@ function fixture(provider: "claude" | "codex" = "claude", withManagedCodex = fal
     };
   });
   const native = createNativeSubscriptionHost({ adapters, now: () => clock,
-    accounts: () => [{ id, provider, route: provider === "codex" ? "codex" : "claude-code", label: "Synthetic subscription", status: signedIn ? "ready" : "setup-required",
+    accounts: () => [{ id, provider, route: provider === "codex" ? "codex" : provider === "devin" ? "devin" : "claude-code", label: "Synthetic subscription", status: signedIn ? "ready" : "setup-required",
       detail: "Synthetic account metadata only", defaultReplyModel: "observed-model", classifierModel: "observed-model" }],
     async check() { checks++; }, async selection(_id, purpose) {
       return { route: adapters[purpose === "classify" ? 0 : 1]!.route, modelCatalog: { provider, observedAt: NOW,
@@ -77,7 +77,7 @@ function fixture(provider: "claude" | "codex" = "claude", withManagedCodex = fal
     holdRun() { return holdRun = deferred(); }, holdStop() { return holdStop = deferred(); } };
 }
 
-test.each(["claude", "codex"] as const)("native %s checks both profiles and uses exactly one real shared task lease", async provider => {
+test.each(["claude", "codex", "devin"] as const)("native %s checks both profiles and uses exactly one real shared task lease", async provider => {
   const f = fixture(provider);
   expect(f.host.accounts().find(row => row.id === f.id)?.status).toBe("unavailable");
   await f.host.check(f.id, new AbortController().signal);

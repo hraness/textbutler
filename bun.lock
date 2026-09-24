@@ -10,7 +10,7 @@
       "devDependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.268",
         "@anthropic-ai/sdk": "0.125.0",
-        "@hraness/agentmixer": "https://github.com/hraness/agentmixer/releases/download/v0.1.1/hraness-agentmixer-0.1.1.tgz",
+        "@hraness/agentmixer": "https://github.com/hraness/xcb/releases/download/v0.3.0/hraness-agentmixer-0.3.0.tgz",
         "@hraness/algal": "github:hraness/algal#c5bd50452a676dc0b035ef206178c397de0cba92",
         "@hraness/desktop-foundation": "https://github.com/hraness/desktop-foundation/releases/download/v0.7.0/hraness-desktop-foundation-0.7.0.tgz",
         "@hraness/local-custody": "github:hraness/local-custody#v0.4.0",
@@ -54,7 +54,7 @@
 
     "@hono/node-server": ["@hono/node-server@2.1.1", "", { "peerDependencies": { "hono": "^4" } }, "sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg=="],
 
-    "@hraness/agentmixer": ["@hraness/agentmixer@https://github.com/hraness/agentmixer/releases/download/v0.1.1/hraness-agentmixer-0.1.1.tgz", { "dependencies": { "@anthropic-ai/claude-agent-sdk": "0.3.268", "@anthropic-ai/sdk": "0.125.0", "@modelcontextprotocol/sdk": "1.30.0", "zod": "4.6.2" } }, "sha512-2AcTdAbZea4EfkH8wE66HTiSgu1rXYG5NCff9Od3qt9J29iS2CRGh21Blwpugxn5HlAza5oN/8L+/YxYaczyRg=="],
+    "@hraness/agentmixer": ["@hraness/agentmixer@https://github.com/hraness/xcb/releases/download/v0.3.0/hraness-agentmixer-0.3.0.tgz", { "dependencies": { "@anthropic-ai/claude-agent-sdk": "0.3.268", "@anthropic-ai/sdk": "0.125.0", "@modelcontextprotocol/sdk": "1.30.0", "zod": "4.6.2" }, "bin": { "agentmixer": "dist/cli.js" } }, "sha512-I/5ozXA+B6G1prtlr98OMkEEZfW++PqYa0XQZ5ph+23Qu3EURJ0Faveg6czBOJPiDuyzPl5FXYNKDsb5CVgKPQ=="],
 
     "@hraness/algal": ["@hraness/algal@github:hraness/algal#c5bd504", { "bin": { "algal": "./cli.ts" } }, "hraness-algal-c5bd504", "sha512-08CCbrYfejZEeJDdk3A1yiHnJ2mTGLHWvr2SGyifzZ+r07DRaAdSu3Sqq4ws8qqwIefUZ39Hkfadt17U8KFcYA=="],
 

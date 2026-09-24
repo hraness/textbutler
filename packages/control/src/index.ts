@@ -154,7 +154,7 @@ export function validateContactSettings(settings: ContactSettings): string | nul
   if (settings.selfChat !== undefined && typeof settings.selfChat !== "boolean") return "The self conversation flag must be on or off.";
   if (settings.accountId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(settings.accountId)) return "Choose a configured account.";
   if (typeof settings.enabled !== "boolean" || !["smart", "keyword"].includes(settings.responseMode)
-    || !["codex", "claude"].includes(settings.provider)) return "Choose a supported response mode and agent provider.";
+    || !["codex", "claude", "devin"].includes(settings.provider)) return "Choose a supported response mode and agent provider.";
   if (typeof settings.keyword !== "string" || !settings.keyword.trim() || settings.keyword.length > 40
     || /[\p{Cc}\p{Cf}]/u.test(settings.keyword)) return "Use a keyword between 1 and 40 characters without control characters.";
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -258,7 +258,7 @@ function settings(value: unknown): ContactSettings {
   const row = record(value); const symbols = record(row.disclosure);
   const result: ContactSettings = {
     enabled: bool(row.enabled), responseMode: oneOf(row.responseMode, ["smart", "keyword"]),
-    keyword: text(row.keyword, 40), provider: oneOf(row.provider, ["codex", "claude"]),
+    keyword: text(row.keyword, 40), provider: oneOf(row.provider, ["codex", "claude", "devin"]),
     ...(row.accountId === undefined ? {} : { accountId: text(row.accountId, 80) }),
     ...(row.selfChat === undefined ? {} : { selfChat: bool(row.selfChat) }),
     disclosure: { character: text(symbols.character, 16), begin: text(symbols.begin, 16), end: text(symbols.end, 16) },
@@ -363,8 +363,8 @@ export function parseControlResponse(value: unknown): ControlResponse {
     activity: list(source.activity, 200).map(value => { const row = record(value); return { id: text(row.id, 256), at: text(row.at, 64), contactId: row.contactId === null ? null : text(row.contactId, 256), title: text(row.title, 256), detail: text(row.detail) }; }),
     ...(source.providerAccounts === undefined ? {} : { providerAccounts: list(source.providerAccounts, 10).map(value => {
       const account = record(value);
-      return { id: text(account.id, 80), label: text(account.label, 100), provider: oneOf(account.provider, ["claude", "codex"]),
-        route: oneOf(account.route, ["claude-api", "claude-code", "codex"]), status: oneOf(account.status, ["ready", "setup-required", "unavailable"]),
+      return { id: text(account.id, 80), label: text(account.label, 100), provider: oneOf(account.provider, ["claude", "codex", "devin"]),
+        route: oneOf(account.route, ["claude-api", "claude-code", "codex", "devin"]), status: oneOf(account.status, ["ready", "setup-required", "unavailable"]),
         detail: text(account.detail, 512), defaultReplyModel: account.defaultReplyModel === null ? null : text(account.defaultReplyModel, 160),
         classifierModel: account.classifierModel === null ? null : text(account.classifierModel, 160),
         ...(account.managedAccount === undefined ? {} : { managedAccount: {
@@ -384,7 +384,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
     || new Set(snapshot.capabilities.map(capability => capability.id)).size !== snapshot.capabilities.length
     || snapshot.providerAccounts && new Set(snapshot.providerAccounts.map(account => account.id)).size !== snapshot.providerAccounts.length) throw new Error("Duplicate identity in control response.");
   for (const account of snapshot.providerAccounts ?? []) {
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(account.id) || account.provider !== (account.route === "codex" ? "codex" : "claude")) throw new Error("Invalid provider account identity.");
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(account.id) || account.provider !== (account.route === "codex" ? "codex" : account.route === "devin" ? "devin" : "claude")) throw new Error("Invalid provider account identity.");
     // Qualified native subscription hosts use the same diagnostic contract.
     // Readiness is admitted by the host; the wire still requires both models.
     if (account.status === "ready" && (!account.classifierModel || !account.defaultReplyModel)) throw new Error("Invalid provider readiness.");

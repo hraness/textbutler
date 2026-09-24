@@ -30,6 +30,10 @@ export function nativeSubscriptionProvider(accountId: string): NativeSubscriptio
 export function nativeSubscriptionAccount(provider: NativeSubscriptionProvider): NativeSubscriptionAccount {
   return provider === "claude" ? "native-claude-code" : provider === "codex" ? "native-codex" : "native-devin";
 }
+/** The owner-visible route name for each subscription provider's coding agent. */
+export function nativeSubscriptionRoute(provider: NativeSubscriptionProvider): "claude-code" | "codex" | "devin" {
+  return provider === "claude" ? "claude-code" : provider;
+}
 function account(value: string): NativeSubscriptionAccount {
   if (nativeSubscriptionProvider(value) === null) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_INVALID");
   return value as NativeSubscriptionAccount;
@@ -67,7 +71,7 @@ export function createNativeSubscriptionHost(options: Readonly<{
     if (purpose !== "classify" && purpose !== "respond") throw Error("NATIVE_SUBSCRIPTION_PURPOSE_INVALID");
     await options.beforeSelection?.(id, purpose, shutdown.signal); active();
     const observed = observe().find(row => row.id === id);
-    if (!observed || observed.provider !== nativeSubscriptionProvider(id) || observed.route !== (id === "native-codex" ? "codex" : "claude-code")
+    if (!observed || observed.provider !== nativeSubscriptionProvider(id) || observed.route !== nativeSubscriptionRoute(nativeSubscriptionProvider(id)!)
       || observed.status !== "ready") throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_UNAVAILABLE");
     const choice = await choose(id, purpose); active();
     const adapter = adapters.find(candidate => candidate.route.id === choice.route.id);
@@ -86,10 +90,10 @@ export function createNativeSubscriptionHost(options: Readonly<{
   const host: NativeSubscriptionHost = Object.freeze<NativeSubscriptionHost>({
     accounts() {
       const rows = observe();
-      if (rows.length > 2 || new Set(rows.map(row => row.id)).size !== rows.length) throw Error("NATIVE_SUBSCRIPTION_ACCOUNTS_INVALID");
+      if (rows.length > NATIVE_SUBSCRIPTION_PROVIDERS.length || new Set(rows.map(row => row.id)).size !== rows.length) throw Error("NATIVE_SUBSCRIPTION_ACCOUNTS_INVALID");
       return Object.freeze(rows.map(row => {
         const id = account(row.id), provider = nativeSubscriptionProvider(id)!;
-        if (row.provider !== provider || row.route !== (provider === "codex" ? "codex" : "claude-code")) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_BINDING_INVALID");
+        if (row.provider !== provider || row.route !== nativeSubscriptionRoute(provider)) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_BINDING_INVALID");
         let qualified = !shutdown.signal.aborted;
         for (const purpose of ["classify", "respond"] as const) {
           const selection = ready.get(`${id}:${purpose}`), adapter = adapters.find(candidate => candidate.route.id === selection?.route.id);

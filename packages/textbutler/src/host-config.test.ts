@@ -60,6 +60,7 @@ test("XCB configuration pins one explicit account and full model key per subscri
   const xcb = { executable: "/opt/bin/xcb", stateHome: "/private/xcb", sha256: "a".repeat(64), accounts: [
     { provider: "codex", accountId: "account-one[1]", model: "codex/synthetic-model/high" },
     { provider: "claude", accountId: "account.two", model: "claude/synthetic-model" },
+    { provider: "devin", accountId: "a_devin", model: "devin/swe-2-high" },
   ] } as const;
   const parsed = parseHostConfig({ schemaVersion: 1, xcb });
   expect(parsed.xcb).toEqual(xcb);
@@ -74,6 +75,8 @@ test("XCB configuration pins one explicit account and full model key per subscri
     { accounts: [{ ...xcb.accounts[0], model: "synthetic-model" }] },
     { accounts: [{ ...xcb.accounts[0], model: "claude/synthetic-model" }] },
     { accounts: [{ ...xcb.accounts[0], model: "codex/model/high/extra" }] },
+    { accounts: [{ ...xcb.accounts[2], model: "claude/synthetic-model" }] },
+    { accounts: [...xcb.accounts, { provider: "claude", accountId: "again", model: "claude/other" }] },
     { accounts: [{ ...xcb.accounts[0], credential: "not-allowed" }] },
   ]) expect(() => parseHostConfig({ schemaVersion: 1, xcb: { ...xcb, ...changes } })).toThrow("Invalid private");
 });

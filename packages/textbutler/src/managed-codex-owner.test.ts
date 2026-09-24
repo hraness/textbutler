@@ -55,7 +55,7 @@ test("owner managed login stays lazy, private, cancelable and separate from repl
   expect(login).toMatchObject({ ok: true, kind: "provider-login", accountId, challenge: { userCode: "TEST-ONLY" } });
   expect(f.created()).toBe(1);
   const pending = await finish(f.service, { protocol, command: "provider.accounts.check", accountId });
-  expect(pending).toMatchObject({ ok: true, kind: "snapshot", snapshot: { providerAccounts: [{ managedAccount: { state: "signing-in" } }, {}] } });
+  expect(pending).toMatchObject({ ok: true, kind: "snapshot", snapshot: { providerAccounts: [{ managedAccount: { state: "signing-in" } }, {}, {}] } });
   const privateSettings = await readFile(join(f.root, "state", "settings.json"), "utf8");
   expect(privateSettings).not.toContain("TEST-ONLY");
   expect(JSON.stringify(await f.service.snapshot())).not.toMatch(/TEST-ONLY|authUrl|verificationUrl|synthetic@example/);
