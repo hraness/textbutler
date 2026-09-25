@@ -39,7 +39,7 @@ Restarting Textbutler does not silently clear it.
 | --- | --- |
 | `status`, `start` | Observe capabilities; explicitly start supported synchronization. |
 | `conversations`, `enroll`, `enrollments` | Exact account generation and direct participant-bound conversation enrollment. |
-| `poll`, `pollSet`, `history`, `events` | Bounded history, durable observation cursors, revisions, catch-up and gap detection; `pollSet` shares one provider session across a contact set and reports each enrollment separately. |
+| `poll`, `pollSet`, `history`, `events` | Bounded history, durable observation cursors, revisions, catch-up and gap detection; `pollSet` shares one provider session across a contact set and reports each enrollment separately. An enrollment busy with another operation reports its current stored row — not necessarily synced this tick. |
 | `grant`, `grant.get`, `grant.by-intent`, `revoke` | Recipient, action, expiry and quota limits; idempotent issuance lookup and immediate revocation. |
 | `asset`, `prepare` | Admit exact attachment bytes and bind the ordered action list to a context revision and expiry. |
 | `submit`, `cancel`, `run` | Journal an action claim before dispatch and retain accepted, failed, partial or indeterminate results. |
