@@ -19,7 +19,7 @@ const toolSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("javascript"), code: z.string().min(1).refine(value => Buffer.byteLength(value) <= JAVASCRIPT_LIMITS.codeBytes && !value.includes("\0")), input: z.unknown().optional() }),
 ]);
 const outputSchema = z.strictObject({ respond: z.boolean(), confidence: z.number().min(0).max(1), reason: z.enum(["requested", "helpful", "human_active", "not_needed", "uncertain"]),
-  summary: z.string().min(1).max(1024), actions: z.array(z.unknown()).max(7), tool: toolSchema.nullable() });
+  summary: z.string().min(1).max(1024), actions: z.array(z.unknown()).max(7), tool: toolSchema.nullish() });
 const outputContract = { respond: "boolean", confidence: "number 0..1; below 0.85 stays silent", reason: "requested|helpful|human_active|not_needed|uncertain", summary: "brief intended purpose of this response", actions: "0..7 action objects", tool: "null, {kind:web-search|meme-search|meme-image|memory-search,query:string}, or {kind:javascript,code:string,input:JSON}" };
 const actionContract = [
   { kind: "text", text: "The response" }, { kind: "attachment", file: "an existing outbox path", name: "file.png", mimeType: "image/png" },

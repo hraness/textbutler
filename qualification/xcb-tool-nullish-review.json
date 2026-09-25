@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "devin-cli-subagent/explore-review",
+    "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and diff read-only and produced only this review record."
+  },
+  "sourceState": {
+    "branch": "claude/habitat-tool-optional",
+    "baseCommit": "22e6148",
+    "headCommit": "claude/habitat-tool-optional tip",
+    "identity": "Source digests identify the reviewed bytes; commits alone do not."
+  },
+  "scope": "The habitat respond-organism output schema fix: outputSchema's tool field changes from nullable() to nullish() in packages/textbutler/src/habitat-agent.ts, plus a regression test in habitat-agent.test.ts and a NoReplyNeeded import. Production evidence: the configured fast driver (gateway qwen3.5-flash) omits the tool key in some outputs; strictObject required the key present, so every affected reply run failed closed as a generic run-failed, including silent not_needed decisions.",
+  "method": "Read-only inspection of the diff and the surrounding compose flow (habitat-agent.ts lines 17-23, 140-210, 219-263), the downstream consumers of result.tool, the fast-driver response schema, routed-agent's fallback output check, contact-habitat's assessment/plan schemas, runtime.ts failure classification and reply-loop.ts failure handling. Verification was by source inspection; the integrating agent ran the test suites.",
+  "result": "Ship. .nullish() matches the outputContract's \"null, {...}\" wording (optional() alone would wrongly reject the sanctioned null). No consumer distinguishes absent from null: result.tool is read only by truthiness at habitat-agent.ts:156 and the silence clamp rewrites tool:null at :155. Bounds are unchanged: actions stays required and capped at 7, a present tool still passes the full discriminated union and per-kind checks, and strictObject still rejects unknown top-level keys. The regression test fails pre-fix on both the classify resolve and the compose NoReplyNeeded assertions. Adjacent model-output parses were audited: evolve-path parses (replay text, judge object, proposal key-set check, assessment/plan) degrade inside their own guard and never reach the reply path; fast-driver's responseSchema requires genuinely required fields and maps failures to a distinct driver-unavailable reason. Noted non-blocking: routed-agent's fallback {summary, actions} exact-key check is the same fragility class on the non-habitat path.",
+  "findings": [
+    {
+      "severity": "note",
+      "status": "accepted",
+      "file": "packages/textbutler/src/routed-agent.ts:144-150",
+      "finding": "The non-habitat routed agent applies an exact key-set check to provider output ({summary, actions} only), so a provider emitting an extra field (e.g. confidence) would run-failed there too. Same fragility class, different provider surface and contract; the habitat path is the configured one.",
+      "recommendation": "Leave strict for now; revisit only if production evidence shows the same drift on the routed-agent path.",
+      "resolution": "Noted; out of scope for this fix."
+    }
+  ]
+}

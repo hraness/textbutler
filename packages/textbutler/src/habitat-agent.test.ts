@@ -8,7 +8,7 @@ import { newContact } from "./config.ts";
 import { createFastDriver } from "./fast-driver.ts";
 import { createHabitatAgent, admitPublicQuery } from "./habitat-agent.ts";
 import { ContactHabitat, DEFAULT_HABITAT_PLAN, habitatDigest, type HabitatMemory } from "./contact-habitat.ts";
-import type { AgentRequest } from "./runtime.ts";
+import { NoReplyNeeded, type AgentRequest } from "./runtime.ts";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -264,6 +264,17 @@ test("low-confidence outputs carrying actions or tools are clamped to silence", 
   expect((await tooled.habitat.agent.classify(tooled.request) as { respond: boolean }).respond).toBe(false);
   await expect(tooled.habitat.agent.compose(tooled.request)).rejects.toThrow();
   expect(tooled.calls()).toBe(1);
+});
+
+test("driver outputs that omit the tool field parse as no tool", async () => {
+  const omit = { respond: false, confidence: 0.95, reason: "not_needed", summary: "Nothing needed", actions: [] };
+  const silent = await fixture(omit);
+  expect((await silent.habitat.agent.classify(silent.request) as { respond: boolean }).respond).toBe(false);
+  await expect(silent.habitat.agent.compose(silent.request)).rejects.toThrow(NoReplyNeeded);
+  expect(silent.calls()).toBe(1);
+  const reply = await fixture({ respond: true, confidence: 0.95, reason: "requested", summary: "Answer", actions: [{ kind: "text", text: "Here you go" }] });
+  const result = await reply.habitat.agent.compose(reply.request) as { actions: [{ kind: string; text: string }] };
+  expect(result.actions[0]?.text).toBe("Here you go");
 });
 
 test("low confidence stays silent and unsupported rich actions cannot be proposed as text", async () => {
