@@ -65,6 +65,12 @@ describe("site source and artifact admission", () => {
     const conditionalSkipped = ciFixture();
     conditionalSkipped.jobs = conditionalSkipped.jobs.filter(job => SITE_CONDITIONAL_CI_JOBS.includes(job.name) === false);
     expect(admitSiteCiRun(conditionalSkipped).runId).toBe(10);
+    const skippedConclusion = ciFixture();
+    for (const job of skippedConclusion.jobs) if (SITE_CONDITIONAL_CI_JOBS.includes(job.name)) job.conclusion = "skipped";
+    expect(admitSiteCiRun(skippedConclusion).runId).toBe(10);
+    const skippedAlways = ciFixture();
+    skippedAlways.jobs[0].conclusion = "skipped";
+    expect(() => admitSiteCiRun(skippedAlways)).toThrow();
   });
   test("rejects advancing main and a CI run rerun after the selected successful attempt", async () => {
     const api = sourceApi(); api.values[`/repos/${repo}/git/ref/heads/main`].object.sha = oldSha;

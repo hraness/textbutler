@@ -112,10 +112,12 @@ export function admitSiteCiRun({ run, workflow, jobs, sourceSha, runId, runAttem
   }
   const known = new Set(SITE_REQUIRED_CI_JOBS);
   const always = new Set(SITE_ALWAYS_CI_JOBS);
+  const conditional = new Set(SITE_CONDITIONAL_CI_JOBS);
   const present = new Set(jobs.map(job => job.name));
   if (jobs.some(job => !known.has(job.name)) || ![...always].every(name => present.has(name)) ||
       jobs.some(job => job.run_id !== run.id || job.run_attempt !== run.run_attempt ||
-        job.head_sha !== sourceSha || job.status !== "completed" || job.conclusion !== "success")) {
+        job.head_sha !== sourceSha || job.status !== "completed" ||
+        job.conclusion !== (conditional.has(job.name) && job.conclusion === "skipped" ? "skipped" : "success"))) {
     throw new Error("site CI required jobs are missing, stale, skipped, or failed");
   }
   const completedAt = new Date(Math.max(...jobs.map(job => Date.parse(siteTimestamp(job.completed_at, "CI job completion"))))).toISOString();
