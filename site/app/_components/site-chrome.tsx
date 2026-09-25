@@ -5,7 +5,7 @@ import { AskAiAboutThis } from '@hraness/ui';
 
 import {
   absoluteUrl,
-  type CanonicalPagePath,
+  type SitePath,
   GITHUB_URL,
   ARCHITECTURE_URL,
 } from '../_lib/site';
@@ -37,7 +37,7 @@ export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>)
   );
 }
 
-export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
+export function SiteFooter({ path }: Readonly<{ path?: SitePath }>) {
   return (
     <>
       {path === undefined ? null : (
@@ -55,6 +55,7 @@ export function SiteFooter({ path }: Readonly<{ path?: CanonicalPagePath }>) {
           { href: '/about', label: 'About' },
           { href: '/sources', label: 'Legacy history tools' },
           { href: '/docs', label: 'Docs' },
+          { href: '/blog', label: 'Blog' },
           { href: GITHUB_URL, label: 'GitHub' },
         ]}
         name="Textbutler"

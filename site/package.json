@@ -19,10 +19,10 @@
     "build:theme": "bun scripts/build-theme-bootstrap.ts"
   },
   "dependencies": {
-    "@hraness/design-kit": "github:hraness/design-kit#v0.16.3",
+    "@hraness/design-kit": "github:hraness/design-kit#v0.17.0",
     "@hraness/site-footer": "github:hraness/site-footer#v0.15.0",
     "@hraness/ui": "github:hraness/ui#v0.5.18",
-    "@hraness/web-discovery": "github:hraness/web-discovery#v0.6.0",
+    "@hraness/web-discovery": "github:hraness/web-discovery#v0.8.0",
     "next": "16.2.12",
     "react": "19.2.6",
     "react-dom": "19.2.6"

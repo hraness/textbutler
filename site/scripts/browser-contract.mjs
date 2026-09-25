@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 export function browserCases() {
   return [1440, 390].flatMap((width) => ['light', 'dark'].flatMap((theme) =>
-    ['/', '/docs', '/sources', '/preview'].map((path) => ({ width, theme, path }))));
+    ['/', '/docs', '/sources', '/preview', '/blog', '/blog/introducing-textbutler'].map((path) => ({ width, theme, path }))));
 }
 
 // Pin the synthetic presentation state instead of inheriting host accessibility

@@ -458,6 +458,14 @@ nav.message-like-me-ask-ai + footer {
   max-width: var(--measure);
   padding: 0 var(--gutter) clamp(4rem, 8vw, 6rem);
 }
+/* Blog index and posts use the shared plain-publication article grammar. */
+.blog-page {
+  margin: 0 auto;
+  max-width: var(--measure);
+  padding: clamp(2rem, 5vw, 3.5rem) var(--gutter) clamp(4rem, 8vw, 6rem);
+}
+.blog-page .plain-publication__article-body pre { max-width: 100%; overflow-x: auto; }
+.blog-feed-link { margin: 2rem auto 0; max-width: 43rem; }
 .document-page h1,
 .not-found h1 {
   margin: 0;

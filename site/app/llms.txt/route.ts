@@ -7,6 +7,7 @@ import {
   SITE_NAME,
   SITE_STATUS,
 } from '../_lib/site';
+import { blogPostPath, indexableBlogPosts } from '../_lib/blog';
 
 export function GET() {
   const body = [
@@ -43,6 +44,10 @@ export function GET() {
     `- ${absoluteUrl('/methodology')}`,
     `- ${absoluteUrl('/research')}`,
     `- ${absoluteUrl('/about')}`,
+    '',
+    '## Blog',
+    `- ${absoluteUrl('/blog')}`,
+    ...indexableBlogPosts().map((post) => `- [${post.title}](${absoluteUrl(blogPostPath(post))}): ${post.dek}`),
     '',
     '## Source',
     `- ${GITHUB_URL}`,
