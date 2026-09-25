@@ -9,6 +9,10 @@ const mode = basename(process.env.GHOSTGET_STATE_HOME ?? "normal");
 let buffer = "", sending: Record<string, unknown> | undefined;
 const heldPolls: Record<string, unknown>[] = [];
 let maxHeld = 0, totalPolls = 0;
+const pollSetResult = (request: Record<string, unknown>) => {
+  const ids = Array.isArray(request.params?.enrollmentIds) ? request.params.enrollmentIds : [];
+  return { results: ids.map((id: unknown) => ({ enrollmentId: String(id), enrollment: fixtureEnrollment(String(id)), error: null })) };
+};
 const fixtureEnrollment = (id: string) => {
   const identity = { provider: "imessage", authId: "fixture", accountIdentity: "1".repeat(64), accountSubject: "imessage:fixture", implementationIdentity: "2".repeat(64), sourceGeneration: "fixture:1" };
   const coordinate = { provider: "imessage", chatGuid: "iMessage;-;fixture@example.test", service: "iMessage", observedChatRowId: 1 };
@@ -43,15 +47,19 @@ process.stdin.on("data", (chunk: string) => {
         error: { code: ["unavailable"], message: "ghostget.discovery.v1:native-chats:failed" } }) + "\n");
     }
     else if (request.method === "conversations") reply(request, { privateBody: "Must never be published" });
-    else if (request.method === "poll" && mode === "poll-lane") {
+    else if ((request.method === "poll" || request.method === "pollSet") && mode === "poll-lane") {
       // Held polls prove wire overlap: a serialized client could never reach
       // more than one held frame, and the lane cap bounds the burst.
       heldPolls.push(request); totalPolls++; maxHeld = Math.max(maxHeld, heldPolls.length);
     }
-    else if (request.method === "poll") reply(request, fixtureEnrollment(String(request.params?.enrollmentId ?? "enrollment:fixture")));
+    else if (request.method === "poll") reply(request, fixtureEnrollment(String(request.params?.enrollmentId ?? "enrollment:fixture")))
+    else if (request.method === "pollSet") reply(request, pollSetResult(request));
     else if (request.method === "lane-stats") reply(request, { held: heldPolls.length, maxHeld, totalPolls });
     else if (request.method === "release-polls") {
-      for (const held of heldPolls.splice(0)) reply(held, fixtureEnrollment(String(held.params?.enrollmentId ?? "enrollment:fixture")));
+      for (const held of heldPolls.splice(0)) {
+        if (held.method === "pollSet") reply(held, pollSetResult(held));
+        else reply(held, fixtureEnrollment(String(held.params?.enrollmentId ?? "enrollment:fixture")));
+      }
       reply(request, { released: true });
     }
     else if (request.method === "submit") sending = request;

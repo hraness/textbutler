@@ -145,6 +145,38 @@ test("discovery distinguishes rejected remote requests from invalid successful r
   expect(automationFailure(await client.conversations("whatsapp").catch(error => error))).toEqual({ stage: "unknown", code: "unknown" });
 });
 
+test("a set-poll answers exactly the requested enrollments and nothing else", async () => {
+  const f = automationFixture();
+  const ok = (id: string) => ({ enrollmentId: id, enrollment: { ...f.enrollment, id }, error: null });
+  const client = createGhostgetAutomationClient(async () => ({ results: [ok("enrollment:a"), { enrollmentId: "enrollment:b", enrollment: null, error: "unavailable" }] }));
+  const results = await client.pollSet(["enrollment:a", "enrollment:b"]);
+  expect(results.get("enrollment:a")?.enrollment?.id).toBe("enrollment:a");
+  expect(results.get("enrollment:b")).toEqual({ enrollment: null, error: "unavailable" });
+  // Attributed entry faults degrade to that enrollment's error result — the
+  // same blast radius a single failing per-contact poll used to have.
+  for (const bad of [
+    { enrollmentId: "enrollment:b", enrollment: null, error: null },
+    { enrollmentId: "enrollment:b", enrollment: { ...f.enrollment, id: "enrollment:c" }, error: null },
+    { enrollmentId: "enrollment:b", enrollment: { ...f.enrollment, ready: "yes" }, error: null },
+  ]) {
+    const client = createGhostgetAutomationClient(async () => ({ results: [ok("enrollment:a"), bad] }));
+    const degraded = await client.pollSet(["enrollment:a", "enrollment:b"]);
+    expect(degraded.get("enrollment:a")?.enrollment?.id).toBe("enrollment:a");
+    expect(degraded.get("enrollment:b")?.enrollment).toBeNull();
+    expect(degraded.get("enrollment:b")?.error).toBe("Poll result could not be verified.");
+  }
+  // Envelope faults — duplicates, escapes, missing ids — stay fatal because
+  // they break the whole response contract and cannot be attributed.
+  for (const results of [
+    [ok("enrollment:a"), ok("enrollment:a")],
+    [ok("enrollment:a")],
+    [ok("enrollment:a"), ok("enrollment:z")],
+  ]) {
+    const client = createGhostgetAutomationClient(async () => ({ results }));
+    await expect(client.pollSet(["enrollment:a", "enrollment:b"])).rejects.toThrow();
+  }
+});
+
 test("only complete allowlisted native markers survive remote unavailable classification", () => {
   const phases = ["admission", "native-preflight", "native-status", "native-chats", "native-projection", "reauthorization", "native-finalization", "host-status", "host-identity", "host-response"] as const;
   const codes = ["failed", "cancelled", "deadline", "cleanup-unverified", "process-failed", "process-stderr", "streams-failed", "response-invalid", "rpc-rejected", "rpc-invalid-params", "rpc-method-unavailable", "schema-invalid", "coordinate-invalid", "identity-changed", "database-unreadable"] as const;

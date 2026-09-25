@@ -89,9 +89,11 @@ test("non-string remote codes reject the pending request and retain custody inst
 test("polls run through a bounded parallel lane beside the serialized ordinary lane", async () => {
   const process = await createGhostgetAutomationProcess(await options("poll-lane"));
   try {
-    // Eight polls at once: the lane admits six frames over the wire and holds
-    // the rest client-side; a serialized chain could never show held > 1.
-    const polls = Array.from({ length: 8 }, (_unused, index) => process.client.poll(`enrollment:${index}`));
+    // Eight lane calls at once — one set-poll plus seven singles: the lane
+    // admits six frames over the wire and holds the rest client-side; a
+    // serialized chain could never show held > 1.
+    const setPoll = process.client.pollSet(["enrollment:a", "enrollment:b"]);
+    const polls = Array.from({ length: 7 }, (_unused, index) => process.client.poll(`enrollment:${index}`));
     // Ordinary and priority work do not wait behind the held poll lane.
     expect(automationFailure(await process.client.conversations("imessage").catch(error => error)))
       .toEqual({ stage: "response-schema", code: "response-schema" });
@@ -101,6 +103,7 @@ test("polls run through a bounded parallel lane beside the serialized ordinary l
     // The two queued polls reach the wire only after released slots freed.
     expect(await process.invoke("lane-stats", {})).toEqual({ held: 2, maxHeld: 6, totalPolls: 8 });
     await process.invoke("release-polls", {});
+    const set = await setPoll; expect([...set.keys()].sort()).toEqual(["enrollment:a", "enrollment:b"]);
     for (const [index, poll] of polls.entries()) expect((await poll).id).toBe(`enrollment:${index}`);
   } finally { await process.close(); }
 });

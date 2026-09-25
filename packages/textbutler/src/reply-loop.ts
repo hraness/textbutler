@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { automationContextId, createGhostgetAutomationTransport, type AutomationEvent, type AutomationMessage, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
+import { automationContextId, createGhostgetAutomationTransport, type AutomationEnrollment, type AutomationEvent, type AutomationMessage, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import { assertAutomationBinding, type AutomationBinding } from "./automation-owner.ts";
 import { messageAuthor, pendingCluster, type MessageAuthor } from "./attribution.ts";
 import type { OwnerRuntimeState, TextbutlerControlService } from "./control-service.ts";
@@ -80,8 +80,8 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     contacts.get(id)?.runtime.cancelContact(id);
     habitat?.invalidateContact(id);
   });
-  async function snapshot(contact: ContactSettings, state: ContactLoop): Promise<ConversationSnapshot> {
-    const enrollment = await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
+  async function snapshot(contact: ContactSettings, state: ContactLoop, current?: AutomationEnrollment): Promise<ConversationSnapshot> {
+    const enrollment = current ?? await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
     const page = await client.history(state.binding.enrollmentId, 200); assertAutomationBinding(state.binding, page.enrollment);
     for (const message of page.messages) if (author(message, contact) === "owner" && !(message.kind === "message" && message.text !== null && keywordPresent(message.text, contact.keyword))) state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(message.occurredAt));
     if (state.historyRevision !== page.enrollment.revision) {
@@ -101,7 +101,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     if (previous && previous.binding.bindingDigest === binding.bindingDigest && previous.binding.enrollmentId === binding.enrollmentId && previous.settingsRevision === contact.revision) return previous;
     previous?.runtime.cancelContact(contact.id);
     const state = { binding, settingsRevision: contact.revision, initialized: false, running: false, runningPinned: false, lastOwnerAt: null, historyRevision: null, pendingFirstAt: null, syncFailures: 0, runFailures: 0 } as unknown as ContactLoop;
-    state.runtime = new ButlerRuntime({ settings: () => settings, refresh: current => snapshot(current, state), agent,
+    state.runtime = new ButlerRuntime({ settings: () => settings, refresh: currentContact => snapshot(currentContact, state), agent,
       transport: createGhostgetAutomationTransport({ client, enrollmentId: binding.enrollmentId, admitAsset: async path => (await workspace(contact.id)).admitAsset(path), now }),
       journal: service.runJournal(), hooks, delegatedGrant: current => service.delegatedGrant(current),
       ...(habitat === undefined ? {} : { onSubmitted: habitat.submitted }),
@@ -156,23 +156,23 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
       const binding = owner.bindings[contact.id]; if (binding?.version !== 2) continue;
       actives.push({ contact, binding, state: contactLoop(contact, binding) });
     }
-    // One poll per contact keeps liveness, readiness and binding evidence; a
-    // single events drain then serves the whole set through a shared cursor.
-    const ready = new Map<string, boolean>(), pollFailed = new Set<string>(), drain = new Map<string, { contact: ContactSettings; state: ContactLoop }>();
-    // Polls run concurrently: the host multiplexes requests, spawns one provider
-    // session per enrollment, and rejects only same-enrollment cursor races.
-    // Results apply in contact order so drain membership stays deterministic.
-    const polls = await Promise.all(actives.map(async ({ contact, binding, state }) => {
+    // One set-poll keeps per-contact liveness, readiness and binding evidence;
+    // a single events drain then serves the whole set through a shared cursor.
+    const ready = new Map<string, boolean>(), pollFailed = new Set<string>(), drain = new Map<string, { contact: ContactSettings; state: ContactLoop }>(), fresh = new Map<string, AutomationEnrollment>();
+    // One set-poll covers every contact: the host shares a provider session
+    // across enrollments and a lane already running reports its current row.
+    // A failed call-level poll fails every contact exactly like the per-contact
+    // failures it replaces.
+    let results: Awaited<ReturnType<typeof client.pollSet>> | null = null;
+    try { results = await client.pollSet(actives.map(item => item.binding.enrollmentId)); }
+    catch { results = null; }
+    for (const { contact, binding, state } of actives) {
+      const result = results?.get(binding.enrollmentId);
       try {
-        const current = await client.poll(binding.enrollmentId); assertAutomationBinding(binding, current);
-        return { ok: true as const, contact, binding, state, current };
-      } catch {
-        return { ok: false as const, contact, state };
-      }
-    }));
-    for (const poll of polls) {
-      if (poll.ok) { ready.set(poll.contact.id, poll.current.ready); drain.set(poll.binding.enrollmentId, { contact: poll.contact, state: poll.state }); }
-      else { poll.state.runtime.cancelContact(poll.contact.id); poll.state.initialized = false; pollFailed.add(poll.contact.id); }
+        if (result === undefined || result.error !== null || result.enrollment === null) throw new Error(result?.error ?? "Poll result missing");
+        assertAutomationBinding(binding, result.enrollment);
+        ready.set(contact.id, result.enrollment.ready); drain.set(binding.enrollmentId, { contact, state }); fresh.set(contact.id, result.enrollment);
+      } catch { state.runtime.cancelContact(contact.id); state.initialized = false; pollFailed.add(contact.id); }
     }
     // The drain cursor belongs to the enrollment set, not one contact. A
     // membership change re-establishes the cursor; replayed events only re-
@@ -197,7 +197,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
       const healthy = !pollFailed.has(contact.id) && ready.get(contact.id) === true;
       if (healthy && caughtUp && !drainFailed) state.syncFailures = 0; else state.syncFailures++;
       if (!healthy) continue;
-      if (!state.initialized) { state.initialized = true; await snapshot(contact, state); continue; }
+      if (!state.initialized) { state.initialized = true; await snapshot(contact, state, fresh.get(contact.id)); continue; }
       if (service.runJournal().hasUncertainSend(contact.id)) state.blocked = RECONCILE_DETAIL;
       else if (state.blocked === RECONCILE_DETAIL) delete state.blocked;
       const event = state.pending;
