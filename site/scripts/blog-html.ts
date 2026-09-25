@@ -42,8 +42,14 @@ export function resolveBlogTokens(source: string, values: Readonly<Record<string
 }
 
 function headingLabel(html: string): string {
-  return html
-    .replace(/<[^>]+>/gu, '')
+  let text = '';
+  let inTag = false;
+  for (const character of html) {
+    if (character === '<') inTag = true;
+    else if (character === '>') inTag = false;
+    else if (!inTag) text += character;
+  }
+  return text
     .replaceAll('&quot;', '"')
     .replaceAll('&#39;', "'")
     .replaceAll('&lt;', '<')

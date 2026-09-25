@@ -60,11 +60,26 @@ function bodyOf(html: string): string {
 }
 
 function visibleText(html: string): string {
-  return html
-    .replace(/<script\b[\s\S]*?<\/script>/gu, ' ')
-    .replace(/<[^>]+>/gu, ' ')
-    .replace(/\s+/gu, ' ')
-    .toLowerCase();
+  let text = '';
+  let inTag = false;
+  let index = 0;
+  while (index < html.length) {
+    const rest = html.slice(index).toLowerCase();
+    const boundary = rest.charAt(7);
+    if (rest.startsWith('<script') && (boundary === '' || !/[a-z]/u.test(boundary))) {
+      const close = rest.indexOf('</script>');
+      if (close === -1) break;
+      index += close + '</script>'.length;
+      text += ' ';
+      continue;
+    }
+    const character = html[index]!;
+    if (character === '<') inTag = true;
+    else if (character === '>') inTag = false;
+    else if (!inTag) text += character;
+    index += 1;
+  }
+  return text.replace(/\s+/gu, ' ').toLowerCase();
 }
 
 describe('blog admission records', () => {
