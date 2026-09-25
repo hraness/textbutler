@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "devin-cli-subagent/explore-review",
+    "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and the companion Ghostget source read-only and produced only the review verdict; findings were re-verified and patched by the integrating agent before this record."
+  },
+  "sourceState": {
+    "branch": "claude/batched-poll",
+    "baseCommit": "4fe1acc",
+    "headCommit": "claude/batched-poll tip",
+    "identity": "Source digests identify the reviewed bytes; commits alone do not."
+  },
+  "scope": "The batched set poll: transport automation.ts adds client.pollSet with strict response validation; reply-loop.ts replaces the per-contact Promise.all poll burst with one pollSet per tick and reuses the tick's fresh enrollment for first-initialization snapshots; ghostget-automation-process.ts routes pollSet through the same bounded poll lane; the child fixture and tests pin wire lane membership, per-entry error isolation and contract faults. The companion Ghostget server (hraness/ghostget claude/poll-enrollment-lanes) implements the pollSet wire method, host pollEnrollments with provider-grouped scoped reads, FIFO provider queues, factory custody refcounting and multi-plan asset tracking.",
+  "method": "Independent read-only inspection of the diff plus automation.ts pollSet parsing, reply-loop.ts bookkeeping (ready/drain/fresh/pollFailed ordering and the snapshot reuse), ghostget-automation-process.ts lane admission, config.ts active-contact bound, and the Ghostget host/server/provider implementations in the sibling checkout. The integrating agent ran the focused suites and the full check.",
+  "result": "Ship after the two client-side fixes below were applied: attributed per-entry payload faults now degrade to that enrollment's error result instead of failing the whole set, and the remembered enrollment map is written only after the entry's id check. The reviewer verified deterministic ordering, the shared lane state machine, the bounded busy-row staleness, and that send-gating refreshes still poll fresh.",
+  "findings": [
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "file": "packages/transport/src/automation.ts:53-68",
+      "finding": "Any malformed entry threw the whole pollSet, so one contact's drifted enrollment row would cancel and de-initialize every contact; under the per-contact Promise.all the identical fault failed only that contact.",
+      "recommendation": "Keep envelope faults fatal (duplicate, escaped or missing ids cannot be attributed) while degrading attributed entry faults — enrollment parse, overlong error, id mismatch — to that entry's error result.",
+      "resolution": "Per-entry parsing now runs inside a try that degrades to { enrollment: null, error: 'Poll result could not be verified.' }; envelope checks still throw."
+    },
+    {
+      "severity": "medium",
+      "status": "accepted",
+      "file": "packages/textbutler/src/ghostget-automation-process.ts:280",
+      "finding": "One shared request watchdog bounds the whole pollSet; on providers without eventsScoped the host falls back to sequential per-scope reads, so a deep backlog over many enrollments shares a single deadline instead of per-contact deadlines.",
+      "recommendation": "Note the bound; the deployed iMessage provider implements eventsScoped so the fallback bound only matters to future WhatsApp or Beeper enrollment sets.",
+      "resolution": "Accepted and documented: a watchdog trip faults the supervised transport and retries on the next tick; iMessage — the only enrolled provider — serves the whole set in one session."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "packages/transport/src/automation.ts:57",
+      "finding": "remember() wrote the parsed enrollment into the client's known map before the entry's id-match check, so a mismatched entry could poison known under a foreign id before the call rejected.",
+      "recommendation": "Parse, verify the id, then record.",
+      "resolution": "The entry now parses without remembering, checks the id, and records via known.set only after the checks pass."
+    },
+    {
+      "severity": "low",
+      "status": "accepted",
+      "file": "packages/textbutler/test-fixtures/ghostget-automation.ts:12",
+      "finding": "The pollSet fixture echoes successful results for every requested id; no wire-level mode exercises a mixed or busy-row result set.",
+      "recommendation": "Optional: a fixture mode returning per-entry errors would close the wire-level gap.",
+      "resolution": "Accepted: per-entry error isolation is pinned at the client contract level (automation.test.ts) and at the reply loop (reply-loop.test.ts); the fixture's job is only lane-membership evidence."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "docs/textbutler/ghostget-contract.md:42, packages/textbutler/src/reply-loop.ts:159",
+      "finding": "The contract table omitted pollSet and the reply-loop comment still described one poll per contact.",
+      "recommendation": "Update both to describe the batched set poll.",
+      "resolution": "Contract table lists pollSet's shared-session behavior; the comment and the misleading refresh arrow parameter name were corrected."
+    }
+  ]
+}

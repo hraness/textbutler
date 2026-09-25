@@ -42,6 +42,34 @@ export function createGhostgetAutomationClient(invoke: GhostgetAutomationInvoker
     async grantStatus(grantId: string, signal?: AbortSignal) { const result = parseAutomationGrant(await invoke("grant.get", { grantId: automationId(grantId) }, signal)); if (result.id !== grantId) throw new Error("Grant status changed identity"); return result; },
     async grantByIntent(intentId: string, signal?: AbortSignal) { const result = automationRecord(await invoke("grant.by-intent", { intentId: automationId(intentId) }, signal), ["grant"]); return result.grant === null ? null : parseAutomationGrant(result.grant); },
     async poll(enrollmentId: string, signal?: AbortSignal) { const result = remember(await invoke("poll", { enrollmentId: automationId(enrollmentId) }, signal)); if (result.id !== enrollmentId) throw new Error("Poll changed enrollment"); return result; },
+    /** One provider-sync for the whole selection: the host shares a session
+     * across enrollments and answers one entry per id — a lane already running
+     * reports its current row instead of re-polling. */
+    async pollSet(enrollmentIds: readonly string[], signal?: AbortSignal) {
+      const ids = array(enrollmentIds, 50).map(automationId);
+      if (!ids.length || new Set(ids).size !== ids.length) throw new Error("Invalid poll selection");
+      const r = automationRecord(await invoke("pollSet", { enrollmentIds: ids }, signal), ["results"]);
+      const results = new Map<string, { enrollment: AutomationEnrollment | null; error: string | null }>();
+      for (const entry of array(r.results, ids.length)) {
+        // Envelope faults — a missing/extra key, a duplicate or escaped id —
+        // break the whole response and stay fatal. A fault inside one
+        // attributed entry degrades to that enrollment's error result, the
+        // same blast radius a per-contact poll failure had.
+        const item = automationRecord(entry, ["enrollmentId", "enrollment", "error"]);
+        const id = automationId(item.enrollmentId);
+        if (results.has(id) || !ids.includes(id)) throw new Error("Poll result escaped its selection");
+        try {
+          const enrollment = item.enrollment === null ? null : parseAutomationEnrollment(item.enrollment);
+          if (enrollment !== null && enrollment.id !== id) throw new Error("Poll changed enrollment");
+          const error = item.error === null ? null : string(item.error, 1024);
+          if (enrollment === null && error === null) throw new Error("Poll result is empty");
+          if (enrollment !== null) known.set(id, enrollment);
+          results.set(id, { enrollment, error });
+        } catch { results.set(id, { enrollment: null, error: "Poll result could not be verified." }); }
+      }
+      if (results.size !== ids.length) throw new Error("Poll set missed an enrollment");
+      return results;
+    },
     async history(enrollmentId: string, limit = 200, signal?: AbortSignal) {
       const r = automationRecord(await invoke("history", { enrollmentId: automationId(enrollmentId), limit: integer(limit, 1, 200) }, signal), ["enrollment", "messages"]);
       const enrollment = remember(r.enrollment), messages = array(r.messages, limit).map(parseAutomationMessage);

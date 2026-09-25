@@ -302,7 +302,7 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   let normalChain: Promise<unknown> = Promise.resolve(), queued = 0;
   const invoke: GhostgetAutomationInvoker = (method, params, signal) => {
     if (["cancel", "revoke", "close"].includes(method)) return send(method, params, signal);
-    if (method === "poll") {
+    if (method === "poll" || method === "pollSet") {
       // The owner serializes enrollment-scoped work per enrollment, so polls
       // across contacts proceed concurrently through this lane. The waiter
       // bound exceeds the 50-contact active limit plus owner-side polls; the
