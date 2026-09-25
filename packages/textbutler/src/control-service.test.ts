@@ -243,6 +243,15 @@ describe("persistent owner control service", () => {
     expect(JSON.stringify(snapshot)).not.toContain("api-owner-key");
     expect(snapshot.settings.paused).toBe(true);
   });
+  test("the Devin subscription account is selectable only for the Devin provider", async () => {
+    const { service, dataDir } = await setup(); await service.close(); services.splice(services.indexOf(service), 1);
+    const reopened = await TextbutlerControlService.open({ dataDir, providers: leases => createProviderHost({ dataDir, config: { schemaVersion: 1 }, leases }) }); services.push(reopened);
+    const { accountId: _accountId, ...oldSettings } = (await reopened.snapshot()).contacts[0]!.settings;
+    expect(await reopened.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 1, settings: { ...oldSettings, provider: "codex", accountId: "native-devin" } })).toMatchObject({ ok: false, code: "invalid-request" });
+    expect(await reopened.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 1, settings: { ...oldSettings, provider: "devin", accountId: "native-devin" } }))
+      .toMatchObject({ ok: true, kind: "snapshot", snapshot: { contacts: [{ settings: { accountId: "native-devin", provider: "devin" } }, {}] } });
+    expect((await reopened.settings()).contacts[0]).toMatchObject({ accountId: "native-devin", provider: "devin" });
+  });
   test("provider checks use bounded owner jobs without changing settings or blocking pause", async () => {
     const { service, dataDir } = await setup(); await service.close(); services.splice(services.indexOf(service), 1);
     let finish!: () => void, checked = "";

@@ -50,7 +50,7 @@ function providerName(provider: AutomationProvider): string { return provider ==
 function parseUiSettings(value: unknown) {
   const settings = record(value); exact(settings, ["enabled", "responseMode", "keyword", "provider", "disclosure", ...(settings.accountId === undefined ? [] : ["accountId"]), ...(settings.selfChat === undefined ? [] : ["selfChat"])]);
   const disclosure = record(settings.disclosure); exact(disclosure, ["character", "begin", "end"]);
-  if (settings.responseMode !== "smart" && settings.responseMode !== "keyword" || settings.provider !== "codex" && settings.provider !== "claude") fail("invalid-request", "Unknown reply mode or provider.");
+  if (settings.responseMode !== "smart" && settings.responseMode !== "keyword" || settings.provider !== "codex" && settings.provider !== "claude" && settings.provider !== "devin") fail("invalid-request", "Unknown reply mode or provider.");
   const keyword = text(settings.keyword, 160);
   if (keyword.length > 40) fail("invalid-request", "The trigger keyword is limited to 40 characters.");
   return { enabled: bool(settings.enabled), responseMode: settings.responseMode as "smart" | "keyword", keyword, provider: settings.provider as "codex" | "claude" | "devin",
