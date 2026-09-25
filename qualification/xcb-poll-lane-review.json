@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "devin-cli-subagent/explore-review",
+    "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and diff read-only and produced only the review verdict; findings were re-verified and patched by the integrating agent before this record."
+  },
+  "sourceState": {
+    "branch": "claude/poll-enrollment-lanes",
+    "baseCommit": "d5368a9",
+    "headCommit": "claude/poll-enrollment-lanes tip",
+    "identity": "Source digests identify the reviewed bytes; commits alone do not."
+  },
+  "scope": "The automation poll lane: ghostget-automation-process.ts routes client.poll through a bounded parallel lane (six in flight) that bypasses the serialized normalChain, and reply-loop.ts issues the per-tick per-contact polls with Promise.all, applying results in contact order. The companion Ghostget server admits enrollment-scoped operations concurrently (poll/history/prepare/grant/submit order per enrollment via planEnrollment). Test fixture gains held-poll/lane-stats/release-polls modes; tests pin real wire concurrency, queueing, deterministic result application and gate release.",
+  "method": "Independent read-only inspection of the diff plus the admission, send/settle, watchdog, close and cancel paths in ghostget-automation-process.ts, reply-loop.ts bookkeeping (ready/drain/uninitialized/failure ordering), automation.ts submit/refresh consumers, config.ts active-contact bound, and the child fixture. The reviewer reconstructed the diff against the pre-change sibling checkout. The integrating agent ran the focused suites and full check.",
+  "result": "Ship after the two capacity fixes below were applied: the poll waiter bound was raised to 64 (> the 50-contact active limit plus concurrent owner polls) removing deterministic positional starvation, and polls now dispatch only while fewer than six frames are pending, reserving wire slots seven through nine for priority and ordinary work so a poll burst cannot crowd out cancel/revoke/close. Reviewer verified the lane state machine: no stranded waiters, no deadlock, exact accounting on every failure path, Promise.all cannot reject early since every mapped poll catches, and results apply in contact order.",
+  "findings": [
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "file": "packages/textbutler/src/ghostget-automation-process.ts:304-310",
+      "finding": "Six in flight plus twenty-four waiters admitted at most thirty concurrent polls while parseSettings allows up to fifty enabled contacts (MAX_ACTIVE_LIMIT, config.ts:34,113); a burst over thirty would deterministically reject positions thirty-one-plus every tick, cancelling and de-initializing those contacts permanently.",
+      "recommendation": "Size the waiter bound above the configured active limit, chunk the burst, or treat local queue-capacity as a non-fatal skip.",
+      "resolution": "Waiter bound raised to 64; the fifty-contact burst plus owner-side polls now fits without rejection."
+    },
+    {
+      "severity": "low-medium",
+      "status": "fixed",
+      "file": "packages/textbutler/src/ghostget-automation-process.ts:181-189,304-316",
+      "finding": "Six polls plus one normal send could occupy seven of the nine wire frames, leaving two slots for priority work; a burst of three or more concurrent cancel/revoke/close frames during a poll burst would hit queue-capacity, surfacing indeterminate-cancel semantics for submits.",
+      "recommendation": "Reserve wire frames for non-poll traffic or lower the in-flight poll cap.",
+      "resolution": "Polls dispatch only while pending.size < 6 (pollReady), so poll frames can never fill wire slots seven through nine; waiters re-evaluate on every pending settle via clear() calling wakePoll(), so no waiter parks while a non-poll frame frees a slot."
+    }
+  ]
+}
