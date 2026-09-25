@@ -243,6 +243,15 @@ describe("persistent owner control service", () => {
     expect(JSON.stringify(snapshot)).not.toContain("api-owner-key");
     expect(snapshot.settings.paused).toBe(true);
   });
+  test("a maximal provider configuration still yields a parseable snapshot", async () => {
+    const { service, dataDir } = await setup(false); await service.close(); services.splice(services.indexOf(service), 1);
+    const config = parseHostConfig({ schemaVersion: 1, providerAccounts: Array.from({ length: 8 }, (_, index) => ({ id: `configured-${index}`, label: `Configured ${index}`, route: "claude-code" })) });
+    const reopened = await TextbutlerControlService.open({ dataDir, providers: leases => createProviderHost({ dataDir, config, leases }) }); services.push(reopened);
+    const parsed = parseControlResponse(JSON.parse(JSON.stringify(await reopened.request({ protocol, command: "snapshot" }))));
+    if (!parsed.ok || parsed.kind !== "snapshot") throw new Error("Missing snapshot");
+    expect(parsed.snapshot.providerAccounts?.map(account => account.id).slice(0, 3)).toEqual(["native-codex", "native-claude-code", "native-devin"]);
+    expect(parsed.snapshot.providerAccounts).toHaveLength(11);
+  });
   test("the Devin subscription account is selectable only for the Devin provider", async () => {
     const { service, dataDir } = await setup(); await service.close(); services.splice(services.indexOf(service), 1);
     const reopened = await TextbutlerControlService.open({ dataDir, providers: leases => createProviderHost({ dataDir, config: { schemaVersion: 1 }, leases }) }); services.push(reopened);

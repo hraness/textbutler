@@ -41,7 +41,7 @@ The verified bundle connects to an explicitly selected xcb installation after
 its build checks reviewed composition evidence against current source bytes and
 both contact profiles. A source daemon has no embedded admission and keeps
 subscription inference unavailable. xcb handles
-Claude Code or Codex subscription authentication, confinement and provider
+Claude Code, Codex or Devin subscription authentication, confinement and provider
 custody. Textbutler uses zero-tool generation, parses one operation proposal at
 a time and applies its contact-scoped broker policy before any effect.
 

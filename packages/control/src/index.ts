@@ -176,7 +176,7 @@ export function disconnectedSnapshot(detail = "The Textbutler daemon is not conn
     capabilities: [
       { id: "messages", status: "setup-required", detail: "Connect the daemon to negotiate Ghostget Messages access." },
       { id: "contacts", status: "setup-required", detail: "Contacts appear after Ghostget grants scoped access." },
-      { id: "agent", status: "setup-required", detail: "A qualified Codex or Claude account is required." },
+      { id: "agent", status: "setup-required", detail: "A qualified Claude, Codex or Devin account is required." },
       { id: "attachments", status: "setup-required", detail: "File sending must be reported by the connected provider." },
       { id: "reactions", status: "setup-required", detail: "Available only when the transport supports reactions." },
       { id: "stickers", status: "unsupported", detail: "No qualified sticker transport is connected." },
@@ -361,7 +361,8 @@ export function parseControlResponse(value: unknown): ControlResponse {
       ...(row.messaging === undefined ? {} : { messaging: { provider: oneOf(record(row.messaging).provider, ["imessage", "whatsapp", "beeper"]), state: oneOf(record(row.messaging).state, ["active", "missing", "revocation-pending", "recovery-required"]), detail: text(record(row.messaging).detail, 512), grantExpiresAt: record(row.messaging).grantExpiresAt === null ? null : text(record(row.messaging).grantExpiresAt, 32) } }) }; }),
     capabilities: list(source.capabilities, 9).map(value => { const row = record(value); return { id: oneOf(row.id, ["messages", "contacts", "agent", "attachments", "reactions", "stickers", "links", "polls", "mini-apps"]), status: oneOf(row.status, ["available", "setup-required", "unsupported"]), detail: text(row.detail) }; }),
     activity: list(source.activity, 200).map(value => { const row = record(value); return { id: text(row.id, 256), at: text(row.at, 64), contactId: row.contactId === null ? null : text(row.contactId, 256), title: text(row.title, 256), detail: text(row.detail) }; }),
-    ...(source.providerAccounts === undefined ? {} : { providerAccounts: list(source.providerAccounts, 10).map(value => {
+    // Three native subscription accounts plus at most eight configured accounts.
+    ...(source.providerAccounts === undefined ? {} : { providerAccounts: list(source.providerAccounts, 11).map(value => {
       const account = record(value);
       return { id: text(account.id, 80), label: text(account.label, 100), provider: oneOf(account.provider, ["claude", "codex", "devin"]),
         route: oneOf(account.route, ["claude-api", "claude-code", "codex", "devin"]), status: oneOf(account.status, ["ready", "setup-required", "unavailable"]),
