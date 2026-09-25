@@ -1028,7 +1028,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs admit
@@ -1107,7 +1107,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs workflow
@@ -1129,7 +1129,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/release-production-authority.mjs consume
@@ -1148,7 +1148,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs deny
@@ -1170,7 +1170,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/release-production-authority.mjs attest
@@ -1190,7 +1190,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs promote
@@ -1215,7 +1215,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/release-production-authority.mjs consume
@@ -1269,7 +1269,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs finalize
@@ -1323,7 +1323,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs wait
@@ -1340,7 +1340,7 @@ jobs:
           876c176fd0d203a091e8e6a819fc1656826c04a6d02a653b6b470aa8db641e7d  scripts/release-provider-outcome.mjs
           38c3f102b475b47bc4823060c13270234664b50d56160015e31cc4a224268591  scripts/release-ref-writer.mjs
           50f9feefba8aad4a831ab5ae1d3ac3e029f1b721cd813400742c82c7c6980df7  scripts/release-workflow-range.mjs
-          573fd84bf726e15983db0cbb0d5c6d31b37eac5cd248c4523bb38154b60f0b20  scripts/site-production-subject.mjs
+          bf7b7c1ec00cf2b61a4736a7ac25e244f12c9d70c3e25de9a2d2f66e30cbd91f  scripts/site-production-subject.mjs
           70dec16f999d28e3cb657c390094f1f82c26e0eaf034c05e4b46a8d8d72b3c4d  scripts/site-production.mjs
           SITE_AUTHORITY_HASHES
           node ./scripts/site-production.mjs qualify

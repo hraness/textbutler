@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { admitSiteCiRun, parseSiteSubject, revalidateSiteSource, revalidateSiteSubject, SITE_REQUIRED_CI_JOBS,
+import { admitSiteCiRun, parseSiteSubject, revalidateSiteSource, revalidateSiteSubject, SITE_CONDITIONAL_CI_JOBS, SITE_REQUIRED_CI_JOBS,
   SITE_REPOSITORY as repo, SITE_REPOSITORY_ID as repoId, siteDigest } from "./site-production-subject.mjs";
 import { assertSiteInvocation, assertConsumedSiteStatus, proveSiteProductionDenial, promoteSiteProduction, siteMain, siteReceiptDigest } from "./site-production.mjs";
 import { encodeProviderReceipt } from "./release-provider-outcome.mjs";
@@ -35,7 +35,7 @@ function sourceApi(changes = {}) {
     [`/repos/${repo}/actions/workflows/ci.yml`]: fixture.workflow,
     [`/repos/${repo}/actions/runs/10`]: fixture.run,
     [`/repos/${repo}/actions/runs/10/attempts/1`]: fixture.run,
-    [`/repos/${repo}/actions/runs/10/attempts/1/jobs?per_page=100`]: { total_count: 2, jobs: fixture.jobs },
+    [`/repos/${repo}/actions/runs/10/attempts/1/jobs?per_page=100`]: { total_count: SITE_REQUIRED_CI_JOBS.length, jobs: fixture.jobs },
     [`/repos/${repo}/actions/artifacts/30`]: { id: 30, name: "textbutler-site-build", expired: false,
       digest: subject.buildArtifactDigest, size_in_bytes: 1000, created_at: "2026-09-11T10:01:00Z", workflow_run: { id: 20, head_sha: sha } },
     [`/repos/${repo}/actions/runs/20/attempts/1`]: { id: 20, run_attempt: 1, workflow_id: 8,
@@ -57,11 +57,14 @@ describe("site source and artifact admission", () => {
     expect(() => parseSiteSubject({ ...subject, kind: "release" })).toThrow();
   });
   test("rejects missing, skipped, failed, duplicated, and wrong-attempt CI jobs", () => {
-    for (const change of [f => f.jobs.pop(), f => { f.jobs[0].conclusion = "skipped"; },
+    for (const change of [f => { f.jobs.splice(0, 1); }, f => { f.jobs[0].conclusion = "skipped"; },
       f => { f.jobs[0].conclusion = "failure"; }, f => { f.jobs[0].name = f.jobs[1].name; },
       f => { f.jobs[0].run_attempt = 2; }, f => { f.run.event = "pull_request"; }]) {
       const fixture = ciFixture(); change(fixture); expect(() => admitSiteCiRun(fixture)).toThrow();
     }
+    const conditionalSkipped = ciFixture();
+    conditionalSkipped.jobs = conditionalSkipped.jobs.filter(job => SITE_CONDITIONAL_CI_JOBS.includes(job.name) === false);
+    expect(admitSiteCiRun(conditionalSkipped).runId).toBe(10);
   });
   test("rejects advancing main and a CI run rerun after the selected successful attempt", async () => {
     const api = sourceApi(); api.values[`/repos/${repo}/git/ref/heads/main`].object.sha = oldSha;
