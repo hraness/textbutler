@@ -6,10 +6,13 @@ import { parseFastDriverConfig, type FastDriverConfig } from "./fast-driver.ts";
 export type GhostgetHostConfig = Readonly<{ executable: string; runtimeExecutable?: string; authId: string; stateHome?: string;
   automationAccounts?: readonly Readonly<{ provider: "imessage" | "whatsapp" | "beeper"; authId: string }>[] }>;
 export type XcbHostConfig = Readonly<{ executable: string; stateHome: string; sha256: string;
-  accounts: readonly Readonly<{ provider: "claude" | "codex"; accountId: string; model: string }>[] }>;
+  accounts: readonly Readonly<{ provider: XcbProvider; accountId: string; model: string }>[] }>;
+/** Subscription providers XCB can drive through its application route. */
+export type XcbProvider = "claude" | "codex" | "devin";
+export const XCB_PROVIDERS: readonly XcbProvider[] = Object.freeze(["claude", "codex", "devin"]);
 export type ProviderAccountConfig = Readonly<{ id: string; label: string }> & (
   | Readonly<{ route: "claude-api"; credentialFile: string; replyModel: string; prices: ClaudePriceCatalog; maxBudgetUsd: number }>
-  | Readonly<{ route: "claude-code" | "codex" }>
+  | Readonly<{ route: "claude-code" | "codex" | "devin" }>
 );
 export type HabitatHostConfig = Readonly<{ enabled: boolean; driver: FastDriverConfig; evolutionModel: string | null; debounceMs: number }>;
 export type HostConfig = Readonly<{ schemaVersion: 1; ghostget?: GhostgetHostConfig; xcb?: XcbHostConfig; providerAccounts?: readonly ProviderAccountConfig[]; habitat?: HabitatHostConfig }>;
@@ -65,15 +68,15 @@ function parseXcbConfig(value: unknown): XcbHostConfig {
   const xcb = record(value);
   if (Object.keys(xcb).sort().join(",") !== "accounts,executable,sha256,stateHome"
     || typeof xcb.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(xcb.sha256)
-    || !Array.isArray(xcb.accounts) || xcb.accounts.length < 1 || xcb.accounts.length > 2) return invalid();
+    || !Array.isArray(xcb.accounts) || xcb.accounts.length < 1 || xcb.accounts.length > XCB_PROVIDERS.length) return invalid();
   const accounts = Object.freeze(xcb.accounts.map(value => {
     const account = record(value);
     if (Object.keys(account).sort().join(",") !== "accountId,model,provider"
-      || account.provider !== "claude" && account.provider !== "codex"
+      || typeof account.provider !== "string" || !(XCB_PROVIDERS as readonly string[]).includes(account.provider)
       || typeof account.accountId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159}$/u.test(account.accountId)
-      || typeof account.model !== "string" || !/^(?:claude|codex)\/[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159}(?:\/[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159})?$/u.test(account.model)
+      || typeof account.model !== "string" || !/^(?:claude|codex|devin)\/[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159}(?:\/[A-Za-z0-9][A-Za-z0-9_.\[\]-]{0,159})?$/u.test(account.model)
       || !account.model.startsWith(`${account.provider}/`)) return invalid();
-    return Object.freeze({ provider: account.provider, accountId: account.accountId, model: account.model });
+    return Object.freeze({ provider: account.provider as XcbProvider, accountId: account.accountId, model: account.model });
   }));
   if (new Set(accounts.map(account => account.provider)).size !== accounts.length) return invalid();
   return Object.freeze({ executable: path(xcb.executable), stateHome: path(xcb.stateHome), sha256: xcb.sha256, accounts });
@@ -81,9 +84,9 @@ function parseXcbConfig(value: unknown): XcbHostConfig {
 function parseProviderAccount(value: unknown): ProviderAccountConfig {
   const account = record(value);
   if (typeof account.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(account.id)
-    || ["native-codex", "native-claude-code"].includes(account.id)
+    || ["native-codex", "native-claude-code", "native-devin"].includes(account.id)
     || typeof account.label !== "string" || !account.label.trim() || account.label.length > 100 || /[\u0000-\u001f\u007f]/u.test(account.label)) return invalid();
-  if (account.route === "claude-code" || account.route === "codex") {
+  if (account.route === "claude-code" || account.route === "codex" || account.route === "devin") {
     if (Object.keys(account).some(key => !["id", "label", "route"].includes(key))) return invalid();
     return Object.freeze({ id: account.id, label: account.label, route: account.route });
   }

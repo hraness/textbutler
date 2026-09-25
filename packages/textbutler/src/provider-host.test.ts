@@ -40,7 +40,7 @@ test("source mode and coding-agent selections never discover or substitute an AP
   const host = createProviderHost({ dataDir: f.root, config: f.config, leases: f.journal.accountLeases(), now: () => at }, {
     createAdapter: async () => { calls++; throw new Error("unexpected"); }, discover: async () => { calls++; throw new Error("unexpected"); },
   }); hosts.push(host);
-  expect(host.accounts().map(value => value.route)).toEqual(["codex", "claude-code", "claude-api", "claude-api"]);
+  expect(host.accounts().map(value => value.route)).toEqual(["codex", "claude-code", "devin", "claude-api", "claude-api"]);
   expect(host.accounts().every(value => value.status !== "ready")).toBe(true);
   await expect(host.check("account-a", new AbortController().signal)).rejects.toThrow("setup");
   await expect(host.selection(contact("native-claude-code"))).rejects.toThrow("no API substitution");

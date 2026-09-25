@@ -68,14 +68,15 @@ describe("persistent owner control service", () => {
     expect(response).toMatchObject({ ok: true, kind: "snapshot", snapshot: { settings: { paused: true }, contacts: [], providerAccounts: [
       { id: "native-codex", provider: "codex", route: "codex", status: "ready", defaultReplyModel: "codex/observed", classifierModel: "codex/observed" },
       { id: "native-claude-code", provider: "claude", route: "claude-code", status: "ready", defaultReplyModel: "claude/observed", classifierModel: "claude/observed" },
+      { id: "native-devin", provider: "devin", route: "devin", status: "unavailable", defaultReplyModel: null, classifierModel: null },
     ], capabilities: expect.arrayContaining([{ id: "agent", status: "available", detail: "An AI account is ready. Contact account selection and messaging grants still apply." }]) } });
     expect(response).toEqual(raw); expect(generated).toBe(0);
   });
   test("ready account snapshots still require models, route identity and qualified account state", async () => {
     const { service } = await setup(false), snapshot = await service.snapshot();
     const parse = (account: unknown) => parseControlResponse({ protocol, ok: true, kind: "snapshot", snapshot: { ...snapshot, providerAccounts: [account] } });
-    for (const route of ["claude-api", "claude-code", "codex"] as const) {
-      const account = { id: "synthetic-account", label: "Synthetic", provider: route === "codex" ? "codex" : "claude", route,
+    for (const route of ["claude-api", "claude-code", "codex", "devin"] as const) {
+      const account = { id: "synthetic-account", label: "Synthetic", provider: route === "codex" ? "codex" : route === "devin" ? "devin" : "claude", route,
         status: "ready", detail: "Synthetic qualification", defaultReplyModel: "reply-model", classifierModel: "classifier-model" };
       expect(parse(account)).toMatchObject({ ok: true, kind: "snapshot" });
       for (const field of ["defaultReplyModel", "classifierModel"] as const) {
@@ -241,6 +242,24 @@ describe("persistent owner control service", () => {
     expect(snapshot.providerAccounts?.some(account => account.id === "api-owner" && account.route === "claude-api")).toBe(true);
     expect(JSON.stringify(snapshot)).not.toContain("api-owner-key");
     expect(snapshot.settings.paused).toBe(true);
+  });
+  test("a maximal provider configuration still yields a parseable snapshot", async () => {
+    const { service, dataDir } = await setup(false); await service.close(); services.splice(services.indexOf(service), 1);
+    const config = parseHostConfig({ schemaVersion: 1, providerAccounts: Array.from({ length: 8 }, (_, index) => ({ id: `configured-${index}`, label: `Configured ${index}`, route: "claude-code" })) });
+    const reopened = await TextbutlerControlService.open({ dataDir, providers: leases => createProviderHost({ dataDir, config, leases }) }); services.push(reopened);
+    const parsed = parseControlResponse(JSON.parse(JSON.stringify(await reopened.request({ protocol, command: "snapshot" }))));
+    if (!parsed.ok || parsed.kind !== "snapshot") throw new Error("Missing snapshot");
+    expect(parsed.snapshot.providerAccounts?.map(account => account.id).slice(0, 3)).toEqual(["native-codex", "native-claude-code", "native-devin"]);
+    expect(parsed.snapshot.providerAccounts).toHaveLength(11);
+  });
+  test("the Devin subscription account is selectable only for the Devin provider", async () => {
+    const { service, dataDir } = await setup(); await service.close(); services.splice(services.indexOf(service), 1);
+    const reopened = await TextbutlerControlService.open({ dataDir, providers: leases => createProviderHost({ dataDir, config: { schemaVersion: 1 }, leases }) }); services.push(reopened);
+    const { accountId: _accountId, ...oldSettings } = (await reopened.snapshot()).contacts[0]!.settings;
+    expect(await reopened.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 1, settings: { ...oldSettings, provider: "codex", accountId: "native-devin" } })).toMatchObject({ ok: false, code: "invalid-request" });
+    expect(await reopened.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 1, settings: { ...oldSettings, provider: "devin", accountId: "native-devin" } }))
+      .toMatchObject({ ok: true, kind: "snapshot", snapshot: { contacts: [{ settings: { accountId: "native-devin", provider: "devin" } }, {}] } });
+    expect((await reopened.settings()).contacts[0]).toMatchObject({ accountId: "native-devin", provider: "devin" });
   });
   test("provider checks use bounded owner jobs without changing settings or blocking pause", async () => {
     const { service, dataDir } = await setup(); await service.close(); services.splice(services.indexOf(service), 1);

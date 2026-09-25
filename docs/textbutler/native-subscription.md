@@ -1,7 +1,7 @@
 # AI subscriptions through xcb
 
 Textbutler uses [xcb (Excalibur)](https://github.com/hraness/xcb) to draft replies
-through an explicitly connected Claude Code or Codex subscription. xcb owns
+through an explicitly connected Claude Code, Codex, or Devin subscription. xcb owns
 provider sign-in, runtime admission, operating-system confinement and account
 custody. Textbutler owns contact context, response policy and every message send.
 Textbutler is an MIT-licensed reference application for this separation.
@@ -36,8 +36,9 @@ bun run textbutler setup \
   --xcb-model FULL_MODEL_KEY
 ```
 
-Repeat setup with `--xcb-account codex:ACCOUNT_ID` and its full model key to add
-a Codex account. Setup records the xcb executable's SHA-256 and the explicit
+Repeat setup with `--xcb-account codex:ACCOUNT_ID` or `--xcb-account devin:ACCOUNT_ID`
+and the matching full model key to add a Codex or Devin account; one account per
+provider. Setup records the xcb executable's SHA-256 and the explicit
 account/model binding. It does not copy subscription credentials, create a
 provider sign-in or enable a contact. Restart the installed daemon, run `providers list`,
 and use the returned Textbutler account ID with `providers check ACCOUNT_ID`.

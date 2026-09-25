@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "devin-cli-subagent/independent-review",
+    "independence": "The reviewer did not implement or edit the application, tests, admission gate or validation receipts. This review record is its only persistent written artifact. Two transient scratch files under /tmp, created while diffing dependency JavaScript during the initial review, were deleted immediately. No other repository or system file was created, modified or deleted. The follow-up review changed only this record, as did the 35dd6eb delta check."
+  },
+  "sourceState": {
+    "branch": "claude/xcb-devin-route",
+    "baseCommit": "cb4e67c5a2375f6dc325aa46c3148c7f49cc67ef",
+    "headCommit": "35dd6eb081e5f5ae8700fe16b0d1f4cb555e379f",
+    "identity": "Source digests identify the reviewed bytes; commits alone do not."
+  },
+  "scope": "The claude/xcb-devin-route change set (feature commits 717af44, 643232b and 2dbd92a, plus the review fix e744704 and the copy fix 35dd6eb) that adds Devin as a third xcb subscription provider across the control wire, contact settings, private host configuration, native subscription and xcb hosts, provider host, routed agent, onboarding, CLI help and docs, and moves @hraness/agentmixer from 0.1.1 to 0.3.0.",
+  "method": "Initial review at 2dbd92a: read-only inspection of git diff origin/main...HEAD, excluding the merges of main. The reviewer read every changed source in full, plus the consumers and gates it affects: xcb-client.ts, xcb-integration.ts, daemon.ts, owner-cli.ts, menubar.ts, tui.ts, reply-loop.ts, journal.ts, habitat-agent.ts, scripts/build-textbutler.ts, scripts/textbutler-build.test.ts, scripts/xcb-integration-admission.ts and qualification/xcb-textbutler-v1.json. Repository-wide rg sweeps covered provider, route, native account-id and length-bound enumerations, and git history was checked for the providerAccounts limits (5dba7f4). For the dependency, the reviewer checked package.json and bun.lock consistency, compared node_modules/@hraness/agentmixer with Bun's cached 0.3.0 extraction (identical) and 0.1.1 extraction (all .d.ts diffs, plus runtime JavaScript diffs for validation, accounts, broker, capabilities, task-runtime, runtime, public-web, models, Claude API, credential and Codex account sections), and confirmed that all 59 imported names exist in the 0.3.0 .d.ts. The local xcb 0.8.1 deployment source was read to confirm Devin provider serialization, identifier grammar, model-key format and the Devin generate branch. Receipt drift and changed-file digests were measured with shasum -a 256, with one read-only bun -e JSON read of the receipt. The reviewer ran no tests, typechecks, builds or installs, and made no provider or network calls. followupReview describes the recheck at e744704, and its deltaChecks entry describes the copy-only delta at 35dd6eb.",
+  "result": "No blocking findings remain at 35dd6eb, which only adds Oxford commas to copy. The build pins the same agentmixer 0.3.0 URL as package.json and bun.lock, and the control wire accepts 11 provider accounts (3 built-in plus 8 configured), with a regression test. Devin readiness still requires xcb's exact account, qualification and pinned runtime digest. Remaining items are optional tests and notes.",
+  "findings": [
+    {
+      "severity": "blocking",
+      "status": "resolved",
+      "file": "scripts/build-textbutler.ts:10",
+      "finding": "PINNED_INPUTS still pins @hraness/agentmixer to https://github.com/hraness/agentmixer/releases/download/v0.1.1/hraness-agentmixer-0.1.1.tgz, but package.json:97 and bun.lock:13/57 now pin https://github.com/hraness/xcb/releases/download/v0.3.0/hraness-agentmixer-0.3.0.tgz. buildTextbutler throws 'Textbutler build dependency pin changed: @hraness/agentmixer' at line 23, and it still does after qualification/xcb-textbutler-v1.json is refreshed. Only the built bundle defines __TEXTBUTLER_XCB_ADMISSION (xcb-integration.ts), so neither the new Devin route nor the existing claude/codex routes can be built or installed from this branch (textbutler:build, textbutler:install). scripts/textbutler-build.test.ts, which runs under bun run test inside the required bun run check, also fails. The file is unchanged (sha256 896c6e0c2f571e6702f7634fb684e0a61ee24e1fbe92d82eead45a19c8faf9a5) and is itself in XCB_INTEGRATION_SOURCES.",
+      "recommendation": "Set PINNED_INPUTS['@hraness/agentmixer'] to the exact 0.3.0 URL in package.json and bun.lock, which also updates the pinned-dependency line in notices.md. Have the changed file reviewed with the other inventory changes, then refresh the composition receipt and rerun scripts/textbutler-build.test.ts.",
+      "resolution": "Resolved in e744704. scripts/build-textbutler.ts:10 now pins https://github.com/hraness/xcb/releases/download/v0.3.0/hraness-agentmixer-0.3.0.tgz. All three PINNED_INPUTS entries equal their package.json devDependencies byte for byte, so the check at line 23 passes. package.json:97, bun.lock:13/57 and this line are the only places that carry the agentmixer URL, and no other file prints or validates the notices pin list. The build was not run: scripts/textbutler-build.test.ts exercises this check only after the composition receipt is refreshed."
+    },
+    {
+      "severity": "blocking",
+      "status": "resolved",
+      "file": "packages/control/src/index.ts:364",
+      "finding": "parseControlResponse accepts at most 10 snapshot providerAccounts. Commit 5dba7f4 set that limit together with two built-in native accounts and the 8-entry providerAccounts limit in host-config.ts:33 (2 + 8 = 10). This branch adds a third built-in account that is always listed (provider-host.ts:67), so a valid existing host.json with 8 providerAccounts now puts 11 accounts in every snapshot (control-service.ts:477). requestDaemon (daemon.ts:147) parses every daemon response with parseControlResponse. The owner CLI, TUI, doctor/readiness and menu bar therefore reject every response that carries a snapshot ('Control response exceeds its list limit.'), including pause and settings updates the daemon has already applied. No test covers this maximal configuration.",
+      "recommendation": "Raise the wire limit to 11 (3 built-in plus 8 configured accounts), preferably derived from shared constants, without rejecting existing host.json files. Add a regression test that parses the snapshot of a provider host configured with 8 providerAccounts.",
+      "resolution": "Resolved in e744704. packages/control/src/index.ts:364-365 raises the limit to 11, with a comment naming 3 built-in plus 8 configured accounts, so 12 or more accounts are still rejected. control-service.test.ts:246-254 opens a provider host with 8 configured claude-code accounts (the host-config.ts:33 maximum) and parses the JSON round-tripped snapshot through parseControlResponse, the same parser requestDaemon uses. It gets 11 accounts with the three native ones first. Under the old limit of 10 that parse throws, so the test exercises the regression. The other consumers handle 11 accounts: the TUI picker lists up to 20 (tui.ts:56), and boundedMenu truncates the menu at 248 nodes with an overflow hint (menubar.ts:117-135)."
+    },
+    {
+      "severity": "should-fix",
+      "status": "partially-resolved",
+      "file": "packages/textbutler/src/xcb-host.test.ts:14",
+      "finding": "Devin test coverage stops short of the xcb binding. native-subscription.test.ts exercises a synthetic native Devin host with the real lease store, host-config.test.ts covers the parser, and control-service.test.ts covers source-mode account selection. No test binds a Devin account through createXcbSubscriptionHost: the native-devin id, the devin route, the xcb-devin-classify/respond route ids, readiness only when xcb reports the exact account available and runtimeAdmitted with a qualification whose runtimeDigest equals the pinned sha256, and an unavailable status with selection refused otherwise. Nor does any test cover provider-host with a native Devin host, or setup adding devin:ACCOUNT to an existing claude/codex binding. The code paths are provider-generic, so this is a coverage gap rather than an observed defect.",
+      "recommendation": "Parameterize the xcb-host readiness, digest-mismatch and settlement tests over claude, codex and devin. Add a provider-host test that selects native-devin only for provider devin, and an onboarding test that merges a third provider binding.",
+      "resolution": "Partially resolved in e744704. xcb-host.test.ts:63-74 binds claude, codex and devin accounts through createXcbSubscriptionHost. It asserts that each reports its own native id and route, ready with the pinned runtime digest and unavailable with a different digest; the two cases differ only in that digest. The Devin ready case also depends on agentmixer 0.3.0, because selectClassifierModel validates the catalog provider. Still untested: provider-host selection and runManagedTask with a ready native Devin host (for example, by adding devin to the 'qualified XCB accounts survive the provider host' test at control-service.test.ts:45-74), and setup merging a devin:ACCOUNT binding. Both run provider-generic code, so the remainder is optional follow-up, not a merge blocker."
+    },
+    {
+      "severity": "note",
+      "status": "partially-resolved",
+      "file": "packages/textbutler/src/onboarding.ts:66",
+      "finding": "Public and CLI copy is inconsistent. docs/textbutler/native-subscription.md:4 and the CLI help list Devin. The readiness step text (onboarding.ts:66), disconnectedSnapshot (packages/control/src/index.ts:179), docs/textbutler/getting-started.md:8, docs/textbutler/readiness.md:44, README.md:6 and :17, PRODUCT.md:25, packages/textbutler/README.md:12, packages/textbutler/PROVIDERS.md:3-4 and the site (site/app/_lib/site.ts:12, site/app/llms.txt/route.ts:23, site/app/page.tsx) still name only Claude Code or Codex.",
+      "recommendation": "Decide whether to advertise Devin before live acceptance evidence exists. Either update the copy consistently under STYLE.md, noting that readiness depends on xcb's own Devin qualification, or limit Devin mentions to setup reference text.",
+      "resolution": "Partially resolved in e744704, which names Devin in onboarding.ts:66, packages/control/src/index.ts:179, docs/textbutler/getting-started.md:8 and docs/textbutler/readiness.md:44. Still naming only Claude Code or Codex: README.md:6 and :17, PRODUCT.md:25, packages/textbutler/README.md:12, packages/textbutler/PROVIDERS.md:3-4 and the site (site/app/_lib/site.ts:12, site/app/llms.txt/route.ts:23, site/app/page.tsx:52/72/171/186, site/app/about/page.tsx:13; site/scripts/product-marketing.test.tsx:67 pins one of these). At e744704, the new three-item lists, and native-subscription.md:4 from the feature commits, omitted the Oxford comma that STYLE.md:150 requires ('Claude Code, Codex, or Devin'). Commit 35dd6eb resolves that part for the branch's own additions. All five three-provider lists the branch adds (onboarding.ts:66, packages/control/src/index.ts:179, getting-started.md:8, native-subscription.md:4, and readiness.md:44) now read 'Claude Code, Codex, or Devin' or 'Claude, Codex, or Devin'. The branch's other provider lists either name two providers or, like the CLI help's 'claude, codex, devin', use no conjunction. Older lists without the Oxford comma in the same files, such as readiness.md:44-45, predate the branch. onboarding.ts:66 also keeps the uppercase XCB used throughout the existing CLI text, where STYLE.md:246 asks for xcb."
+    },
+    {
+      "severity": "note",
+      "status": "open",
+      "file": "packages/textbutler/src/provider-host.ts:67",
+      "finding": "Mixed-version and rollback compatibility. native-devin is always listed, so every textbutler.control.v1 snapshot now carries devin provider and route values, which earlier Textbutler clients reject. Once a Devin contact (config.ts:90) or a Devin xcb binding (host-config.ts:75) is saved, earlier builds reject the whole settings.json or host.json. host-config.ts:87 also reserves the id native-devin, so an existing host.json that used it for a configured providerAccount would stop loading. Each case refuses and changes nothing, and existing claude/codex files parse to identical values.",
+      "recommendation": "Document that the CLI, daemon and menu companion must be upgraded together, and that rollback requires removing Devin contact selections and the Devin xcb binding first."
+    },
+    {
+      "severity": "note",
+      "status": "open",
+      "file": "package.json:97",
+      "finding": "The dependency bump checks out. package.json:97, both bun.lock entries and, since e744704, scripts/build-textbutler.ts:10 pin the same 0.3.0 release URL, with unchanged transitive dependencies. node_modules/@hraness/agentmixer 0.3.0 is byte-identical to Bun's cached extraction, and all 59 names Textbutler imports exist in its dist .d.ts. Compared with 0.1.1, the task-runtime admission, capability-profile, broker, accounts, public-web, models, Claude API, credential and Codex account code differs only by bundler identifier renames and whitespace. The only behavior changes are that provider() and AgentProvider accept devin, plus a devin unqualified reason and devin launch-plan metadata. The package now declares a bin (agentmixer -> dist/cli.js), which the library entry does not import, and ships Devin ACP, browser-session, os-sandbox, egress-bridge and managed-account modules that Textbutler does not use. The tarball now comes from hraness/xcb releases instead of hraness/agentmixer.",
+      "recommendation": "No source change is needed. Confirm the lock's sha512 and the release provenance with a frozen-lockfile install in CI. The bundle's check for external imports remains the guard against pulling the new CLI into the runtime."
+    },
+    {
+      "severity": "note",
+      "status": "open",
+      "file": "packages/textbutler/src/native-subscription.ts:25",
+      "finding": "The three-provider union is written out separately in native-subscription.ts:25, host-config.ts:11-12, config.ts:1, packages/control/src/index.ts:17/37/157/261/367-368/388, control-service.ts:53, native-task.ts:88, routed-agent.ts:42 and provider-host.ts:71-72. All of them agree at HEAD. The wire bound at packages/control/src/index.ts:365 is now a commented literal 11 that must track both the built-in account count (provider-host.ts:65-67) and host-config.ts:33 by hand. The partial update fixed in 2dbd92a and the stale wire limit fixed in e744704 show how these copies can drift when another provider is added.",
+      "recommendation": "Optionally derive these lists, the provider<->route<->account-id mapping and the wire bound from shared exported constants, add a test that the mapping is total and one-to-one, and test that a twelfth account is still rejected."
+    }
+  ],
+  "authorityReview": {
+    "qualification": "Devin becomes ready only through the unchanged xcb-host admitted() predicate (xcb-host.ts:88-93). It requires valid bundled composition admission, no capability failure, supported capabilities, and the exact configured xcb account id and provider. That account must be available, enabled, not busy, connected and runtimeAdmitted, with a qualification whose runtimeDigest equals the pinned xcb sha256 and expires at least 135 s ahead, and the exact configured model observed within 24 h. native-subscription.ts select() and routed-agent.ts selectButlerModel() still require a qualified adapter with matching route, profile, controls, runtime digest and version. AgentMixer.runTask checks these again before acquiring the lease. Since e744704, xcb-host.test.ts:63-74 exercises the runtime-digest gate for claude, codex and devin.",
+    "noFallbackOrSubstitution": "provider-host.ts selection() sends provider devin only to native-devin on the native host. Every other combination reaches the Claude API-only branch and throws without substituting an API account. The legacy router's new unqualifiedAdapter('devin') always throws PROVIDER_UNQUALIFIED. validateAccountChange binds native-devin to provider devin, which the control-service test at control-service.test.ts:255-263 covers.",
+    "tools": "No tool, capability profile, broker operation, command or filesystem root was added. The contact capability profiles and the agentmixer capability, broker and task-runtime code are unchanged, and xcb generate still receives the same zero-tool request with the same size and time limits.",
+    "mappings": "claude<->claude-code<->native-claude-code, codex<->codex<->native-codex and devin<->devin<->native-devin agree across native-subscription.ts, xcb-host.ts, provider-host.ts, the wire identity check (packages/control/src/index.ts:388) and host-config parsing. The owner CLI, TUI and menu take the provider from the selected snapshot account. Limits that were 2, 4 and 10 are now 3, 6 and 11 (the last in e744704).",
+    "compatibility": "Existing claude/codex settings.json and host.json content parses to identical values. textbutler.control.v1, the xcb route ids, native account ids, the lease table and the capability profile identities are unchanged. xcb 0.8.1 serializes the provider as devin, uses the identifier grammar and provider/model[/effort] model keys that host-config accepts, and its generate command has a Devin branch."
+  },
+  "admissionInventoryReview": {
+    "inventorySources": 42,
+    "inventoryUnchanged": true,
+    "sourcesDriftedFromReceipt": [
+      "bun.lock",
+      "package.json",
+      "packages/control/src/index.ts",
+      "packages/textbutler/src/cli.ts",
+      "packages/textbutler/src/control-service.ts",
+      "packages/textbutler/src/host-config.ts",
+      "packages/textbutler/src/native-subscription.ts",
+      "packages/textbutler/src/native-task.ts",
+      "packages/textbutler/src/provider-host.ts",
+      "packages/textbutler/src/routed-agent.ts",
+      "packages/textbutler/src/xcb-host.ts",
+      "scripts/build-textbutler.ts"
+    ],
+    "result": "XCB_INTEGRATION_SOURCES is unchanged. Twelve inventory files now differ from qualification/xcb-textbutler-v1.json: the eleven changed by the feature commits, and scripts/build-textbutler.ts, changed by e744704, which also changed packages/control/src/index.ts again. Commit 35dd6eb changed packages/control/src/index.ts a third time, adding one comma to the disconnectedSnapshot agent detail string at line 179; the drift set, remeasured at 35dd6eb, is unchanged. reviewedSourceSha256 binds all twelve at 35dd6eb. From this review's side, the receipt can be refreshed against exactly these bytes. Test and build evidence belong to the validation owner, and any further change to an inventory file needs another review."
+  },
+  "reviewedSourceSha256": {
+    "bun.lock": "d7275c271129b75f91181da97a3af8450127f7b1d1e0d1c8000b1e829f0be216",
+    "docs/textbutler/getting-started.md": "e6632aa616bc26304102a185772b288d919739c46b98e078eceba2778e00f554",
+    "docs/textbutler/native-subscription.md": "09762d1dc66086f5f7c6421afd206768b5295b1f647224c054f1a4b69f0e12d6",
+    "docs/textbutler/readiness.md": "cbf43379c6a7f632305da24fd775b237cde67faca4acb42c2ac2fa805c778c1e",
+    "package.json": "f7662cd480547dd92a0de558b472e1438e2ddebb39a66f44b8a0a1e7f8f3b83e",
+    "packages/control/src/index.ts": "76e11bb995f826314e0a54e8af78ead79fc6a96fdc3cb36af554b956d7ba35e1",
+    "packages/textbutler/src/cli.ts": "1847462b11d007925b0096733fb393fbc6dcd4667b4f895cd0e07fd30ed20d1c",
+    "packages/textbutler/src/config.ts": "d65a29813c5b46c226220c47b9c7f8900f266b2eefb187d3ea1b583627f66817",
+    "packages/textbutler/src/control-service.test.ts": "e6451327a02bf3fcf28e379d54da8940991dca891151ebda6fc9a5422145f590",
+    "packages/textbutler/src/control-service.ts": "ba1bd87d6ee295e20e6a764f177901cc45c170fec641e420773b367318006707",
+    "packages/textbutler/src/host-config.test.ts": "5cdd6692a445ef3d889611f305ccf0bd6a5e9deb8e1f8e3515f2a836ada419f6",
+    "packages/textbutler/src/host-config.ts": "c0a59527d9427aaa3ca26ca469ce73e7edb1153607d1ac5d9c50e84dd825ccd0",
+    "packages/textbutler/src/managed-codex-owner.test.ts": "63d0a22a2ce139e1f1b3b57e48dae35614ec71c2767be22aadb015f943112a6c",
+    "packages/textbutler/src/native-subscription.test.ts": "99239a46d6ee71e4860a76acd54d9f87cc793ab698e7f233446743a7901364c0",
+    "packages/textbutler/src/native-subscription.ts": "f448154b264237ac1e854f3f1a3cf8fb2d38266b71fbb2fb8ebec52cb842c91b",
+    "packages/textbutler/src/native-task.ts": "122ba7b346ba9cbaca3d1c71270c32e6d6dda37e4c59c8a34c4051c8241859f4",
+    "packages/textbutler/src/onboarding.ts": "ae65d8e4e2449ff452a9127e09519541fcab5c66bda7353e7284f1b7c65e858f",
+    "packages/textbutler/src/provider-host.test.ts": "2570538ce3be8c34f72e2ae2a1fa6caca9319521e0b78c312f5587f3ffdb493c",
+    "packages/textbutler/src/provider-host.ts": "81f9b55d8d47882429a31331994db5195530a599090ceef96986fe237cd64d2e",
+    "packages/textbutler/src/routed-agent.ts": "63897e366965b77ac8bcce8b1b8c08b218c20605923dd86bf468e0b9a65f22b3",
+    "packages/textbutler/src/xcb-host.test.ts": "dafa5d00aeea917b5e8c0384f7e78d44525195e80ce2f469289035605727eb66",
+    "packages/textbutler/src/xcb-host.ts": "27395d6bb942dfb297ceb852c097bfa62263d893c94e273d2fb217bda853120b",
+    "scripts/build-textbutler.ts": "89645b8c85058de94641de3f67291f802094e2be6b9261da5605e8a7797db272"
+  },
+  "limitations": [
+    "This record is independent AI source review, not human approval or a provider attestation.",
+    "The reviewer ran no tests, typechecks, builds or installs in the initial review, the follow-up, or the 35dd6eb delta check. The integrator reports that the tests added in e744704 pass. Test execution, typecheck results and final integration gates belong to the validation owner.",
+    "The build pin fix was verified by exact string comparison only. scripts/textbutler-build.test.ts exercises it only after the composition receipt is refreshed.",
+    "No live xcb or Devin provider calls were made. This review does not establish live Devin qualification, xcb's Devin runtime admission or confinement, reply quality, completion within Textbutler's 120-second task limit, macOS permissions or messaging delivery.",
+    "The bun.lock sha512 integrity and GitHub release provenance of the 0.3.0 tarball were not recomputed or verified offline; the dependency comparison relies on Bun's local cache extraction.",
+    "The xcb 0.8.1 source was read from a local deployment checkout only to check identifier and wire compatibility. It is not a dependency of this repository, and other xcb versions were not reviewed.",
+    "This follow-up covers the e744704 bytes, and the 35dd6eb delta check extends that coverage to the bytes now listed in reviewedSourceSha256. Any later change to an inventory file needs another review before qualification/xcb-textbutler-v1.json is refreshed."
+  ],
+  "followupReview": {
+    "reviewer": "devin-cli-subagent/independent-review",
+    "date": "2026-09-24",
+    "reviewedCommit": "e7447049036798e8ec6d917781500befde2130d8",
+    "previousHeadCommit": "2dbd92a144e034cfeea251d0cc009ee7a35afc19",
+    "method": "Read-only inspection of git show e744704, whose parent is 2dbd92a and which changes 7 files: scripts/build-textbutler.ts, packages/control/src/index.ts, packages/textbutler/src/onboarding.ts, control-service.test.ts, xcb-host.test.ts, docs/textbutler/getting-started.md and docs/textbutler/readiness.md. The reviewer compared PINNED_INPUTS with package.json devDependencies using a read-only bun -e string comparison. It swept the repository for other agentmixer URL pins and for every provider-account consumer and bound. It read the fixtures behind both new tests (setup, capabilities, integration) and traced them through xcb-host admitted(), native-subscription select() and agentmixer selectClassifierModel. It checked the copy changes against test pins and STYLE.md, confirmed that the other 16 changed files still match their initial digests, and remeasured receipt drift and all 23 changed-file digests with shasum -a 256. It ran no tests, typechecks, builds or installs, and made no provider or network calls.",
+    "rechecked": [
+      "Build pin: all three PINNED_INPUTS entries equal package.json. Only package.json:97, bun.lock:13/57 and scripts/build-textbutler.ts:10 carry the agentmixer URL, all at 0.3.0, and nothing else reads the notices pin list. The 64 MiB MAX_RUNTIME_BYTES leaves ample room for the larger 0.3.0 dist (about 415 KB, against about 291 KB for 0.1.1).",
+      "Wire bound: list(source.providerAccounts, 11) at packages/control/src/index.ts:365. No other provider-account bound exists in the control package, owner CLI, TUI (20-choice picker) or menu (248-node boundedMenu with an overflow hint).",
+      "Regression tests: the maximal-configuration test fails under the old limit of 10 and passes at 11. The per-provider xcb-host test changes only the runtime digest between its ready and unavailable cases, uses a fresh capabilities object per case, and its Devin ready case needs agentmixer 0.3.0.",
+      "Collateral: no test pins the changed copy strings; the only pinned copy is the unchanged site marketing page. The fix did not touch the receipt, validation records, inventory list, package.json or bun.lock."
+    ],
+    "result": "Both blocking findings are resolved at e744704, and this review found no new defect in the fix beyond a copy-style note: the new lists omit the Oxford comma. The test-coverage and copy findings are partially resolved, and the compatibility, dependency and maintainability notes still apply. None blocks merge.",
+    "deltaChecks": [
+      {
+        "commit": "35dd6eb081e5f5ae8700fe16b0d1f4cb555e379f",
+        "previousHeadCommit": "e7447049036798e8ec6d917781500befde2130d8",
+        "reviewer": "devin-cli-subagent/independent-review",
+        "date": "2026-09-24",
+        "scope": "git diff e744704 35dd6eb, the only commit since the follow-up: one line each in docs/textbutler/getting-started.md:8, docs/textbutler/native-subscription.md:4, docs/textbutler/readiness.md:44, packages/control/src/index.ts:179, and packages/textbutler/src/onboarding.ts:66.",
+        "method": "Read-only. A character-level word diff shows five inserted commas and nothing else. Each file grows by exactly one byte, and deleting its single 'Codex, or Devin' comma restores the e744704 blob. File modes and line numbers are unchanged. No test pins either runtime string, and the 56-character control detail stays far under its 4,096-character parse bound. The reviewer remeasured all 23 changed-file digests and the receipt drift with shasum -a 256, and ran no tests, typechecks, builds, or installs.",
+        "result": "Copy-only, with no blocking finding. The commas complete the Oxford comma fix for every three-provider list the branch adds, and no identifier, logic, bound, or test changed. packages/control/src/index.ts is an XCB_INTEGRATION_SOURCES file, so the receipt refresh must record its 35dd6eb digest from reviewedSourceSha256, not the e744704 value."
+      }
+    ]
+  }
+}

@@ -94,7 +94,7 @@
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.268",
     "@anthropic-ai/sdk": "0.125.0",
-    "@hraness/agentmixer": "https://github.com/hraness/agentmixer/releases/download/v0.1.1/hraness-agentmixer-0.1.1.tgz",
+    "@hraness/agentmixer": "https://github.com/hraness/xcb/releases/download/v0.3.0/hraness-agentmixer-0.3.0.tgz",
     "@hraness/algal": "github:hraness/algal#c5bd50452a676dc0b035ef206178c397de0cba92",
     "@hraness/desktop-foundation": "https://github.com/hraness/desktop-foundation/releases/download/v0.7.0/hraness-desktop-foundation-0.7.0.tgz",
     "@hraness/local-custody": "github:hraness/local-custody#v0.4.0",

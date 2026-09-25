@@ -60,6 +60,18 @@ test.each(["missing", "expired", "wrong-runtime", "unsupported", "busy", "stale-
   try { expect(f.host.accounts()[0]?.status).toBe("unavailable"); await expect(f.run()).rejects.toThrow(); expect(f.seen).toEqual([]); }
   finally { await f.close(); }
 });
+test.each([["claude", "native-claude-code", "claude-code"], ["codex", "native-codex", "codex"], ["devin", "native-devin", "devin"]] as const)(
+  "XCB %s accounts bind their own native account and route, ready only for the pinned runtime", async (provider, id, route) => {
+    const model = `${provider}/observed`, bound: XcbHostConfig = { ...config, accounts: [{ provider, accountId: "account-one", model }] };
+    for (const [digest, status] of [[config.sha256, "ready"], ["c".repeat(64), "unavailable"]] as const) {
+      const caps = capabilities(), account = caps.accounts[0]!;
+      account.provider = provider; account.models[0]!.key = model; account.qualification!.runtimeDigest = digest;
+      const host = await createXcbSubscriptionHost(bound, { now: () => NOW, integration, client: {
+        async capabilities() { return caps; }, async generate() { throw Error("Readiness must not invoke a model"); } } });
+      try { await host.check(id, new AbortController().signal); expect(host.accounts()).toMatchObject([{ id, provider, route, status }]); }
+      finally { await host.close().catch(() => {}); }
+    }
+  });
 test("malformed generated JSON is a settled failure, never an operation", async () => {
   const f = await fixture(async r => completed(r, "not JSON"));
   try { expect((await f.run()).outcome.status).toBe("failed"); expect(f.operations()).toBe(0); expect(f.journal.accountLeases().inspect("claude", "native-claude-code")).toBeNull(); }

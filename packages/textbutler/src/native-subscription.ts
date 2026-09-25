@@ -3,7 +3,7 @@ import type { ProviderAccountDiagnostic } from "../../control/src/index.ts";
 import { contactCapabilityIdentity, type ButlerPurpose } from "./contact-capabilities.ts";
 import { selectButlerModel, type ProviderSelection } from "./routed-agent.ts";
 
-export type NativeSubscriptionAccount = "native-codex" | "native-claude-code";
+export type NativeSubscriptionAccount = "native-codex" | "native-claude-code" | "native-devin";
 export type NativeSubscriptionSelection = Extract<ProviderSelection, { kind: "managed" }>;
 export type NativeSubscriptionChoice = Pick<NativeSubscriptionSelection, "route" | "modelCatalog" | "defaultReplyModel">;
 export type NativeSubscriptionAdmission = Readonly<{ leases: AccountLeaseStore; now(): number }>;
@@ -22,8 +22,17 @@ const hosts = new WeakSet<object>();
 export function assertNativeSubscriptionHost(value: NativeSubscriptionHost): void {
   if (!hosts.has(value)) throw Error("NATIVE_SUBSCRIPTION_HOST_REQUIRED");
 }
-export function nativeSubscriptionProvider(accountId: string): "codex" | "claude" | null {
-  return accountId === "native-codex" ? "codex" : accountId === "native-claude-code" ? "claude" : null;
+export const NATIVE_SUBSCRIPTION_PROVIDERS = ["claude", "codex", "devin"] as const;
+export type NativeSubscriptionProvider = (typeof NATIVE_SUBSCRIPTION_PROVIDERS)[number];
+export function nativeSubscriptionProvider(accountId: string): NativeSubscriptionProvider | null {
+  return accountId === "native-codex" ? "codex" : accountId === "native-claude-code" ? "claude" : accountId === "native-devin" ? "devin" : null;
+}
+export function nativeSubscriptionAccount(provider: NativeSubscriptionProvider): NativeSubscriptionAccount {
+  return provider === "claude" ? "native-claude-code" : provider === "codex" ? "native-codex" : "native-devin";
+}
+/** The owner-visible route name for each subscription provider's coding agent. */
+export function nativeSubscriptionRoute(provider: NativeSubscriptionProvider): "claude-code" | "codex" | "devin" {
+  return provider === "claude" ? "claude-code" : provider;
 }
 function account(value: string): NativeSubscriptionAccount {
   if (nativeSubscriptionProvider(value) === null) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_INVALID");
@@ -50,8 +59,8 @@ export function createNativeSubscriptionHost(options: Readonly<{
   now?: () => number;
 }>): NativeSubscriptionHost {
   const adapters = Object.freeze([...options.adapters]), now = options.now ?? Date.now;
-  if (adapters.length > 4 || new Set(adapters.map(adapter => adapter.route.id)).size !== adapters.length
-    || adapters.some(adapter => adapter.route.authentication !== "subscription" || !["claude", "codex"].includes(adapter.route.provider)))
+  if (adapters.length > NATIVE_SUBSCRIPTION_PROVIDERS.length * 2 || new Set(adapters.map(adapter => adapter.route.id)).size !== adapters.length
+    || adapters.some(adapter => adapter.route.authentication !== "subscription" || !(NATIVE_SUBSCRIPTION_PROVIDERS as readonly string[]).includes(adapter.route.provider)))
     throw Error("NATIVE_SUBSCRIPTION_ADAPTER_INVALID");
   const observe = options.accounts.bind(options), check = options.check.bind(options), choose = options.selection.bind(options), close = options.close.bind(options);
   const ready = new Map<string, NativeSubscriptionSelection>(), pending = new Set<Promise<unknown>>();
@@ -62,7 +71,7 @@ export function createNativeSubscriptionHost(options: Readonly<{
     if (purpose !== "classify" && purpose !== "respond") throw Error("NATIVE_SUBSCRIPTION_PURPOSE_INVALID");
     await options.beforeSelection?.(id, purpose, shutdown.signal); active();
     const observed = observe().find(row => row.id === id);
-    if (!observed || observed.provider !== nativeSubscriptionProvider(id) || observed.route !== (id === "native-codex" ? "codex" : "claude-code")
+    if (!observed || observed.provider !== nativeSubscriptionProvider(id) || observed.route !== nativeSubscriptionRoute(nativeSubscriptionProvider(id)!)
       || observed.status !== "ready") throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_UNAVAILABLE");
     const choice = await choose(id, purpose); active();
     const adapter = adapters.find(candidate => candidate.route.id === choice.route.id);
@@ -81,10 +90,10 @@ export function createNativeSubscriptionHost(options: Readonly<{
   const host: NativeSubscriptionHost = Object.freeze<NativeSubscriptionHost>({
     accounts() {
       const rows = observe();
-      if (rows.length > 2 || new Set(rows.map(row => row.id)).size !== rows.length) throw Error("NATIVE_SUBSCRIPTION_ACCOUNTS_INVALID");
+      if (rows.length > NATIVE_SUBSCRIPTION_PROVIDERS.length || new Set(rows.map(row => row.id)).size !== rows.length) throw Error("NATIVE_SUBSCRIPTION_ACCOUNTS_INVALID");
       return Object.freeze(rows.map(row => {
         const id = account(row.id), provider = nativeSubscriptionProvider(id)!;
-        if (row.provider !== provider || row.route !== (provider === "codex" ? "codex" : "claude-code")) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_BINDING_INVALID");
+        if (row.provider !== provider || row.route !== nativeSubscriptionRoute(provider)) throw Error("NATIVE_SUBSCRIPTION_ACCOUNT_BINDING_INVALID");
         let qualified = !shutdown.signal.aborted;
         for (const purpose of ["classify", "respond"] as const) {
           const selection = ready.get(`${id}:${purpose}`), adapter = adapters.find(candidate => candidate.route.id === selection?.route.id);

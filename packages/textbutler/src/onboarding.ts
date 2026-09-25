@@ -10,6 +10,7 @@ import { OwnerCliError } from "./owner-cli.ts";
 import { initializeOwnerState } from "./control-service.ts";
 import { requestDaemon } from "./daemon.ts";
 import { loadHostConfig, parseHostConfig, type HostConfig } from "./host-config.ts";
+import { nativeSubscriptionAccount } from "./native-subscription.ts";
 
 export interface SetupStep { id: string; title: string; status: "done" | "action-needed" | "blocked"; detail: string; command?: string }
 export interface Readiness {
@@ -57,12 +58,12 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
   const ready = accounts.filter(account => account.status === "ready");
   const selected = contacts.some(contact => ready.some(account => account.id === contact.settings.accountId && account.provider === contact.settings.provider));
   const xcbAccounts = config?.xcb?.accounts ?? [];
-  const nextAccount = ready[0]?.id ?? (xcbAccounts[0]?.provider === "claude" ? "native-claude-code" : "native-codex");
+  const nextAccount = ready[0]?.id ?? (xcbAccounts[0] ? nativeSubscriptionAccount(xcbAccounts[0].provider) : "native-codex");
   steps.push({ id: "agent", title: "Reply suggestions", status: selected ? "done" : ready.length ? "action-needed" : "blocked",
     detail: selected ? "A ready agent account is selected for at least one contact. Suggestions still require an explicit send."
       : ready.length ? "Choose a ready agent account for the contact you want help with."
       : xcbAccounts.length ? "XCB subscription accounts are configured. Start or restart the daemon, then check the selected account. Sign-in, model access and contact-scoped qualification must all pass before suggestions are available."
-      : "Connect your Claude or Codex subscription through XCB using an explicit account and full model key. Sign in using XCB first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
+      : "Connect your Claude, Codex, or Devin subscription through XCB using an explicit account and full model key. Sign in using XCB first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
     command: ready.length ? `textbutler contacts account CONTACT ${nextAccount}`
       : xcbAccounts.length ? `textbutler providers check ${nextAccount}`
       : "textbutler setup --xcb /absolute/xcb --xcb-state /absolute/xcb-state --xcb-account codex:ACCOUNT --xcb-model codex/MODEL" });
