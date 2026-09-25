@@ -30,6 +30,6 @@ export default function OpenGraphImage() {
       foreground: "#393533",
       muted: "#584F48",
     },
-    title: "Your personal message butler for Mac",
+    title: "Your AI butler replies in the chats you choose.",
   });
 }

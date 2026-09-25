@@ -1,8 +1,8 @@
-Textbutler is a message butler for your Mac. It drafts replies to the iMessage, WhatsApp and Beeper conversations you pick, and by default the send decision stays with you.
+Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats you choose on your Mac. It drafts replies, and by default the send decision stays with you.
 
 A friend asks which weekend works for dinner, your sister wants the name of that plumber, and a former coworker wants to catch up. Each thread needs thirty seconds of thought and a reply you would send, and by Thursday there are dozens. Textbutler runs on your Mac, keeps each contact's context in files you can read, works from the history you choose to import, and writes drafts you check before they go out.
 
-If you knew it as Message Like Me, this is the same project under a new name; messagelikeme.com now redirects here.
+If you knew it as Message Like Me, Textbutler replaced it; messagelikeme.com now redirects here.
 
 ## Who it is for
 
@@ -14,7 +14,7 @@ It is the wrong tool if you want to message people you do not already talk to, s
 
 Textbutler connects to your messaging apps through Ghostget, which handles sign-in and permissions, so the butler never opens the Messages database itself. You add one conversation at a time. A new contact starts switched off, and a new install starts paused. Adding a conversation never sends a message.
 
-For each contact, Textbutler keeps a private folder of plain files: who the person is to you, dated notes, and evidence of how you write to them. Folders are named with opaque identifiers rather than names or phone numbers, and the model can only read and edit files inside the one folder it is working on. Importing history is a separate opt-in step. It takes up to 200 recent messages from that one conversation, keeps who said what and when, records anything it shortened or left out, and does not fetch media. It is a starting sample, not your whole archive.
+For each contact, Textbutler keeps a private folder of plain files: who the person is to you, dated notes, and your standing instructions for the butler. Folders are named with opaque identifiers rather than names or phone numbers, and the model can only read and edit files inside the one folder it is working on. Importing history is a separate opt-in step. It takes up to 200 recent messages from that one conversation, keeps who said what and when, records anything it shortened or left out, and does not fetch media. It is a starting sample, not your whole archive.
 
 The daily loop runs from the terminal:
 
@@ -44,7 +44,7 @@ Choose **Setup & readiness**, then **Connect messaging apps**. You can read your
 
 You write differently to your mother than to your running partner, so one style profile per owner misses most of what matters. Textbutler's longer bet is that each conversation gets its own small, private learning space, which the source calls a habitat.
 
-Habitats are opt-in and switched on by the owner. Each conversation gets its own, and nothing is shared between them, even between two threads with the same person. You can write a fixed core for a contact, covering your voice, your shared history and any boundaries, and the habitat treats it as an anchor it may not rewrite. Over time a background step looks at how past replies landed and proposes a new reply plan: warmer or more direct, more or less formal, longer or shorter, more or less humor. A candidate plan replaces the current one only after a blind side-by-side replay, scored by a separate judge, shows it did no worse on either of the two most recent cases that got a response, and better by a set margin on average. Silence from the other person does not count as success.
+Habitats are opt-in and switched on by the owner. Each conversation gets its own, and nothing is shared between them, even between two threads with the same person. You can write a fixed core for a contact, covering the voice the butler should use, your shared history and any boundaries, and the habitat treats it as an anchor it may not rewrite. Over time a background step looks at how past replies landed and proposes a new reply plan: warmer or more direct, more or less formal, longer or shorter, more or less humor. A candidate plan replaces the current one only after a blind side-by-side replay, scored by a separate judge, shows it did no worse on either of the two most recent cases that got a response, and better by a set margin on average. Silence from the other person does not count as success.
 
 A plan is style and strategy, stored as data. It cannot change who receives a message, which AI provider runs it, what tools are allowed, or whether replies are disclosed. Web search, meme search and the small code sandbox are switches only you control. The learning step is told to leave them alone and keep your core text word for word, and a candidate that changes either one is rejected before it can take over. You can inspect a habitat at any time; rolling it back or clearing what it remembered requires pausing the butler first. [How Textbutler uses ALGAL](/blog/how-textbutler-uses-algal) walks through how those programs run.
 

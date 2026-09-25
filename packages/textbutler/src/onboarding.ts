@@ -62,8 +62,8 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
   steps.push({ id: "agent", title: "Reply suggestions", status: selected ? "done" : ready.length ? "action-needed" : "blocked",
     detail: selected ? "A ready agent account is selected for at least one contact. Suggestions still require an explicit send."
       : ready.length ? "Choose a ready agent account for the contact you want help with."
-      : xcbAccounts.length ? "XCB subscription accounts are configured. Start or restart the daemon, then check the selected account. Sign-in, model access and contact-scoped qualification must all pass before suggestions are available."
-      : "Connect your Claude, Codex, or Devin subscription through XCB using an explicit account and full model key. Sign in using XCB first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
+      : xcbAccounts.length ? "xcb subscription accounts are configured. Start or restart the daemon, then check the selected account. Sign-in, model access and contact-scoped qualification must all pass before suggestions are available."
+      : "Connect your Claude, Codex, or Devin subscription through xcb using an explicit account and full model key. Sign in using xcb first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
     command: ready.length ? `textbutler contacts account CONTACT ${nextAccount}`
       : xcbAccounts.length ? `textbutler providers check ${nextAccount}`
       : "textbutler setup --xcb /absolute/xcb --xcb-state /absolute/xcb-state --xcb-account codex:ACCOUNT --xcb-model codex/MODEL" });
@@ -78,7 +78,7 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
 }
 
 export function readinessText(value: Readiness): string {
-  return ["Textbutler — setup and readiness", "", ...value.steps.map(step => `${step.status === "done" ? "✓" : step.status === "blocked" ? "!" : "○"} ${step.title}\n  ${step.detail}${step.command && step.status !== "done" ? `\n  Next: ${step.command}` : ""}`),
+  return ["Textbutler setup and readiness", "", ...value.steps.map(step => `${step.status === "done" ? "✓" : step.status === "blocked" ? "!" : "○"} ${step.title}\n  ${step.detail}${step.command && step.status !== "done" ? `\n  Next: ${step.command}` : ""}`),
     "", "Your Mac must be awake and signed in. Quitting the menu does not stop the daemon.",
     "Pause stops automatic replies; owner-confirmed replies are a separate action.", ""].join("\n");
 }
@@ -112,7 +112,7 @@ async function xcbExecutableDigest(path: string): Promise<string> {
     if (total !== before.size || !after.isFile() || await realpath(path) !== path
       || ["dev", "ino", "mode", "nlink", "uid", "gid", "size", "mtimeMs", "ctimeMs"].some(key => after[key as keyof typeof after] !== before[key as keyof typeof before])) throw Error("changed executable");
     return hash.digest("hex");
-  } catch { throw new OwnerCliError("Use an owned physical XCB executable, without links or group/public write access. Its exact SHA-256 is pinned during setup; no account credentials are copied."); }
+  } catch { throw new OwnerCliError("Use an owned physical xcb executable, without links or group/public write access. Its exact SHA-256 is pinned during setup; no account credentials are copied."); }
   finally { await handle?.close(); }
 }
 
@@ -160,7 +160,7 @@ export async function runSetup(args: readonly string[], dataDir: string, output:
     if (config.xcb) {
       const sha256 = await xcbExecutableDigest(config.xcb.executable);
       try { await assertOwnedPath(config.xcb.stateHome, { kind: "directory", canonical: true, ownerOnly: true }); }
-      catch { throw new OwnerCliError("Use XCB's existing owned, private, physical state directory. Connect your subscription using XCB first; Textbutler does not create or copy credentials."); }
+      catch { throw new OwnerCliError("Use xcb's existing owned, private, physical state directory. Connect your subscription using xcb first; Textbutler does not create or copy credentials."); }
       config = parseHostConfig({ ...config, xcb: { ...config.xcb, sha256 } });
     }
   }
@@ -173,7 +173,7 @@ export async function runSetup(args: readonly string[], dataDir: string, output:
         if (!previous) merged = parseHostConfig({ ...merged, xcb: incoming });
         else {
           if (previous.executable !== incoming.executable || previous.stateHome !== incoming.stateHome || previous.sha256 !== incoming.sha256)
-            throw new OwnerCliError("Existing XCB executable, digest and state directory were preserved. Reuse the same installation when adding an account; an XCB upgrade requires explicit owner configuration review.");
+            throw new OwnerCliError("Existing xcb executable, digest and state directory were preserved. Reuse the same installation when adding an account; an xcb upgrade requires explicit owner configuration review.");
           const accounts = [...previous.accounts];
           for (const account of incoming.accounts) {
             const found = accounts.find(value => value.provider === account.provider);

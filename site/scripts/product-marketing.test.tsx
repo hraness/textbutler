@@ -48,7 +48,7 @@ function textBeforeRelated(html: string): string {
 test('renders Textbutler with the shared grammar and one development status', () => {
   const html = renderToStaticMarkup(<Home />);
   expect(html.match(/<h1\b/gu)).toHaveLength(1);
-  expect(/<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1]).toBe('Your agent in your messaging apps');
+  expect(/<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1]).toBe('Your AI butler replies in the chats you choose.');
   for (const role of ['header', 'hero', 'proof-frame', 'section', 'flow', 'trust', 'questions', 'cta', 'footer']) {
     expect(html).toContain(`data-hraness-marketing="${role}"`);
   }
@@ -60,7 +60,7 @@ test('renders Textbutler with the shared grammar and one development status', ()
   expect(header).not.toContain('src="/icon.png"');
   expect(html).toContain('data-foil=""');
   expect(html).toContain('Textbutler');
-  expect(html).toContain('See what’s ready');
+  expect(html).toContain('How replies stay off');
   expect(html.split(SITE_STATUS)).toHaveLength(2);
   expect(html).toContain('New installations start paused');
   expect(html).toContain('iMessage and WhatsApp');
@@ -88,8 +88,7 @@ test('keeps the hero outcome-led and free of contract vocabulary', () => {
   expect(hero).not.toBeNull();
   const heroCopy = (hero?.[0] ?? '').replace(/<[^>]+>/gu, ' ').toLowerCase();
   const heading = /<h1[^>]*>([^<]+)<\/h1>/u.exec(html)?.[1] ?? '';
-  expect(heading.split(/\s+/u).length).toBeLessThanOrEqual(8);
-  expect(heading).not.toMatch(/\.$/u);
+  expect(heading.split(/\s+/u).length).toBeLessThanOrEqual(10);
   expect(heroCopy).toContain('your');
   const boundary = /<p\b[^>]*class="[^"]*\bhraness-marketing-hero__boundary\b[^"]*"[^>]*>([^<]+)<\/p>/u.exec(hero?.[0] ?? '')?.[1] ?? '';
   expect(boundary).toStartWith(`${SITE_STATUS_LABEL} · macOS`);

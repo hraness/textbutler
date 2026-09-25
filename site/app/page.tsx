@@ -45,7 +45,7 @@ const HERO_FOOTNOTE = `${SITE_STATUS_LABEL} · macOS · iMessage, WhatsApp, and 
 const HOME_QUESTIONS = [
   {
     question: 'Can I use Textbutler today?',
-    answer: 'Yes, from source on a Mac. The guided terminal helps you connect your messaging apps through Ghostget, add a conversation, check your inbox, and send replies you write yourself. That needs no AI account, and new installations start paused. A local build with a connected coding agent adds the butler: it reads the conversations you turn on, drafts replies, and can send them on its own. There is no app to download; you start the menu bar companion from the terminal.',
+    answer: 'Yes, from source on a Mac. The guided terminal helps you connect your messaging apps through Ghostget, add a conversation, check your inbox, and send replies you write yourself. That needs no AI account, and new installations start paused. A local build with a connected AI account adds the butler: it reads the conversations you turn on, drafts replies, and can send them on its own. There is no app to download; you start the menu bar companion from the terminal.',
   },
   {
     question: 'Can it answer messages for me?',
@@ -99,7 +99,7 @@ function ButlerFrame() {
             <div><dt>ABOUT.md</dt><dd>What matters in this relationship.</dd></div>
             <div><dt>MEMORY.md</dt><dd>Useful context, with sources and dates.</dd></div>
             <div><dt>STYLE.md</dt><dd>How to help in this conversation.</dd></div>
-            <div><dt>AGENTS.md</dt><dd>Guidance the butler can read and revise.</dd></div>
+            <div><dt>AGENTS.md</dt><dd>Standing instructions it reads but can’t change.</dd></div>
           </dl>
           <p>You can open and edit every note.</p>
         </div>
@@ -126,15 +126,15 @@ export default function Home() {
           <div className="hraness-material-wall">
           <ProductHero
             backdrop={<ConversationField />}
-            actions={[{ href: '#development', label: 'See what’s ready' }, { href: GETTING_STARTED_URL, label: 'Start guided setup' }]}
+            actions={[{ href: GETTING_STARTED_URL, label: 'Set up on your Mac' }, { href: '#replies', label: 'How replies stay off' }]}
             boundary={HERO_FOOTNOTE}
             className="mlm-marketing-hero"
-            eyebrow=""
+            eyebrow="Messaging assistant for Mac"
             frame={<ButlerFrame />}
-            heading="Your agent in your messaging apps"
+            heading="Your AI butler replies in the chats you choose."
             headingId="textbutler-title"
             name="Textbutler"
-            summary="Connect your coding agent to iMessage, WhatsApp, and Beeper. It reads each conversation you choose, keeps a folder of notes you can open and edit, and answers when you let it. Its replies are marked, and you can pause it at any time."
+            summary="Turn it on for one person on iMessage, WhatsApp, or Beeper, and it replies as a clearly marked assistant that knows your history with them."
           />
           </div>
 
@@ -188,7 +188,7 @@ export default function Home() {
           </MarketingSection>
 
           <MarketingQuestionList className="mlm-marketing-questions" heading="A few things to know" headingId="questions-title" id="questions" label="" questions={HOME_QUESTIONS.map(({ answer, question }) => ({ answer: <p>{answer}</p>, question }))} />
-          <MarketingRelated heading="From the same workshop" headingId="related-title" label="Related" summary="Each Hraness product owns one private domain and gives your agent the same kind of access: local, limited, and open to inspection." groups={[
+          <MarketingRelated heading="From the same workshop" headingId="related-title" label="Related" summary="More Hraness tools that work on your Mac and keep the agent’s access limited." groups={[
             {
               heading: "The personal apps",
               headingId: "related-apps",
@@ -196,19 +196,19 @@ export default function Home() {
                 {
                   name: "PeopleBlade",
                   href: "https://peopleblade.com",
-                  role: "A private contact book for you and your agent",
-                  relationship: "Textbutler drafts what you'd say, and PeopleBlade keeps track of who each person is, in one local contact book with notes, history, and identity details you can review.",
+                  role: "Local personal CRM for everyone you know, built for your agent",
+                  relationship: "PeopleBlade keeps the people. Textbutler’s legacy history tools write the same private message-bundle format, so an export made for one reads in the other.",
                 },
                 {
                   name: "Soulscrape",
                   href: "https://soulscrape.com",
-                  role: "A dated, cited dossier on a person",
-                  relationship: "When a reply needs more than memory, a Soulscrape dossier gives the conversation a cited profile of the person.",
+                  role: "Free agent skill that writes dated dossiers on people, sources cited",
+                  relationship: "Textbutler’s legacy history tools can export your messages with a person as evidence for a Soulscrape profile.",
                 },
                 {
                   name: "Wordcell",
                   href: "https://wordcell.io",
-                  role: "A Markdown knowledge base for agents",
+                  role: "Markdown knowledge base that gives agents the decisions behind code",
                   relationship: "The butler's memory lives in ordinary files; Wordcell is the same idea grown into a full queryable vault your agent can search.",
                 },
               ],
@@ -216,31 +216,25 @@ export default function Home() {
             {
               heading: "The agent platform",
               headingId: "related-tools",
-              summary: "The tools your agent runs through, covering sessions, accounts, web reads, and the models behind them.",
+              summary: "The connections, subscription, and model comparisons around the butler.",
               items: [
                 {
                   name: "Ghostget",
                   href: "https://ghostget.com",
-                  role: "A bridge between your agent and your accounts",
-                  relationship: "Ghostget connects Textbutler to iMessage, WhatsApp, and Beeper, and gives an agent limited reads of the accounts and pages a draft might reference.",
-                },
-                {
-                  name: "Gobstopper",
-                  href: "https://gobstopper.sh",
-                  role: "Automatic context compaction for agent sessions",
-                  relationship: "Threads run long; Gobstopper compacts the session context so studying a whole conversation stays cheap.",
+                  role: "Named web actions for AI agents: read pages, save media, use connected accounts",
+                  relationship: "Ghostget connects Textbutler to iMessage, WhatsApp, and Beeper.",
                 },
                 {
                   name: "xcb",
                   href: "https://xcb.sh",
-                  role: "A metaharness for agent subscriptions",
-                  relationship: "xcb runs the agents the butler hands drafts to, in one workspace that keeps your account sign-ins and shows token spend.",
+                  role: "Routes coding tasks across the Claude, Codex, and Devin plans you have",
+                  relationship: "xcb runs the butler’s replies on your Claude Code or Codex subscription and keeps that sign-in out of Textbutler.",
                 },
                 {
-                  name: "Aicharts",
+                  name: "AI Charts",
                   href: "https://aicharts.io",
-                  role: "AI model benchmarks and usage inspection",
-                  relationship: "Aicharts compares the models your drafts run on and shows what a reply cost.",
+                  role: "Model benchmark scores plotted against cost and tokens per task",
+                  relationship: "Textbutler’s replies run on Claude or Codex models; AI Charts compares published benchmarks for them.",
                 },
               ],
             },

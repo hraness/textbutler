@@ -26,7 +26,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
   {
     slug: 'introducing-textbutler',
     title: 'Introducing Textbutler',
-    dek: 'Textbutler drafts replies to the Mac conversations you pick, and by default each draft waits until you read and approve it.',
+    dek: 'Textbutler drafts replies as a clearly marked assistant for the Mac chats you pick, and by default each draft waits until you read and approve it.',
     eyebrow: 'Release',
     published: '2026-09-24',
     tags: ['textbutler', 'messaging', 'drafts', 'local-first', 'macos', 'xcb', 'algal'],
@@ -38,7 +38,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
   {
     slug: 'how-textbutler-uses-xcb',
     title: 'How Textbutler uses xcb to draft on your own subscription',
-    dek: 'Textbutler drafts replies through xcb on the Claude Code or Codex subscription you already pay for.',
+    dek: 'Textbutler drafts replies through xcb on the Claude Code, Codex, or Devin subscription you already pay for.',
     eyebrow: 'Integration',
     published: '2026-09-24',
     tags: ['textbutler', 'xcb', 'subscriptions', 'drafts', 'claude-code', 'codex'],

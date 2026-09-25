@@ -2,13 +2,9 @@
 
 [![skills.sh](https://skills.sh/b/hraness/message-like-me)](https://skills.sh/hraness/message-like-me)
 
-Textbutler is a message butler for your Mac. Connect your coding agent, a
-Claude Code or Codex subscription through [xcb](https://github.com/hraness/xcb),
-and it reads the iMessage, WhatsApp, and Beeper conversations you choose, keeps
-each contact's context in files you can read and edit, and answers when you let
-it. The butler's own replies are marked by default, and you can pause it at any
-time. Its guided terminal and menu bar companion keep setup, review, and control
-on your Mac.
+Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats you
+choose on your Mac. Turn it on for one person, and it replies as a clearly
+marked assistant that knows your history with them.
 
 **Status:** In development. Textbutler runs from source on a Mac; there is no
 app to download and no published Textbutler package. Without an AI account you
@@ -16,7 +12,7 @@ can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox,
 and send replies you write yourself. AI replies also need a local build of
 Textbutler and a Claude Code or Codex subscription connected through
 [xcb](https://github.com/hraness/xcb). Automatic replies have worked end to end
-over iMessage in testing by the developer. Try them on your own account,
+over iMessage in our testing. Try them on your own account,
 especially over WhatsApp or Beeper, before you rely on them.
 
 Start with the [guided setup](docs/textbutler/getting-started.md) and
