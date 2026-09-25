@@ -43,7 +43,7 @@
     "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
     "packages/textbutler/src/owner-replies.ts": "586002d4acef0b2a1fc95abb35709a78f4b79122594ce309be0c3882d9d527d6",
     "packages/textbutler/src/provider-host.ts": "81f9b55d8d47882429a31331994db5195530a599090ceef96986fe237cd64d2e",
-    "packages/textbutler/src/reply-loop.ts": "aef054156b0826c452117f07a1faa7a9d1e195ad64eb4fdbc342ffbb18072c26",
+    "packages/textbutler/src/reply-loop.ts": "80255180e7919f61119364caa79b2950138aeb42e8b9a864ca5d2458cd258f43",
     "packages/textbutler/src/routed-agent.ts": "63897e366965b77ac8bcce8b1b8c08b218c20605923dd86bf468e0b9a65f22b3",
     "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
     "packages/textbutler/src/runtime.ts": "d463c7ef523ea667762890d32aacedd32ce4b4240c71782c9de2a947f2e06d75",
@@ -58,6 +58,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "91279f0d741d4cb33ab6a2d1ece5ecf11f16f8234272110831e4c8bb7c364d6f"
+    "receiptSha256": "e8ebac3e1d635034fa5c595079922d8c6c7e2303326dd08e0747c0fb05ca326b"
   }
 }

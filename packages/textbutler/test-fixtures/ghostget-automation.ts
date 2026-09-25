@@ -1,12 +1,20 @@
 import { spawn } from "node:child_process";
 import { basename } from "node:path";
-import { AUTOMATION_PROTOCOL } from "../../transport/src/automation-contract.ts";
+import { AUTOMATION_PROTOCOL, automationBindingDigest } from "../../transport/src/automation-contract.ts";
 
 // Every successful synthetic handshake proves the real delegated child is quiet.
 if (process.env.HRANESS_SUPPORT_AUDIENCE !== "off" || process.env.HRANESS_SUPPORT_EMAIL !== "off") process.exit(4);
 if (process.argv.slice(2).join(" ") !== "messaging automation serve --stdio") process.exit(2);
 const mode = basename(process.env.GHOSTGET_STATE_HOME ?? "normal");
 let buffer = "", sending: Record<string, unknown> | undefined;
+const heldPolls: Record<string, unknown>[] = [];
+let maxHeld = 0, totalPolls = 0;
+const fixtureEnrollment = (id: string) => {
+  const identity = { provider: "imessage", authId: "fixture", accountIdentity: "1".repeat(64), accountSubject: "imessage:fixture", implementationIdentity: "2".repeat(64), sourceGeneration: "fixture:1" };
+  const coordinate = { provider: "imessage", chatGuid: "iMessage;-;fixture@example.test", service: "iMessage", observedChatRowId: 1 };
+  const conversation = { coordinate, title: "Fixture", kind: "single", participants: ["fixture@example.test"] };
+  return { id, identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision: 0, ready: true, reason: null };
+};
 function reply(row: Record<string, unknown>, result: unknown) { process.stdout.write(JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id: mode === "wrong-id" ? "unexpected" : row.id, ok: true, result }) + "\n"); }
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk: string) => {
@@ -35,6 +43,17 @@ process.stdin.on("data", (chunk: string) => {
         error: { code: ["unavailable"], message: "ghostget.discovery.v1:native-chats:failed" } }) + "\n");
     }
     else if (request.method === "conversations") reply(request, { privateBody: "Must never be published" });
+    else if (request.method === "poll" && mode === "poll-lane") {
+      // Held polls prove wire overlap: a serialized client could never reach
+      // more than one held frame, and the lane cap bounds the burst.
+      heldPolls.push(request); totalPolls++; maxHeld = Math.max(maxHeld, heldPolls.length);
+    }
+    else if (request.method === "poll") reply(request, fixtureEnrollment(String(request.params?.enrollmentId ?? "enrollment:fixture")));
+    else if (request.method === "lane-stats") reply(request, { held: heldPolls.length, maxHeld, totalPolls });
+    else if (request.method === "release-polls") {
+      for (const held of heldPolls.splice(0)) reply(held, fixtureEnrollment(String(held.params?.enrollmentId ?? "enrollment:fixture")));
+      reply(request, { released: true });
+    }
     else if (request.method === "submit") sending = request;
     else if (request.method === "cancel") {
       reply(request, { cancelled: true });

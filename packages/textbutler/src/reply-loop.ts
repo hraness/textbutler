@@ -159,11 +159,20 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     // One poll per contact keeps liveness, readiness and binding evidence; a
     // single events drain then serves the whole set through a shared cursor.
     const ready = new Map<string, boolean>(), pollFailed = new Set<string>(), drain = new Map<string, { contact: ContactSettings; state: ContactLoop }>();
-    for (const { contact, binding, state } of actives) {
+    // Polls run concurrently: the host multiplexes requests, spawns one provider
+    // session per enrollment, and rejects only same-enrollment cursor races.
+    // Results apply in contact order so drain membership stays deterministic.
+    const polls = await Promise.all(actives.map(async ({ contact, binding, state }) => {
       try {
         const current = await client.poll(binding.enrollmentId); assertAutomationBinding(binding, current);
-        ready.set(contact.id, current.ready); drain.set(binding.enrollmentId, { contact, state });
-      } catch { state.runtime.cancelContact(contact.id); state.initialized = false; pollFailed.add(contact.id); }
+        return { ok: true as const, contact, binding, state, current };
+      } catch {
+        return { ok: false as const, contact, state };
+      }
+    }));
+    for (const poll of polls) {
+      if (poll.ok) { ready.set(poll.contact.id, poll.current.ready); drain.set(poll.binding.enrollmentId, { contact: poll.contact, state: poll.state }); }
+      else { poll.state.runtime.cancelContact(poll.contact.id); poll.state.initialized = false; pollFailed.add(poll.contact.id); }
     }
     // The drain cursor belongs to the enrollment set, not one contact. A
     // membership change re-establishes the cursor; replayed events only re-

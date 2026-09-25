@@ -86,6 +86,25 @@ test("non-string remote codes reject the pending request and retain custody inst
   expect((await lstat(join(config.custodyDirectory, AUTOMATION_CUSTODY_FILE))).isFile()).toBe(true);
 });
 
+test("polls run through a bounded parallel lane beside the serialized ordinary lane", async () => {
+  const process = await createGhostgetAutomationProcess(await options("poll-lane"));
+  try {
+    // Eight polls at once: the lane admits six frames over the wire and holds
+    // the rest client-side; a serialized chain could never show held > 1.
+    const polls = Array.from({ length: 8 }, (_unused, index) => process.client.poll(`enrollment:${index}`));
+    // Ordinary and priority work do not wait behind the held poll lane.
+    expect(automationFailure(await process.client.conversations("imessage").catch(error => error)))
+      .toEqual({ stage: "response-schema", code: "response-schema" });
+    expect(await process.invoke("cancel", { planId: "plan:none" })).toMatchObject({ cancelled: true });
+    expect(await process.invoke("lane-stats", {})).toEqual({ held: 6, maxHeld: 6, totalPolls: 6 });
+    await process.invoke("release-polls", {});
+    // The two queued polls reach the wire only after released slots freed.
+    expect(await process.invoke("lane-stats", {})).toEqual({ held: 2, maxHeld: 6, totalPolls: 8 });
+    await process.invoke("release-polls", {});
+    for (const [index, poll] of polls.entries()) expect((await poll).id).toBe(`enrollment:${index}`);
+  } finally { await process.close(); }
+});
+
 test("bounded child request queue reports capacity without bypassing cancellation or close", async () => {
   const process = await createGhostgetAutomationProcess(await options());
   try {
