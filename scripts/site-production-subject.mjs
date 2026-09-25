@@ -5,14 +5,23 @@ export const SITE_REPOSITORY = "hraness/textbutler";
 export const SITE_REPOSITORY_ID = 1342143606;
 export const SITE_WORKFLOW_PATH = ".github/workflows/website-production.yml";
 export const SITE_ARTIFACT_NAME = "textbutler-site-build";
-export const SITE_REQUIRED_CI_JOBS = Object.freeze([
+/** Jobs `ci.yml` runs on every push, in workflow order. */
+export const SITE_ALWAYS_CI_JOBS = Object.freeze([
   "Detect changed paths",
   "Standalone package",
   "Tests",
   "Textbutler packages",
+  "Required",
+]);
+/** Conditional jobs; they must succeed whenever changed paths schedule them. */
+export const SITE_CONDITIONAL_CI_JOBS = Object.freeze([
   "Site",
   "macOS synthetic Messages and Contacts fixtures",
-  "Required",
+]);
+/** The closed inventory every admitted run's job names must stay inside. */
+export const SITE_REQUIRED_CI_JOBS = Object.freeze([
+  ...SITE_ALWAYS_CI_JOBS,
+  ...SITE_CONDITIONAL_CI_JOBS,
 ]);
 const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
@@ -98,11 +107,13 @@ export function admitSiteCiRun({ run, workflow, jobs, sourceSha, runId, runAttem
       workflow.state !== "active" || run.path !== ".github/workflows/ci.yml" || run.name !== "CI" ||
       run.event !== "push" || run.head_branch !== "main" || run.head_sha !== sourceSha ||
       run.status !== "completed" || run.conclusion !== "success" ||
-      !Array.isArray(jobs) || jobs.length !== SITE_REQUIRED_CI_JOBS.length) {
+      !Array.isArray(jobs) || jobs.length === 0) {
     throw new Error("site requires the exact successful current-main CI run");
   }
-  const expected = [...SITE_REQUIRED_CI_JOBS].sort();
-  if (JSON.stringify(jobs.map(job => job.name).sort()) !== JSON.stringify(expected) ||
+  const known = new Set(SITE_REQUIRED_CI_JOBS);
+  const always = new Set(SITE_ALWAYS_CI_JOBS);
+  const present = new Set(jobs.map(job => job.name));
+  if (jobs.some(job => !known.has(job.name)) || ![...always].every(name => present.has(name)) ||
       jobs.some(job => job.run_id !== run.id || job.run_attempt !== run.run_attempt ||
         job.head_sha !== sourceSha || job.status !== "completed" || job.conclusion !== "success")) {
     throw new Error("site CI required jobs are missing, stale, skipped, or failed");
@@ -125,7 +136,7 @@ export async function revalidateSiteSource(api, input) {
   if (repo.default_branch !== "main" || ref.ref !== "refs/heads/main" || ref.object?.type !== "commit" || ref.object.sha !== sourceSha) {
     throw new Error("site source is no longer exact current main");
   }
-  if (jobs.total_count !== SITE_REQUIRED_CI_JOBS.length || !Array.isArray(jobs.jobs)) throw new Error("CI jobs inventory is incomplete");
+  if (jobs.total_count !== jobs.jobs?.length) throw new Error("CI jobs inventory is incomplete");
   if (currentRun.id !== run.id || currentRun.run_attempt !== run.run_attempt || currentRun.status !== "completed" ||
       currentRun.conclusion !== "success" || currentRun.head_sha !== sourceSha) throw new Error("site CI run was rerun or is no longer successful");
   return admitSiteCiRun({ run, workflow, jobs: jobs.jobs, sourceSha, runId: input.ciRunId, runAttempt: input.ciRunAttempt });
