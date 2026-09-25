@@ -9,7 +9,7 @@ test('server-renders a script-independent preview with the site status and no na
   const html = renderToStaticMarkup(<PreviewPage />);
 
   expect(html.match(/<h1\b/gu)).toHaveLength(1);
-  expect(html).toContain('Your agent in your messaging apps');
+  expect(html).toContain('Your AI butler replies in the chats you choose.');
   expect(html).toContain(SITE_STATUS);
   expect(html).toContain('replies you write yourself');
   expect(html).toContain('AI replies also need a local build');

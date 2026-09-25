@@ -2,15 +2,15 @@ import type { Metadata } from 'next';
 
 export const SITE_NAME = 'Textbutler';
 export const SITE_ORIGIN = 'https://textbutler.app';
-export const SITE_TITLE = 'Textbutler | Your personal message butler for Mac';
+export const SITE_TITLE = 'Textbutler | Your AI butler replies in the chats you choose.';
 export const SITE_DESCRIPTION =
-  'A message butler for your Mac, in development. Your coding agent drafts and answers the iMessage, WhatsApp, and Beeper chats you choose, and you can pause it.';
+  'Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats you choose. It runs on your Mac and answers as a clearly marked assistant.';
 // The one development-status statement. Pages render it where they state the
 // status; README.md repeats it word for word and a site test keeps them equal.
 export const SITE_STATUS_LABEL = 'In development';
 export const SITE_STATUS =
-  `${SITE_STATUS_LABEL}. Textbutler runs from source on a Mac; there is no app to download and no published Textbutler package. Without an AI account you can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox, and send replies you write yourself. AI replies also need a local build of Textbutler and a Claude Code or Codex subscription connected through xcb. Automatic replies have worked end to end over iMessage in testing by the developer. Try them on your own account, especially over WhatsApp or Beeper, before you rely on them.`;
-export const SOCIAL_IMAGE_ALT = 'The Textbutler mark and the words “Your personal message butler for Mac” on a light card.';
+  `${SITE_STATUS_LABEL}. Textbutler runs from source on a Mac; there is no app to download and no published Textbutler package. Without an AI account you can connect iMessage, WhatsApp, and Beeper through Ghostget, check your inbox, and send replies you write yourself. AI replies also need a local build of Textbutler and a Claude Code or Codex subscription connected through xcb. Automatic replies have worked end to end over iMessage in our testing. Try them on your own account, especially over WhatsApp or Beeper, before you rely on them.`;
+export const SOCIAL_IMAGE_ALT = 'The Textbutler mark and the words “Your AI butler replies in the chats you choose.” on a light card.';
 export const GITHUB_URL = 'https://github.com/hraness/textbutler';
 export const ARCHITECTURE_URL = `${GITHUB_URL}/blob/main/docs/textbutler/architecture.md`;
 export const GETTING_STARTED_URL = `${GITHUB_URL}/blob/main/docs/textbutler/getting-started.md`;

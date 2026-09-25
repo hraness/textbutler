@@ -15,6 +15,8 @@ export function GET() {
     '',
     SITE_DESCRIPTION,
     '',
+    'Textbutler is an AI butler for your messages, running on your Mac. Turn it on for the chats you choose in iMessage, WhatsApp, or Beeper, and it replies as a clearly marked assistant that keeps notes on each person in a folder you can open and edit. Automatic replies stay off until you connect an AI account, turn them on for a contact, and resume the butler. The AI provider you connect sees the context it needs to write a reply. Textbutler is free and MIT licensed.',
+    '',
     'The website is informational. It never receives private message history, contacts, profiles, or drafts.',
     '## Current Textbutler development status',
     SITE_STATUS,

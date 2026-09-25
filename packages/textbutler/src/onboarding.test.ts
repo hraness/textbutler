@@ -112,15 +112,15 @@ test("XCB setup refuses implicit mappings, changed pins, and silent account or m
 test("XCB setup rejects linked, writable or non-executable binaries and unsafe state homes", async () => {
   const { root, executable, stateHome, args } = await xcbFixture();
   await chmod(executable, 0o600);
-  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical XCB executable");
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical xcb executable");
   await chmod(executable, 0o722);
-  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical XCB executable");
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical xcb executable");
   await chmod(executable, 0o700);
   const other = join(root, "other-xcb");
   await link(executable, other);
-  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical XCB executable");
+  await expect(runSetup(args, root, quiet)).rejects.toThrow("physical xcb executable");
   await rm(other); await symlink(executable, other);
-  await expect(runSetup(args.map(value => value === executable ? other : value), root, quiet)).rejects.toThrow("physical XCB executable");
+  await expect(runSetup(args.map(value => value === executable ? other : value), root, quiet)).rejects.toThrow("physical xcb executable");
   await chmod(stateHome, 0o755);
   await expect(runSetup(args, root, quiet)).rejects.toThrow("private, physical state directory");
   await expect(stat(join(root, "state"))).rejects.toThrow();

@@ -1,6 +1,6 @@
 # Start using Textbutler
 
-Textbutler is a message assistant for the conversations you choose on your Mac.
+Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats you choose on your Mac.
 Start with its inbox and replies you write yourself. Automatic replies stay
 paused until you choose a ready agent account, turn them on for a contact, and
 resume the butler.

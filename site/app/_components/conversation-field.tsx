@@ -12,13 +12,13 @@ export function ConversationField() {
         <span>Example message</span><p>Let’s pick this up after the weekend.</p><i>One conversation at a time</i>
       </article>
       <article className="conversation-slip" data-hraness-hero-item="">
-        <span>STYLE.md</span><strong>A familiar voice</strong><p>Thoughtful, brief, and clear about who is helping.</p>
+        <span>STYLE.md</span><strong>The butler’s voice</strong><p>Thoughtful, brief, and clear about who is helping.</p>
       </article>
       <article className="conversation-slip conversation-slip--message" data-hraness-hero-item="">
         <span>Example draft</span><p>That sounds good. I’ll bring the notes.</p><i>Read it before you send</i>
       </article>
       <article className="conversation-slip" data-hraness-hero-item="">
-        <span>AGENTS.md</span><strong>Your guidance</strong><p>Boundaries you can read, change and keep.</p>
+        <span>AGENTS.md</span><strong>Your guidance</strong><p>Instructions the butler reads but can’t change.</p>
       </article>
     </div>
   );

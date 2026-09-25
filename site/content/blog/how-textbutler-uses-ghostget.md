@@ -1,8 +1,8 @@
-Textbutler learns how you write from your Beeper and WhatsApp history, but it never signs in to either service and holds no Beeper or WhatsApp password or session. Ghostget, a separate local tool, exports that history to a private folder in Textbutler's own format. Textbutler then checks the folder and imports it on your Mac. The two programs do not talk to each other during the import; the folder is the whole handoff. (Textbutler's live inbox and replies also go through Ghostget, but that is a separate path this post does not cover.)
+Textbutler can import your Beeper and WhatsApp history as context for each conversation, but it never signs in to either service and holds no Beeper or WhatsApp password or session. Ghostget, a separate local tool, exports that history to a private folder in Textbutler's own format. Textbutler then checks the folder and imports it on your Mac. The two programs do not talk to each other during the import; the folder is the whole handoff. (Textbutler's live inbox and replies also go through Ghostget, but that is a separate path this post does not cover.)
 
 ## Who this is for
 
-You already use Beeper, WhatsApp or both, and you want Textbutler to see how you write to a friend, a sibling or a group chat. You want that without giving a third app your messaging logins, and without anything leaving your Mac.
+You already use Beeper, WhatsApp or both, and you want the butler to have the history of a conversation with a friend, a sibling or a group chat. You want that without giving a third app your messaging logins, and without anything leaving your Mac.
 
 The export covers your own history, from accounts you are signed in to. It also contains the other people's messages, since that is what a conversation is.
 
@@ -75,7 +75,7 @@ You can run the export again next month, and a smaller window will not throw awa
 
 ## What you get
 
-Your Beeper and WhatsApp conversations land in Textbutler's private store on your Mac, where its drafts can learn from how you write, and Textbutler never holds a Beeper or WhatsApp login. `sources list` shows what was imported, and `sources show` reports each source's health.
+Your Beeper and WhatsApp conversations land in Textbutler's private store on your Mac, where its replies can draw on that history, and Textbutler never holds a Beeper or WhatsApp login. `sources list` shows what was imported, and `sources show` reports each source's health.
 
 If you use WhatsApp both natively and through Beeper, Textbutler stops and asks you to name the overlapping Beeper source with `--overlap-source` before it imports the native export. Both sources stay stored. It counts two messages as one only in one-to-one chats where your own number and the other person's number match exactly, and only after at least one unambiguous shared message agrees on sender, time, direction, text and kind. Names, partial numbers, approximate times, group chats and messages without text never count as a match.
 

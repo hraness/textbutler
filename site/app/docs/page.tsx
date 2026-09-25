@@ -3,7 +3,7 @@ import { GITHUB_URL, pageMetadata } from '../_lib/site';
 import { readmeHtml } from '../readme.generated';
 
 const description =
-  'Set up Textbutler, connect your messaging apps, and let your coding agent draft and answer the chats you choose. Also covers the legacy Message Like Me tools.';
+  'Set up Textbutler on your Mac, connect iMessage, WhatsApp, or Beeper, and turn the butler on for one person. The legacy Message Like Me tools have their own section.';
 
 export const metadata = pageMetadata({
   title: 'Documentation',

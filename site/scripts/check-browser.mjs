@@ -350,10 +350,10 @@ try {
         await page.locator('details[open]').first().waitFor({ state: 'visible' });
         await summary.press('Enter');
         assert.equal(await page.locator('details[open]').count(), 0);
-        await page.getByRole('link', { name: 'See what’s ready', exact: true }).click();
-        await page.waitForURL((url) => url.hash === '#development');
-        await page.getByRole('heading', { name: 'Start with a reply you review', exact: true }).waitFor({ state: 'visible' });
-        item.interaction = 'Keyboard FAQ opened and closed; development action reached its real section.';
+        await page.getByRole('link', { name: 'How replies stay off', exact: true }).click();
+        await page.waitForURL((url) => url.hash === '#replies');
+        await page.getByRole('heading', { name: 'It answers when you let it', exact: true }).waitFor({ state: 'visible' });
+        item.interaction = 'Keyboard FAQ opened and closed; replies action reached its real section.';
       } else if (sample.path === '/docs') {
         const link = page.locator('.document-prose a[href^="#"]').first();
         const target = await link.getAttribute('href');

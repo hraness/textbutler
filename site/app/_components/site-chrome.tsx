@@ -7,6 +7,7 @@ import {
   absoluteUrl,
   type SitePath,
   GITHUB_URL,
+  GETTING_STARTED_URL,
   ARCHITECTURE_URL,
 } from '../_lib/site';
 
@@ -19,7 +20,7 @@ export function SiteHeader({ lantern = false }: Readonly<{ lantern?: boolean }>)
     <>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <MarketingSiteHeader
-        action={{ href: '/#development', label: 'Development status' }}
+        action={{ href: GETTING_STARTED_URL, label: 'Set up on your Mac' }}
         ariaLabel="Primary navigation"
         brand="Textbutler"
         brandLabel="Textbutler home"
@@ -62,7 +63,7 @@ export function SiteFooter({ path }: Readonly<{ path?: SitePath }>) {
       >
         <p>Built for Mac · MIT source · in development</p>
       </MarketingSiteFooter>
-      <HranessSiteFooter mailingList={{ kind: "none" }} support={{"id": "message-like-me", "name": "Textbutler", "valueProposition": "Support ongoing development of local tools for your messaging workflows.", "updates": false}} />
+      <HranessSiteFooter mailingList={{ kind: "none" }} support={{"id": "message-like-me", "name": "Textbutler", "valueProposition": "Support Textbutler’s development.", "updates": false}} />
     </>
   );
 }
