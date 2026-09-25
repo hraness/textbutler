@@ -27,6 +27,7 @@ import {
 } from "./release-production-authority.mjs";
 import { controlEpochDigest } from "./release-workflow-range.mjs";
 import { qualifyExistingSiteProduction } from "./site-production.mjs";
+import { SITE_REQUIRED_CI_JOBS } from "./site-production-subject.mjs";
 
 const releaseWorkflowUrl = new URL("../.github/workflows/release.yml", import.meta.url);
 const productionWorkflowUrl = new URL("../.github/workflows/website-production.yml", import.meta.url);
@@ -1119,7 +1120,7 @@ test("already-exact site recovery accepts a deployment after CI but before the r
     [`/repos/${providerRepository}/actions/workflows/ci.yml`]: { id: 7, path: ci.path, name: "CI", state: "active" },
     [`/repos/${providerRepository}/actions/runs/10`]: ci,
     [`/repos/${providerRepository}/actions/runs/10/attempts/1`]: ci,
-    [`/repos/${providerRepository}/actions/runs/10/attempts/1/jobs?per_page=100`]: { total_count: 2, jobs: ["Standalone package", "macOS synthetic Messages and Contacts fixtures"].map(name => ({ name, run_id: 10, run_attempt: 1, head_sha: providerVerifiedSha, status: "completed", conclusion: "success", completed_at: "2026-08-29T14:00:00Z" })) },
+    [`/repos/${providerRepository}/actions/runs/10/attempts/1/jobs?per_page=100`]: { total_count: SITE_REQUIRED_CI_JOBS.length, jobs: [...SITE_REQUIRED_CI_JOBS].map(name => ({ name, run_id: 10, run_attempt: 1, head_sha: providerVerifiedSha, status: "completed", conclusion: "success", completed_at: "2026-08-29T14:00:00Z" })) },
     [`/repos/${providerRepository}/actions/artifacts/30`]: { id: 30, name: "textbutler-site-build", expired: false, digest: subject.buildArtifactDigest, size_in_bytes: 1000, created_at: "2026-08-29T15:00:00Z", workflow_run: { id: 20, head_sha: providerVerifiedSha } },
     [`/repos/${providerRepository}/actions/runs/20/attempts/1`]: { id: 20, run_attempt: 1, workflow_id: 8, path: ".github/workflows/website-production.yml", event: "workflow_dispatch", head_branch: "main", head_sha: providerVerifiedSha, status: "in_progress", conclusion: null, repository: identity, head_repository: identity },
     [`/repos/${providerRepository}/actions/workflows/website-production.yml`]: { id: 8, path: ".github/workflows/website-production.yml", name: "Promote website production", state: "active" },
