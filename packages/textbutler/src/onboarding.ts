@@ -63,7 +63,7 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
     detail: selected ? "A ready agent account is selected for at least one contact. Suggestions still require an explicit send."
       : ready.length ? "Choose a ready agent account for the contact you want help with."
       : xcbAccounts.length ? "XCB subscription accounts are configured. Start or restart the daemon, then check the selected account. Sign-in, model access and contact-scoped qualification must all pass before suggestions are available."
-      : "Connect your Claude, Codex or Devin subscription through XCB using an explicit account and full model key. Sign in using XCB first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
+      : "Connect your Claude, Codex, or Devin subscription through XCB using an explicit account and full model key. Sign in using XCB first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
     command: ready.length ? `textbutler contacts account CONTACT ${nextAccount}`
       : xcbAccounts.length ? `textbutler providers check ${nextAccount}`
       : "textbutler setup --xcb /absolute/xcb --xcb-state /absolute/xcb-state --xcb-account codex:ACCOUNT --xcb-model codex/MODEL" });

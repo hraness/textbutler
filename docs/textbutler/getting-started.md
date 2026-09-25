@@ -5,7 +5,7 @@ Start with its inbox and replies you write yourself. Automatic replies stay
 paused until you choose a ready agent account, turn them on for a contact, and
 resume the butler.
 
-AI replies need a local build of Textbutler and a Claude Code, Codex or Devin
+AI replies need a local build of Textbutler and a Claude Code, Codex, or Devin
 subscription connected through [xcb](https://github.com/hraness/xcb). The account
 also has to pass `providers check`. Installing doesn't turn replies on, and you
 should test live messaging with a recipient you trust. The Claude API route

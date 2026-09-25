@@ -176,7 +176,7 @@ export function disconnectedSnapshot(detail = "The Textbutler daemon is not conn
     capabilities: [
       { id: "messages", status: "setup-required", detail: "Connect the daemon to negotiate Ghostget Messages access." },
       { id: "contacts", status: "setup-required", detail: "Contacts appear after Ghostget grants scoped access." },
-      { id: "agent", status: "setup-required", detail: "A qualified Claude, Codex or Devin account is required." },
+      { id: "agent", status: "setup-required", detail: "A qualified Claude, Codex, or Devin account is required." },
       { id: "attachments", status: "setup-required", detail: "File sending must be reported by the connected provider." },
       { id: "reactions", status: "setup-required", detail: "Available only when the transport supports reactions." },
       { id: "stickers", status: "unsupported", detail: "No qualified sticker transport is connected." },
