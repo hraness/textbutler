@@ -71,10 +71,16 @@ export class ButlerRuntime {
     const decision = decideReply(settings, contact, event, snapshot.state, admittedAt);
     if (decision.outcome === "ignore") return { status: "ignored", reason: decision.reason };
     if (decision.outcome === "defer") return { status: "deferred", reason: decision.reason };
-    const capabilities = await this.ports.transport.capabilities();
+    // The capability and qualification gates are independent reads; fetching
+    // them together keeps a transport status session off the serial run path.
+    // Deferring qualification behind Promise.resolve keeps a synchronous port
+    // throw from detaching the capabilities read.
+    const [capabilities, qualified] = await Promise.all([
+      this.ports.transport.capabilities(), Promise.resolve().then(() => this.ports.agent.qualified(contact)),
+    ]);
     if (!capabilities.ok) return { status: "blocked", reason: capabilities.error.code };
     if (!capabilities.value.capabilities.some(c => c.capability === "autonomous-send" && c.available)) return { status: "blocked", reason: "transport-needs-delegated-send" };
-    if (!await this.ports.agent.qualified(contact)) return { status: "blocked", reason: "agent-sandbox-unqualified" };
+    if (!qualified) return { status: "blocked", reason: "agent-sandbox-unqualified" };
     const grant = await this.ports.delegatedGrant(contact);
     if (!grant) return { status: "blocked", reason: "contact-grant-required" };
     const runId = randomUUID();

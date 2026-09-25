@@ -238,6 +238,9 @@ test("one batched pollSet covers the set and a failed entry only fails its conta
   messages.push(inbound); events.push({ sequence: revision, enrollmentId: enrollmentB.id, revision, message: inbound });
   await loop.tick(); time += 9000; await loop.tick(); await loop.idle();
   expect(sent).toHaveLength(1);
+  // The run's intake refresh reuses the set-poll enrollment; a contact's own
+  // provider poll never leaves the serialized lane even while a run claims.
+  expect(singlePolls).toBe(0);
   expect(sent[0]).toEqual([{ kind: "text", text: "🤖{ Hello }" }]);
 });
 
