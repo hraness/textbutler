@@ -173,11 +173,19 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   const groupExists = () => { if (child.pid === undefined) return false; return groupAlive(child.pid); };
   const kill = (signal: NodeJS.Signals) => { if (child.pid !== undefined) { try { process.kill(-child.pid, signal); } catch { /* close owns the result */ } } };
   const progress = new Map<string, ReturnType<typeof setInterval>>();
+  let pollInFlight = 0;
+  const pollWaiters: (() => void)[] = [];
+  // Polls dispatch only while the wire still reserves three frames for
+  // priority and ordinary work, so a poll burst can never crowd out a
+  // cancel, revoke, close, drain or dispatch.
+  const pollReady = () => pollInFlight < 6 && pending.size < 6;
+  const wakePoll = () => { if (pollWaiters.length !== 0 && pollReady()) pollWaiters.shift()?.(); };
   const clear = (id: string, entry: Pending) => {
     pending.delete(id); clearTimeout(entry.timer);
     const monitor = progress.get(id);
     if (monitor !== undefined) { clearInterval(monitor); progress.delete(id); }
     if (entry.abort) entry.signal?.removeEventListener("abort", entry.abort);
+    wakePoll();
   };
   const stop = () => {
     if (fault) return; fault = true;
@@ -294,6 +302,19 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   let normalChain: Promise<unknown> = Promise.resolve(), queued = 0;
   const invoke: GhostgetAutomationInvoker = (method, params, signal) => {
     if (["cancel", "revoke", "close"].includes(method)) return send(method, params, signal);
+    if (method === "poll") {
+      // The owner serializes enrollment-scoped work per enrollment, so polls
+      // across contacts proceed concurrently through this lane. The waiter
+      // bound exceeds the 50-contact active limit plus owner-side polls; the
+      // wire reservation above keeps this lane from starving priority work.
+      if (pollWaiters.length >= 64) return Promise.reject(new AutomationOperationError("queue-capacity"));
+      return (async () => {
+        while (!pollReady()) await new Promise<void>(resolve => pollWaiters.push(resolve));
+        pollInFlight++;
+        try { return await send(method, params, signal); }
+        finally { pollInFlight--; wakePoll(); }
+      })();
+    }
     if (queued >= 16) return Promise.reject(new AutomationOperationError("queue-capacity"));
     queued++;
     const task = normalChain.catch(() => undefined).then(() => send(method, params, signal)).finally(() => { queued--; });
