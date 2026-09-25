@@ -6,8 +6,13 @@ export const SITE_REPOSITORY_ID = 1342143606;
 export const SITE_WORKFLOW_PATH = ".github/workflows/website-production.yml";
 export const SITE_ARTIFACT_NAME = "textbutler-site-build";
 export const SITE_REQUIRED_CI_JOBS = Object.freeze([
+  "Detect changed paths",
   "Standalone package",
+  "Tests",
+  "Textbutler packages",
+  "Site",
   "macOS synthetic Messages and Contacts fixtures",
+  "Required",
 ]);
 const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;

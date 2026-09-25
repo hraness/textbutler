@@ -35,7 +35,7 @@ function sourceApi(changes = {}) {
     [`/repos/${repo}/actions/workflows/ci.yml`]: fixture.workflow,
     [`/repos/${repo}/actions/runs/10`]: fixture.run,
     [`/repos/${repo}/actions/runs/10/attempts/1`]: fixture.run,
-    [`/repos/${repo}/actions/runs/10/attempts/1/jobs?per_page=100`]: { total_count: 2, jobs: fixture.jobs },
+    [`/repos/${repo}/actions/runs/10/attempts/1/jobs?per_page=100`]: { total_count: SITE_REQUIRED_CI_JOBS.length, jobs: fixture.jobs },
     [`/repos/${repo}/actions/artifacts/30`]: { id: 30, name: "textbutler-site-build", expired: false,
       digest: subject.buildArtifactDigest, size_in_bytes: 1000, created_at: "2026-09-11T10:01:00Z", workflow_run: { id: 20, head_sha: sha } },
     [`/repos/${repo}/actions/runs/20/attempts/1`]: { id: 20, run_attempt: 1, workflow_id: 8,
