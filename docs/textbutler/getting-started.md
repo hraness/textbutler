@@ -188,6 +188,15 @@ app and receipt. If it reports an uncertain transition, preserve its records
 and reconcile that transition before retrying. Recheck Full Disk Access and
 Messages Automation after the upgrade.
 
+Changing the connector's provider implementation changes its reported
+identity. Existing conversation enrollments then report that the provider
+identity changed and must be enrolled again; per-operation owner permissions
+likewise key on the implementation and must be approved again through the
+permission command. Re-enrolling preserves each contact's memory and run
+history: enroll the same conversation coordinate, grant the new binding, and
+update the contact's route reference to the new enrollment in one owner-state
+write, then revoke the superseded grants.
+
 See [local data](local-data.md) for retained setup records and installation data
 removal. Repeating setup preserves an already linked account and its identity.
 
