@@ -8,6 +8,11 @@ const reply = (id = "run-1", time = at): HabitatReply => ({ runId: id, at: time,
 const improved = (runIds: [string, string], evidenceIds: string[], candidate: HabitatPlan | null) => ({ candidate, reason: "Both examples improved", evidenceIds,
   scores: runIds.map((runId, index) => ({ runId, incumbent: 0.6, candidate: 0.8 + index * 0.1, safe: true })) });
 const retain = (remember?: string[]) => ({ candidate: null, reason: "Retain attributed observations", evidenceIds: [], scores: [], ...(remember === undefined ? {} : { remember }) });
+test("the default plan guidance requires an explicit ask for a reply", () => {
+  expect(DEFAULT_HABITAT_PLAN.guidance).toContain("Reply only to explicit asks");
+  expect(DEFAULT_HABITAT_PLAN.guidance).toContain("shared content and ambiguous messages stay silent");
+});
+
 const followupCheckpoint = (habitat: ContactHabitat) => {
   habitat.record(reply()); habitat.observe(message("feedback-1", at + 1, "owner"), at + 1);
   habitat.observe(message("more-1", at + 2), at + 2); habitat.observe(message("more-2", at + 3), at + 3);

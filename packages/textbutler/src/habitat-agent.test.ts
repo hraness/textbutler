@@ -266,6 +266,17 @@ test("low-confidence outputs carrying actions or tools are clamped to silence", 
   expect(tooled.calls()).toBe(1);
 });
 
+test("the decision contract tells the model shares without an explicit ask stay silent", async () => {
+  const f = await fixture((body: string) => {
+    expect(body).toContain("A shared link, document, media item, or forwarded content without an explicit question or request to you wants no reply");
+    expect(body).toContain("intent inferred from a share alone keeps confidence below 0.85");
+    expect(body).toContain("Never request tools when respond=false or confidence<0.85");
+    return replyOutput;
+  });
+  await f.habitat.agent.compose(f.request);
+  expect(f.calls()).toBe(1);
+});
+
 test("driver outputs that omit the tool field parse as no tool", async () => {
   const omit = { respond: false, confidence: 0.95, reason: "not_needed", summary: "Nothing needed", actions: [] };
   const silent = await fixture(omit);
