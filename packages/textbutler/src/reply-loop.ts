@@ -17,7 +17,7 @@ import type { HabitatHostConfig } from "./host-config.ts";
 import type { FastDriver } from "./fast-driver.ts";
 
 type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "onHabitatChanged" | "notePending"> & { setReplyAgent?: (agent: ButlerAgent) => void };
-type ContactLoop = { binding: AutomationBinding; settingsRevision: number; initialized: boolean; runtime: ButlerRuntime; pending?: MessageEvent; pendingFirstAt: number | null; blocked?: string; running: boolean; runningPinned: boolean; lastOwnerAt: number | null; historyRevision: number | null; syncFailures: number; runFailures: number };
+type ContactLoop = { binding: AutomationBinding; settingsRevision: number; initialized: boolean; runtime: ButlerRuntime; pending?: MessageEvent; pendingFirstAt: number | null; blocked?: string; running: boolean; runningPinned: boolean; lastOwnerAt: number | null; lastEnrollment: AutomationEnrollment | null; historyRevision: number | null; syncFailures: number; runFailures: number };
 const RECONCILE_DETAIL = "A previous send needs reconciliation. Check Messages, then run `textbutler replies reconcile`.";
 const SYNC_FAILURE_THRESHOLD = 3;
 export interface ReplyLoopOptions {
@@ -72,7 +72,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     settings = effective(next);
     habitat?.reconcile();
     for (const [id, state] of contacts) {
-      if (!active(id, state.settingsRevision)) { state.runtime.cancelContact(id); delete state.pending; state.pendingFirstAt = null; state.initialized = false; state.syncFailures = 0; state.runFailures = 0; }
+      if (!active(id, state.settingsRevision)) { state.runtime.cancelContact(id); delete state.pending; state.pendingFirstAt = null; state.initialized = false; state.lastEnrollment = null; state.syncFailures = 0; state.runFailures = 0; }
     }
   };
   const unsubscribe = service.onSettingsChanged(next => { settingsEpoch++; changed(next); habitat?.settingsChanged(); });
@@ -81,7 +81,9 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     habitat?.invalidateContact(id);
   });
   async function snapshot(contact: ContactSettings, state: ContactLoop, current?: AutomationEnrollment): Promise<ConversationSnapshot> {
-    const enrollment = current ?? await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
+    // The intake refresh reuses the set-poll's enrollment instead of spending a
+    // second provider session; history still re-reads and re-asserts the live row.
+    const enrollment = current ?? state.lastEnrollment ?? await client.poll(state.binding.enrollmentId); assertAutomationBinding(state.binding, enrollment);
     const page = await client.history(state.binding.enrollmentId, 200); assertAutomationBinding(state.binding, page.enrollment);
     for (const message of page.messages) if (author(message, contact) === "owner" && !(message.kind === "message" && message.text !== null && keywordPresent(message.text, contact.keyword))) state.lastOwnerAt = Math.max(state.lastOwnerAt ?? 0, Date.parse(message.occurredAt));
     if (state.historyRevision !== page.enrollment.revision) {
@@ -100,7 +102,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     const previous = contacts.get(contact.id);
     if (previous && previous.binding.bindingDigest === binding.bindingDigest && previous.binding.enrollmentId === binding.enrollmentId && previous.settingsRevision === contact.revision) return previous;
     previous?.runtime.cancelContact(contact.id);
-    const state = { binding, settingsRevision: contact.revision, initialized: false, running: false, runningPinned: false, lastOwnerAt: null, historyRevision: null, pendingFirstAt: null, syncFailures: 0, runFailures: 0 } as unknown as ContactLoop;
+    const state = { binding, settingsRevision: contact.revision, initialized: false, running: false, runningPinned: false, lastOwnerAt: null, lastEnrollment: null, historyRevision: null, pendingFirstAt: null, syncFailures: 0, runFailures: 0 } as unknown as ContactLoop;
     state.runtime = new ButlerRuntime({ settings: () => settings, refresh: currentContact => snapshot(currentContact, state), agent,
       transport: createGhostgetAutomationTransport({ client, enrollmentId: binding.enrollmentId, admitAsset: async path => (await workspace(contact.id)).admitAsset(path), now }),
       journal: service.runJournal(), hooks, delegatedGrant: current => service.delegatedGrant(current),
@@ -171,8 +173,8 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
       try {
         if (result === undefined || result.error !== null || result.enrollment === null) throw new Error(result?.error ?? "Poll result missing");
         assertAutomationBinding(binding, result.enrollment);
-        ready.set(contact.id, result.enrollment.ready); drain.set(binding.enrollmentId, { contact, state }); fresh.set(contact.id, result.enrollment);
-      } catch { state.runtime.cancelContact(contact.id); state.initialized = false; pollFailed.add(contact.id); }
+        ready.set(contact.id, result.enrollment.ready); drain.set(binding.enrollmentId, { contact, state }); fresh.set(contact.id, result.enrollment); state.lastEnrollment = result.enrollment;
+      } catch { state.runtime.cancelContact(contact.id); state.initialized = false; state.lastEnrollment = null; pollFailed.add(contact.id); }
     }
     // The drain cursor belongs to the enrollment set, not one contact. A
     // membership change re-establishes the cursor; replayed events only re-
@@ -188,7 +190,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
           for (const event of result.events) { const target = drain.get(event.enrollmentId); if (target?.state.initialized) receive(target.contact, target.state, event); }
           setCursor = result.nextCursor; caughtUp = result.caughtUp;
         }
-      } catch { drainFailed = true; for (const { contact, state } of drain.values()) { state.initialized = false; state.runtime.cancelContact(contact.id); } }
+      } catch { drainFailed = true; for (const { contact, state } of drain.values()) { state.initialized = false; state.lastEnrollment = null; state.runtime.cancelContact(contact.id); } }
     }
     for (const { contact, state } of actives) {
       if (closed) break;
@@ -239,7 +241,7 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   }
   const tick = (): Promise<void> => {
     if (closed) return Promise.resolve();
-    ticking ??= tickOnce().catch(() => { for (const state of contacts.values()) state.initialized = false; options.onStatus?.({ state: "unavailable", detail: "Owner settings or messaging state could not be verified." }); }).finally(() => { ticking = undefined; });
+    ticking ??= tickOnce().catch(() => { for (const state of contacts.values()) { state.initialized = false; state.lastEnrollment = null; } options.onStatus?.({ state: "unavailable", detail: "Owner settings or messaging state could not be verified." }); }).finally(() => { ticking = undefined; });
     return ticking;
   };
   const schedule = () => { if (!closed) timer = setTimeout(() => { void tick().finally(schedule); }, 1000); };
