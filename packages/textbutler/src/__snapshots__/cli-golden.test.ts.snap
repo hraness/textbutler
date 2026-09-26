@@ -261,7 +261,7 @@ only references and pins the xcb file's checksum. Stop the service before
 adding a connection, then start it again.
 
 Example
-  textbutler setup --ghostget /Users/me/bin/ghostget --account imessage:messages"
+  textbutler setup --ghostget /opt/ghostget/ghostget --account imessage:messages"
 ,
   "status": 
 "Usage: textbutler status

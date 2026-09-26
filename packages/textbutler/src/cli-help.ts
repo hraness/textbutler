@@ -80,7 +80,7 @@ const TOPICS: Record<string, Topic> = {
 Use absolute paths. Sign in with Ghostget and xcb first; Textbutler stores
 only references and pins the xcb file's checksum. Stop the service before
 adding a connection, then start it again.`,
-    example: "textbutler setup --ghostget /Users/me/bin/ghostget --account imessage:messages" },
+    example: "textbutler setup --ghostget /opt/ghostget/ghostget --account imessage:messages" },
   tui: { usage: "textbutler tui", summary: "Open the guided terminal. It walks through setup, connecting apps,\nadding chats and reviewing replies. Quitting leaves the service running." },
   doctor: { usage: "textbutler doctor [--json]", summary: "Check each setup step and show the one thing to do next.\nDoctor only reads local settings; it never reads messages or spends credits.",
     body: `Options

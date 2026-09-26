@@ -89,7 +89,7 @@ describe("Textbutler CLI style contract", () => {
     expect(JSON.parse((await failure(["contacts", "bogus", "--json"])).stdout).error.code).toBe("usage");
     expect(JSON.parse((await failure(["contacts", "bogus", "--json", "--data-dir", "/tmp/x"])).stdout).error.code).toBe("usage");
     expect((await failure(["replies", "send", "--json"])).stderr).toContain("replies send");
-    expect(describeCliError(new Error("secret /Users/x/path"), ["status"], human, "human")).toEqual({ stdout: "", stderr: "✗ Textbutler couldn't finish this command.\n→ textbutler doctor\n", exitCode: 1 });
+    expect(describeCliError(new Error("secret /private/owner-data/path"), ["status"], human, "human")).toEqual({ stdout: "", stderr: "✗ Textbutler couldn't finish this command.\n→ textbutler doctor\n", exitCode: 1 });
   });
   test("doctor is text for people and the full report with --json or for agents", async () => {
     const dataDir = await mkdtemp(join(await realpath("/tmp"), "textbutler-golden-")); roots.push(dataDir);
