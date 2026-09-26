@@ -21,7 +21,8 @@
         "Client read-lane methods (events, enrollments, status, run, grant lookups) outpaced the server's scoped-admission list and would collide on normalBusy -> not-ready under concurrency — fixed by aligning the server scoped set.",
         "runByIntent called through .catch on a fixture or older client without the method throws synchronously before catch attaches — fixed by wrapping invocation in Promise.resolve().then().",
         "ackReceipt.value dereferenced after a failed receipt — fixed by gating all access on ackReceipt.ok and mapping only dispatch-failed to a provable skip.",
-        "Initial wakeLane order let a sustained read flood cut ahead of a queued submit — fixed by claiming freed wire slots for mutation waiters first."
+        "Initial wakeLane order let a sustained read flood cut ahead of a queued submit — fixed by claiming freed wire slots for mutation waiters first.",
+        "Ack-branch reconcile could claim non-send while a reply row existed but unreadable/nonterminal — fixed by gating ack arbitration on reply === null (provable absence), matching the structural guarantee that an ack-wedged run never composed a reply."
       ],
       "acceptedNits": [
         "Probe uses cancel with a reserved plan id: unknown-plan cancel returns a result or bounded remote error, both prove liveness; a child answering probes but never the invoke is abandoned only at the 15-minute hard cap.",
