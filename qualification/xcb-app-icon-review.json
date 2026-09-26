@@ -1,0 +1,21 @@
+{
+  "kind": "independent-ai-source-review",
+  "scope": "Native app icon (packages/textbutler/src/macos-app.ts, scripts/macos-textbutler-app.ts, native/AppIcon.icns): builds add Contents/Resources/AppIcon.icns and CFBundleIconFile, and the app receipt gains an optional iconSha256 that pins Resources to exactly that file. Receipts without it keep the previous exact inventory. No change to launch roles, payload digests, signing, the swap helper, or Messages access.",
+  "rounds": [
+    {
+      "round": 1,
+      "verdict": "finding-documented",
+      "blockers": [
+        "Downgrade is one-way: releases before the icon reject a receipt with iconSha256 and a bundle with a Resources folder, and no forward change can alter older verifiers. Documented in getting-started with the manual path (move the app and receipt aside, reinstall from the earlier release)."
+      ],
+      "checked": [
+        "Receipts without iconSha256 still parse and verify, and reject an added Resources folder.",
+        "A present iconSha256 must be 64 hex characters and pins Resources to exactly AppIcon.icns under 1 MiB.",
+        "upgradeVerifiedMacosApp verifies each side against its own receipt, so an icon-less previous app in the archive slot is expected to have no Resources.",
+        "seal only touches Resources when it exists, with verification before and after.",
+        "The icon is written before codesign, so CodeResources covers it; codesign --verify --deep --strict runs at build, stage and after the swap."
+      ]
+    }
+  ],
+  "result": "Ship. Additive and backward compatible for installed apps; the one-way downgrade is documented."
+}

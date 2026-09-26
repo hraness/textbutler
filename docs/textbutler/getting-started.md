@@ -191,6 +191,12 @@ with the following command:
 bun run textbutler:app install --from /absolute/new/app-build-directory --upgrade
 ```
 
+Apps now include the Textbutler icon, and releases from before the icon can't
+verify them. To go back to an earlier release, stop the
+service, move `~/Applications/TextButler.app` and `state/macos-app.json` in
+your data folder somewhere safe, then build and install the app from that
+release. Then turn on macOS access for the reinstalled app again.
+
 The upgrade verifies both versions and retains the previous signed
 app and receipt. If it reports an uncertain transition, preserve its records
 and reconcile that transition before retrying. Recheck Full Disk Access and

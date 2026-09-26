@@ -4,15 +4,17 @@ import { dirname, join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
-import { appFileDigest, appPhysicalDirectory, MACOS_APP_BUNDLE_ID, macosAppExecutable, macosAppPath, macosAppReceiptPath, macosLaunchGeneration, readMacosAppReceipt, verifyMacosApp, type MacosAppIdentity } from "../packages/textbutler/src/macos-app.ts";
+import { appFileDigest, appPhysicalDirectory, MACOS_APP_BUNDLE_ID, MACOS_APP_ICON_MAXIMUM, macosAppExecutable, macosAppPath, macosAppReceiptPath, macosLaunchGeneration, readMacosAppReceipt, verifyMacosApp, type MacosAppIdentity } from "../packages/textbutler/src/macos-app.ts";
 import { physicalDirectory, readArtifact, validateBun, verifyDistribution } from "./textbutler-distribution.ts";
 import { acquireOwnerDatabase } from "../packages/textbutler/src/daemon-custody.ts";
 import { MESSAGES_AUTOMATION, MESSAGES_FDA } from "../packages/textbutler/src/permission-copy.ts";
 import { prePrompt, recover, terminalPromptIO, type PromptIO } from "../packages/textbutler/src/permission-prompt.ts";
 
 const SOURCE = fileURLToPath(new URL("../native/textbutler-launcher.c", import.meta.url));
+/** Rendered from native/app-icon.svg (the canonical Textbutler mark). */
+const ICON = fileURLToPath(new URL("../native/AppIcon.icns", import.meta.url));
 const EXECUTION_ENV = { PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
-const INFO = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${MACOS_APP_BUNDLE_ID}</string><key>CFBundleExecutable</key><string>TextButler</string><key>CFBundleName</key><string>Textbutler</string><key>CFBundleDisplayName</key><string>Textbutler</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>1</string><key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/><key>NSAppleEventsUsageDescription</key><string>Textbutler sends replies through Messages only in the chats you turn on.</string></dict></plist>\n`;
+const INFO = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${MACOS_APP_BUNDLE_ID}</string><key>CFBundleExecutable</key><string>TextButler</string><key>CFBundleName</key><string>Textbutler</string><key>CFBundleDisplayName</key><string>Textbutler</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleIconFile</key><string>AppIcon</string><key>CFBundleVersion</key><string>1</string><key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/><key>NSAppleEventsUsageDescription</key><string>Textbutler sends replies through Messages only in the chats you turn on.</string></dict></plist>\n`;
 async function run(args: readonly string[]): Promise<string> {
   const child = Bun.spawn([...args], { cwd: "/", env: EXECUTION_ENV, stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: 120_000, killSignal: "SIGKILL" });
   let total = 0, overflow = false;
@@ -43,9 +45,12 @@ async function publishPrivateArtifact(parent: string, name: string, bytes: Buffe
   }
 }
 async function seal(app: string): Promise<void> {
-  for (const file of [join(app, "Contents", "Info.plist"), join(app, "Contents", "_CodeSignature", "CodeResources")]) await chmod(file, 0o400);
+  // Apps built before the icon have no Resources folder; verifyMacosApp checks
+  // the exact inventory against the receipt either way.
+  const resources = await exists(join(app, "Contents", "Resources")) ? [join(app, "Contents", "Resources")] : [];
+  for (const file of [join(app, "Contents", "Info.plist"), join(app, "Contents", "_CodeSignature", "CodeResources"), ...resources.map(dir => join(dir, "AppIcon.icns"))]) await chmod(file, 0o400);
   await chmod(join(app, "Contents", "MacOS", "TextButler"), 0o500);
-  for (const dir of [join(app, "Contents", "MacOS"), join(app, "Contents", "_CodeSignature"), join(app, "Contents"), app]) { await chmod(dir, 0o500); await syncDirectory(dir); }
+  for (const dir of [join(app, "Contents", "MacOS"), join(app, "Contents", "_CodeSignature"), ...resources, join(app, "Contents"), app]) { await chmod(dir, 0o500); await syncDirectory(dir); }
 }
 async function removeGeneratedFinderMetadata(app: string): Promise<void> {
   // Finder may annotate a newly created .app while the owner's file picker is
@@ -103,6 +108,10 @@ export async function compileTextbutlerMacosApp(input: {
   const app = join(input.output, "TextButler.app"), executable = join(app, "Contents", "MacOS", "TextButler");
   await mkdir(join(app, "Contents", "MacOS"), { recursive: true, mode: 0o700 });
   await writeFile(join(app, "Contents", "Info.plist"), INFO, { flag: "wx", mode: 0o600 });
+  const icon = await readArtifact(ICON, MACOS_APP_ICON_MAXIMUM);
+  if (icon.subarray(0, 4).toString("latin1") !== "icns") throw new Error("The Textbutler app icon is not an .icns file.");
+  await mkdir(join(app, "Contents", "Resources"), { mode: 0o700 });
+  await writeFile(join(app, "Contents", "Resources", "AppIcon.icns"), icon, { flag: "wx", mode: 0o600 });
   const scratch = await mkdtemp(join(await realpath(tmpdir()), "textbutler-native-build-"));
   try {
     const source = await readArtifact(SOURCE, 1024 * 1024), sourceSha256 = createHash("sha256").update(source).digest("hex");
@@ -122,7 +131,8 @@ export async function compileTextbutlerMacosApp(input: {
     await removeGeneratedFinderMetadata(app);
     await run(["/usr/bin/codesign", "--verify", "--deep", "--strict", app]);
     const identity: MacosAppIdentity = { schemaVersion: 1, bundleId: MACOS_APP_BUNDLE_ID, signing: input.signingIdentity === undefined ? "ad-hoc" : "certificate", messagesBundleId, automationConsent: input.syntheticAutomationPermission === undefined ? "native-api" : "synthetic", appPath: input.appPath, home: input.home, dataDir: input.dataDir, runtime: input.runtime, entrypoint: input.entrypoint, runtimeSha256: input.runtimeSha256, entrypointSha256: input.entrypointSha256,
-      executableSha256: await appFileDigest(executable, { executable: true }), infoPlistSha256: await appFileDigest(join(app, "Contents", "Info.plist")), signatureSha256: await appFileDigest(join(app, "Contents", "_CodeSignature", "CodeResources")), sourceSha256 };
+      executableSha256: await appFileDigest(executable, { executable: true }), infoPlistSha256: await appFileDigest(join(app, "Contents", "Info.plist")), signatureSha256: await appFileDigest(join(app, "Contents", "_CodeSignature", "CodeResources")), sourceSha256,
+      iconSha256: await appFileDigest(join(app, "Contents", "Resources", "AppIcon.icns"), { maximum: MACOS_APP_ICON_MAXIMUM }) };
     if (await appFileDigest(SOURCE) !== sourceSha256) throw new Error("The native launcher source changed during compilation; this build is not admitted.");
     await seal(app); await verifyMacosApp(identity, app);
     await publishPrivateArtifact(input.output, "macos-app.json", Buffer.from(`${JSON.stringify(identity)}\n`));
