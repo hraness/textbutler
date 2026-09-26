@@ -210,6 +210,19 @@ describe("persistent owner control service", () => {
     expect(await service.request({ protocol, command: "contact.settings.update", contactId: "synthetic-b", expectedRevision: 2, settings })).toMatchObject({ ok: false, code: "capacity" });
     expect(await service.request({ protocol, command: "contact.memory.read", contactId: "not-configured" })).toMatchObject({ ok: false, code: "invalid-request" });
   });
+  test("the repo allowlist round-trips through ordinary settings writes", async () => {
+    const { service } = await setup();
+    const settings = { ...((await service.snapshot()).contacts[0]!.settings), repos: ["https://github.com/hraness/bio"] };
+    const updated = await service.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 1, settings });
+    expect(updated).toMatchObject({ ok: true, kind: "snapshot", snapshot: { contacts: [{ settings: { repos: ["https://github.com/hraness/bio"] } }, {}] } });
+    expect((await service.settings()).contacts[0]?.repos).toEqual(["https://github.com/hraness/bio"]);
+    // A later settings write that echoes the snapshot keeps the allowlist.
+    const echoed = { ...((await service.snapshot()).contacts[0]!.settings) };
+    expect(await service.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 2, settings: echoed })).toMatchObject({ ok: true });
+    expect((await service.settings()).contacts[0]?.repos).toEqual(["https://github.com/hraness/bio"]);
+    for (const repos of [["http://github.com/x/y"], ["https://user@example.com/x/y"], ["https://github.com/x", "https://github.com/x"], "https://github.com/x/y"])
+      expect(await service.request({ protocol, command: "contact.settings.update", contactId: "synthetic-a", expectedRevision: 3, settings: { ...echoed, repos } })).toMatchObject({ ok: false, code: "invalid-request" });
+  });
   test("memory revisions detect agent changes and do not share the settings revision", async () => {
     const { service, dataDir } = await setup();
     const read = await service.request({ protocol, command: "contact.memory.read", contactId: "synthetic-a" });

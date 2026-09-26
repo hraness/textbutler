@@ -209,6 +209,30 @@ test("owner changes invalidate pending evolution even if the plan returns to ide
   } finally { journal.close(); }
 });
 
+test("evolved candidates cannot grant themselves repository access", () => {
+  const journal = RunJournal.memory();
+  try {
+    const habitat = new ContactHabitat(journal, "contact-a"), checkpoint = followupCheckpoint(habitat);
+    const candidate = { ...DEFAULT_HABITAT_PLAN, repoAccess: true };
+    expect(habitat.finish(checkpoint, improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], candidate))).toBe(false);
+    expect(habitat.snapshot().champion.repoAccess).toBeUndefined();
+    expect(habitat.snapshot().evaluations.at(-1)?.status).toBe("retained");
+    // The owner grants the flag; a candidate carrying the identical grant still
+    // promotes on its own merits.
+    const granted = new ContactHabitat(journal, "contact-b");
+    granted.configure(0, { ...DEFAULT_HABITAT_PLAN, repoAccess: true });
+    const next = followupCheckpoint(granted), styled = { ...granted.snapshot().champion, guidance: "Prefer one short example." };
+    expect(granted.finish(next, improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], styled))).toBe(true);
+    expect(granted.snapshot().champion).toEqual(styled);
+    // And stripping an owner grant in a candidate cannot promote either.
+    const stripped = new ContactHabitat(journal, "contact-c");
+    stripped.configure(0, { ...DEFAULT_HABITAT_PLAN, repoAccess: true });
+    const last = followupCheckpoint(stripped);
+    expect(stripped.finish(last, improved(["run-1", "run-2"], ["feedback-1", "feedback-2"], DEFAULT_HABITAT_PLAN))).toBe(false);
+    expect(stripped.snapshot().champion.repoAccess).toBe(true);
+  } finally { journal.close(); }
+});
+
 test("a new owner baseline preserves history and cannot roll back to older tool grants", () => {
   const journal = RunJournal.memory();
   try {

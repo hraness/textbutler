@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { createPrivateFileOnce, publishPrivateFile } from "@hraness/local-custody/atomic-publish";
 import { ensurePrivateDirectory, readPrivateFile } from "@hraness/local-custody/private-paths";
 import type { ControlRequest, ControlResponse, DesktopSnapshot } from "../../control/src/index.ts";
-import { configureContact, newContact, DEFAULT_ACTIVE_LIMIT, parseSettings, type ContactSettings, type Settings } from "./config.ts";
+import { configureContact, newContact, DEFAULT_ACTIVE_LIMIT, parseRepoUrl, parseSettings, type ContactSettings, type Settings } from "./config.ts";
 import { ContactWorkspace } from "./workspace.ts";
 import { RunJournal } from "./journal.ts";
 import { OwnerReadRecoveryError, assertSameConversation, bindingDigest, boundedHistory, parseConversationBinding, type ConversationBinding, type HistoryMessage, type ObservedConversation, type OwnerConversationReadPort } from "./enrollment.ts";
@@ -24,7 +24,7 @@ import type { HabitatHostConfig } from "./host-config.ts";
 export const TEXTBUTLER_CONTROL_PROTOCOL = "textbutler.control.v1" as const;
 const MAX_SETTINGS_BYTES = 524_288;
 const MAX_CONTACTS = 200;
-const CONTACT_KEYS = ["id", "label", "routeId", "enabled", "selfChat", "mode", "keyword", "provider", "accountId", "replyModel", "classifierModel", "disclosure", "revision", "pausedUntil", "humanCooldownMs", "debounceMs", "maxRepliesPerHour"];
+const CONTACT_KEYS = ["id", "label", "routeId", "enabled", "selfChat", "mode", "keyword", "provider", "accountId", "replyModel", "classifierModel", "disclosure", "revision", "pausedUntil", "humanCooldownMs", "debounceMs", "maxRepliesPerHour", "repos"];
 type FailureCode = "invalid-request" | "conflict" | "capacity" | "unavailable";
 export class ControlFailure extends Error { constructor(readonly code: FailureCode, message: string) { super(message); } }
 function fail(code: FailureCode, message: string): never { throw new ControlFailure(code, message); }
@@ -47,8 +47,14 @@ function text(value: unknown, max = 256): string {
 function contactId(value: unknown): string { const id = text(value, 80); if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/u.test(id)) fail("invalid-request", "Invalid contact identifier."); return id; }
 function bool(value: unknown): boolean { if (typeof value !== "boolean") fail("invalid-request", "Invalid control flag."); return value; }
 function providerName(provider: AutomationProvider): string { return provider === "imessage" ? "iMessage" : provider === "beeper" ? "Beeper" : "WhatsApp"; }
+function parseUiRepos(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 16) fail("invalid-request", "The repo allowlist holds at most 16 HTTPS URLs.");
+  const repos = value.map(entry => { const url = parseRepoUrl(entry); if (url === null) fail("invalid-request", "Repo allowlist entries must be plain HTTPS URLs without credentials."); return url; });
+  if (new Set(repos).size !== repos.length) fail("invalid-request", "Repo allowlist entries must be unique.");
+  return repos;
+}
 function parseUiSettings(value: unknown) {
-  const settings = record(value); exact(settings, ["enabled", "responseMode", "keyword", "provider", "disclosure", ...(settings.accountId === undefined ? [] : ["accountId"]), ...(settings.selfChat === undefined ? [] : ["selfChat"])]);
+  const settings = record(value); exact(settings, ["enabled", "responseMode", "keyword", "provider", "disclosure", ...(settings.accountId === undefined ? [] : ["accountId"]), ...(settings.selfChat === undefined ? [] : ["selfChat"]), ...(settings.repos === undefined ? [] : ["repos"])]);
   const disclosure = record(settings.disclosure); exact(disclosure, ["character", "begin", "end"]);
   if (settings.responseMode !== "smart" && settings.responseMode !== "keyword" || settings.provider !== "codex" && settings.provider !== "claude" && settings.provider !== "devin") fail("invalid-request", "Unknown reply mode or provider.");
   const keyword = text(settings.keyword, 160);
@@ -56,6 +62,7 @@ function parseUiSettings(value: unknown) {
   return { enabled: bool(settings.enabled), responseMode: settings.responseMode as "smart" | "keyword", keyword, provider: settings.provider as "codex" | "claude" | "devin",
     ...(settings.accountId === undefined ? {} : { accountId: contactId(settings.accountId) }),
     ...(settings.selfChat === undefined ? {} : { selfChat: bool(settings.selfChat) }),
+    ...(settings.repos === undefined ? {} : { repos: parseUiRepos(settings.repos) }),
     disclosure: { character: disclosure.character === "" ? "" : text(disclosure.character, 64), begin: disclosure.begin === "" ? "" : text(disclosure.begin, 64), end: disclosure.end === "" ? "" : text(disclosure.end, 64) } };
 }
 /** Owner control channel: explicit sends still use bound grants and journaled intent. */
@@ -196,7 +203,7 @@ function parseOwnerState(value: unknown): OwnerState {
   if (item.schemaVersion !== 1) throw new Error("Unsupported owner state version");
   const settings = record(item.settings); exact(settings, ["schemaVersion", "paused", "maxActiveContacts", "contacts"]);
   if (!Array.isArray(settings.contacts) || settings.contacts.length > MAX_CONTACTS) throw new Error("Too many configured contacts");
-  for (const contact of settings.contacts) { const entry = record(contact); if (!Object.hasOwn(entry, "selfChat")) entry.selfChat = false; exact(entry, CONTACT_KEYS); exact(record(entry.disclosure), ["character", "begin", "end"]); }
+  for (const contact of settings.contacts) { const entry = record(contact); if (!Object.hasOwn(entry, "selfChat")) entry.selfChat = false; if (!Object.hasOwn(entry, "repos")) entry.repos = []; exact(entry, CONTACT_KEYS); exact(record(entry.disclosure), ["character", "begin", "end"]); }
   const parsed = parseSettings(settings);
   const bindings: Record<string, OwnerBinding> = {};
   for (const [id, value] of Object.entries(item.bindings === undefined ? {} : record(item.bindings))) {
@@ -345,6 +352,28 @@ export class TextbutlerControlService {
   }
   /** The reply loop reports the cluster it already observed; owner scans replace it. */
   notePending(contactId: string, value: PendingObservation | null): void { this.replies?.notePending(contactId, value); }
+  /** A repo approval granted through the owner's self-chat channel appends the
+   * exact URL to the contact's allowlist through the serialized settings write. */
+  async allowContactRepo(contactId: string, url: string): Promise<"added" | "full" | "skipped"> {
+    return await this.serial(async () => {
+      const latest = await this.current();
+      const contact = latest.state.settings.contacts.find(value => value.id === contactId);
+      if (!contact || contact.repos.includes(url) || parseRepoUrl(url) !== url) return "skipped" as const;
+      if (contact.repos.length >= 16) return "full" as const;
+      await this.publish(latest, configureContact(latest.state.settings, contactId, { repos: [...contact.repos, url] }));
+      return "added" as const;
+    });
+  }
+  /** Best-effort system notice into the owner's self conversation through the
+   * ordinary owner-send path. The journaled send stays authoritative and a busy
+   * or unconfigured channel is skipped; pending requests remain discoverable. */
+  async notifySelfChat(text: string): Promise<void> {
+    if (this.closed || !this.replies || typeof text !== "string" || !text.trim() || Buffer.byteLength(text) > 4_096 || text.includes("\0")) return;
+    const state = await this.runtimeState();
+    const self = state.settings.contacts.find(value => value.selfChat && value.enabled);
+    if (!self) return;
+    try { await this.replies.send({ contactId: self.id, text }, AbortSignal.timeout(120_000)); } catch { /* The pending request remains discoverable. */ }
+  }
   /** Journal provenance reclassifies disclosure-free sends that the history
    * reader could only mark owner-authored. */
   private reauthor(messages: HistoryMessage[]): HistoryMessage[] {
@@ -473,7 +502,7 @@ export class TextbutlerControlService {
             : contact.enabled && grant ? "A bounded conversation grant renews while this contact remains enabled. Pausing or disabling stops new replies."
             : "Enabling this contact delegates supported actions to its exact conversation using a renewable bounded grant.",
           grantExpiresAt: grant?.expiresAt ?? null } }),
-        settings: { enabled: contact.enabled, selfChat: contact.selfChat, responseMode: contact.mode, keyword: contact.keyword, provider: contact.provider, accountId: contact.accountId, disclosure: { ...contact.disclosure } } }; }),
+        settings: { enabled: contact.enabled, selfChat: contact.selfChat, responseMode: contact.mode, keyword: contact.keyword, provider: contact.provider, accountId: contact.accountId, disclosure: { ...contact.disclosure }, repos: [...contact.repos] } }; }),
       ...(this.providers ? { providerAccounts: this.providers.accounts() } : {}),
       ...(this.habitatConfig?.enabled ? { habitat: { driver: this.habitatConfig.driver.kind, model: this.habitatConfig.driver.model,
         evolutionModel: this.habitatConfig.evolutionModel, debounceMs: this.habitatConfig.debounceMs,
@@ -531,7 +560,8 @@ export class TextbutlerControlService {
     let updated: Settings;
     try { updated = configureContact(current.state.settings, request.contactId, { enabled: true, mode: request.settings.responseMode,
       keyword: request.settings.keyword, provider: request.settings.provider, ...(request.settings.accountId === undefined ? {} : { accountId: request.settings.accountId }),
-      ...(request.settings.selfChat === undefined ? {} : { selfChat: request.settings.selfChat }), disclosure: request.settings.disclosure }); }
+      ...(request.settings.selfChat === undefined ? {} : { selfChat: request.settings.selfChat }), disclosure: request.settings.disclosure,
+      ...(request.settings.repos === undefined ? {} : { repos: request.settings.repos }) }); }
     catch { fail("capacity", "Check contact settings and the active contact limit."); }
     const contact = updated.contacts.find(contact => contact.id === request.contactId)!;
     const response = this.startJob(async signal => {
@@ -790,7 +820,7 @@ export class TextbutlerControlService {
           signal.throwIfAborted(); const latest = await this.current();
           if (latest.state.revision !== request.expectedRevision) fail("conflict", "Settings changed. Reload before saving.");
           if (!contact!.enabled && latest.state.settings.contacts.filter(item => item.enabled).length >= latest.state.settings.maxActiveContacts) fail("capacity", "The active contact limit has been reached.");
-          const updated = configureContact(latest.state.settings, request.contactId, { enabled: request.settings.enabled, mode: request.settings.responseMode, keyword: request.settings.keyword, provider: request.settings.provider, ...(request.settings.accountId === undefined ? {} : { accountId: request.settings.accountId }), ...(request.settings.selfChat === undefined ? {} : { selfChat: request.settings.selfChat }), disclosure: request.settings.disclosure });
+          const updated = configureContact(latest.state.settings, request.contactId, { enabled: request.settings.enabled, mode: request.settings.responseMode, keyword: request.settings.keyword, provider: request.settings.provider, ...(request.settings.accountId === undefined ? {} : { accountId: request.settings.accountId }), ...(request.settings.selfChat === undefined ? {} : { selfChat: request.settings.selfChat }), disclosure: request.settings.disclosure, ...(request.settings.repos === undefined ? {} : { repos: request.settings.repos }) });
           await this.publish(latest, updated);
           return { protocol: TEXTBUTLER_CONTROL_PROTOCOL, ok: true, kind: "snapshot", snapshot: await this.snapshot() };
         });
@@ -802,7 +832,7 @@ export class TextbutlerControlService {
       updated = parseSettings({ ...current.state.settings, paused: request.settings.paused, maxActiveContacts: request.settings.activeContactLimit });
     } else {
       if (request.settings.enabled && !contact!.enabled && current.state.settings.contacts.filter(contact => contact.enabled).length >= current.state.settings.maxActiveContacts) fail("capacity", "The active contact limit has been reached.");
-      try { updated = configureContact(current.state.settings, request.contactId, { enabled: request.settings.enabled, mode: request.settings.responseMode, keyword: request.settings.keyword, provider: request.settings.provider, ...(request.settings.accountId === undefined ? {} : { accountId: request.settings.accountId }), ...(request.settings.selfChat === undefined ? {} : { selfChat: request.settings.selfChat }), disclosure: request.settings.disclosure }); } catch { fail("invalid-request", "Invalid contact settings."); }
+      try { updated = configureContact(current.state.settings, request.contactId, { enabled: request.settings.enabled, mode: request.settings.responseMode, keyword: request.settings.keyword, provider: request.settings.provider, ...(request.settings.accountId === undefined ? {} : { accountId: request.settings.accountId }), ...(request.settings.selfChat === undefined ? {} : { selfChat: request.settings.selfChat }), disclosure: request.settings.disclosure, ...(request.settings.repos === undefined ? {} : { repos: request.settings.repos }) }); } catch { fail("invalid-request", "Invalid contact settings."); }
     }
     await this.publish(current, updated);
     if (request.command === "contact.settings.update" && !request.settings.enabled) {

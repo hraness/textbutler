@@ -27,6 +27,10 @@ async function fixture(fast = false) {
   const mutableSent = sent as unknown[][], plans = new Map<string, AutomationPlan>(), statuses: { state: string; detail: string }[] = [];
   let failEvents = 0, eventsCalls = 0;
   let beforeSubmit: (() => Promise<void>) | undefined;
+  const allowed: [string, string][] = [], notices: string[] = [], synced: [string, string][] = [];
+  const shelf = { sync: async (contactId: string, url: string) => { synced.push([contactId, url]); return { name: "bio", url, commit: "c".repeat(40), syncedAt: time }; },
+    read: async () => ({ file: "README.md", text: "readme", truncated: false }), search: async () => ({ matches: [], scanned: 0, truncated: false }),
+    list: async () => [] as const };
   const client = createGhostgetAutomationClient(async (method, params) => {
     if (method === "poll") return enrolled();
     if (method === "pollSet") return { results: (params.enrollmentIds as string[]).map(id => ({ enrollmentId: id, enrollment: { ...enrolled(), id }, error: null })) };
@@ -46,7 +50,7 @@ async function fixture(fast = false) {
     compositions++;
     return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ value: { respond: true, confidence: 0.99, reason: "requested", summary: "Explain briefly", actions: [{ kind: "text", text: "Synthetic answer" }], tool: null } }) } }] });
   } });
-  const loop = await createDaemonReplyLoop({ client, automatic: false, now: () => time, hooks: new Hooks(), onStatus: value => { statuses.push({ state: value.state, detail: value.detail }); },
+  const loop = await createDaemonReplyLoop({ client, automatic: false, now: () => time, hooks: new Hooks(), onStatus: value => { statuses.push({ state: value.state, detail: value.detail }); }, repos: shelf,
     ...(fast ? { habitat: { config: { enabled: true, driver: driver.config, evolutionModel: null, debounceMs: 1000 }, driver } }
       : { agent: { qualified: (contact: Parameters<ButlerAgent["qualified"]>[0]) => agent.qualified(contact), classify: (request: Parameters<ButlerAgent["classify"]>[0]) => agent.classify(request), compose: (request: Parameters<ButlerAgent["compose"]>[0]) => agent.compose(request) } }), service: {
     dataDir: root, providers: undefined, runtimeState: async () => ({ settings, bindings: { "contact-1": binding }, grants: {} }), runJournal: () => journal,
@@ -54,6 +58,8 @@ async function fixture(fast = false) {
     onSettingsChanged(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     onHabitatChanged(listener) { habitatListeners.add(listener); return () => habitatListeners.delete(listener); },
     notePending() {},
+    async allowContactRepo(contactId: string, url: string) { allowed.push([contactId, url]); return "added" as const; },
+    async notifySelfChat(text: string) { notices.push(text); },
   } });
   cleanup.push(async () => { await loop.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
   return { loop, journal, sent, statuses, coordinate: conversation.coordinate, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },
@@ -61,6 +67,7 @@ async function fixture(fast = false) {
     habitatChanged(id: string) { for (const listener of habitatListeners) listener(id); }, habitatListenerCount: () => habitatListeners.size,
     beforeSubmit(callback: () => Promise<void>) { beforeSubmit = callback; },
     failNextEvents(count: number) { failEvents = count; }, eventsCalls: () => eventsCalls,
+    allowed, notices, synced,
     push(message: AutomationMessage) { revision++; messages.push(message); events.push({ sequence: revision, enrollmentId: binding.enrollmentId, revision, message }); },
     add(text: string, direction: AutomationMessage["direction"] = "incoming", ageMs = 0) { revision++; const message: AutomationMessage = { id: `message:${revision}`, coordinate: conversation.coordinate, direction, occurredAt: new Date(time - ageMs).toISOString(), text, kind: "message", relatedMessageId: null, attachments: [] }; messages.push(message); events.push({ sequence: revision, enrollmentId: binding.enrollmentId, revision, message }); },
   };
@@ -225,6 +232,8 @@ test("one batched pollSet covers the set and a failed entry only fails its conta
       onSettingsChanged() { return () => {}; },
       onHabitatChanged() { return () => {}; },
       notePending() {},
+      async allowContactRepo() { return "added" as const; },
+      async notifySelfChat() {},
     } });
   cleanup.push(async () => { await loop.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
   // One wire call carries the whole set instead of a serialized poll per
@@ -261,4 +270,23 @@ test("a degraded events drain keeps pending work and only flags attention after 
   // Recovery clears it.
   f.failNextEvents(0); await f.loop.tick();
   expect(f.statuses.at(-1)?.state).toBe("running");
+});
+
+test("a self-chat allow command approves the repo request end to end", async () => {
+  const f = await fixture(true);
+  f.change({ ...f.settings(), contacts: f.settings().contacts.map(contact => ({ ...contact, selfChat: true })) });
+  await f.loop.tick();
+  const url = "https://github.com/hraness/bio";
+  f.journal.requestRepoApproval("contact-1", url, 0);
+  f.add("butler allow https://github.com/hraness/bio");
+  await f.loop.tick(); f.advance(9_000); await f.loop.tick(); await f.loop.idle();
+  // The deterministic resolver answered without a model call; the allowlist
+  // write, terminal journal decision and shelf sync all landed.
+  expect(f.stats().compositions).toBe(0);
+  expect(f.allowed).toEqual([["contact-1", url]]);
+  expect(f.synced).toEqual([["contact-1", url]]);
+  expect(f.journal.repoRequests("approved")).toHaveLength(1);
+  expect(f.journal.repoRequests("pending")).toHaveLength(0);
+  expect(f.sent).toHaveLength(1);
+  expect(JSON.stringify(f.sent[0])).toContain("Approved");
 });

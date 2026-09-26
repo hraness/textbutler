@@ -21,6 +21,9 @@ export type ContactSettings = Readonly<{
   humanCooldownMs: number;
   debounceMs: number;
   maxRepliesPerHour: number;
+  /** Owner-approved public repository URLs this contact's agent may sync and
+   * inspect. Approval is recorded through the owner's self-chat channel. */
+  repos: readonly string[];
 }>;
 export type Settings = Readonly<{
   schemaVersion: 1;
@@ -77,8 +80,37 @@ export function disclosedText(text: string, symbols: Disclosure): boolean {
   const markers = disclosureMarkers(symbols);
   return markers !== null && text.startsWith(markers.prefix) && text.endsWith(markers.suffix) && text.length > markers.prefix.length + markers.suffix.length;
 }
+/** A repository the agent may request is an ordinary HTTPS git remote: no
+ * embedded credentials, no non-default ports, and a path that cannot escape or
+ * smuggle scheme-relative or backslash forms. Returns the normalized URL. */
+export function parseRepoUrl(value: unknown): string | null {
+  if (typeof value !== "string" || Buffer.byteLength(value) > 256 || /[\u0000-\u0020\u007f]/u.test(value)) return null;
+  // Reject inputs the URL parser would silently rewrite: query, fragment and
+  // dot segments must not turn one requested repo into a different stored URL.
+  if (value.includes("?") || value.includes("#")) return null;
+  const marker = value.indexOf("://"), slash = marker === -1 ? -1 : value.indexOf("/", marker + 3);
+  if (slash !== -1 && value.slice(slash).split("/").some(part => part === "." || part === "..")) return null;
+  let parsed: URL;
+  try { parsed = new URL(value); } catch { return null; }
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || (parsed.port && parsed.port !== "443")
+    || !parsed.hostname || parsed.hostname.length > 253 || parsed.hostname.split(".").some(label => !label)
+    || !/^[\w.~-]+(?:\.[\w.~-]+)*$/u.test(parsed.hostname)) return null;
+  // A "public repository" names a DNS host: reject IP literals in every
+  // normalized form, single-label intranet names, and local-domain suffixes so
+  // an approved URL cannot point at a loopback, LAN, or link-local endpoint.
+  if (!parsed.hostname.includes(".") || parsed.hostname.startsWith("[") || /^\d+\.\d+\.\d+\.\d+$/u.test(parsed.hostname)
+    || /\.(?:local|localhost|internal|lan|corp|home\.arpa|test|example|invalid)$/iu.test(parsed.hostname)) return null;
+  const path = parsed.pathname;
+  if (path.length < 2 || path.length > 200 || !/^\/[\w./~+-]+$/u.test(path) || path.split("/").some(part => part === "." || part === "..")) return null;
+  return `https://${parsed.hostname}${path}`;
+}
+/** The checkout name is the final URL segment without its .git suffix. */
+export function repoName(url: string): string | null {
+  const base = url.split("/").at(-1)?.replace(/\.git$/u, "") ?? "";
+  return /^[\w][\w.-]{0,79}$/u.test(base) ? base : null;
+}
 export function newContact(id: string, label: string, routeId: string): ContactSettings {
-  return parseContact({ id, label, routeId, enabled: false, selfChat: false, mode: "smart", keyword: "butler", provider: "codex", accountId: "default", replyModel: null, classifierModel: null, disclosure: DEFAULT_DISCLOSURE, revision: 1, pausedUntil: 0, humanCooldownMs: 300_000, debounceMs: 8_000, maxRepliesPerHour: 12 });
+  return parseContact({ id, label, routeId, enabled: false, selfChat: false, mode: "smart", keyword: "butler", provider: "codex", accountId: "default", replyModel: null, classifierModel: null, disclosure: DEFAULT_DISCLOSURE, revision: 1, pausedUntil: 0, humanCooldownMs: 300_000, debounceMs: 8_000, maxRepliesPerHour: 12, repos: [] });
 }
 export function parseContact(value: unknown): ContactSettings {
   const input = record(value);
@@ -104,7 +136,15 @@ export function parseContact(value: unknown): ContactSettings {
     humanCooldownMs: integer(input.humanCooldownMs, "human cooldown", 30_000, 86_400_000),
     debounceMs: integer(input.debounceMs, "debounce", 1_000, 120_000),
     maxRepliesPerHour: integer(input.maxRepliesPerHour, "reply limit", 1, 120),
+    repos: Object.freeze(parseRepos(input.repos)),
   });
+}
+function parseRepos(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 16) throw new Error("Invalid contact repo allowlist");
+  const repos = value.map(entry => parseRepoUrl(entry));
+  if (repos.some(entry => entry === null) || new Set(repos).size !== repos.length) throw new Error("Invalid contact repo allowlist");
+  return repos as string[];
 }
 export function parseSettings(value: unknown): Settings {
   const input = record(value);

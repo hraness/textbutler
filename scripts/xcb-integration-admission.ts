@@ -18,6 +18,7 @@ export const XCB_INTEGRATION_SOURCES = Object.freeze([
   "packages/textbutler/src/contact-capabilities.ts",
   "packages/textbutler/src/control-service.ts",
   "packages/textbutler/src/contact-habitat.ts",
+  "packages/textbutler/src/contact-repos.ts",
   "packages/textbutler/src/habitat-agent.ts",
   "packages/textbutler/src/habitat-program.ts",
   "packages/textbutler/src/javascript-tool.ts",

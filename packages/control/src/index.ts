@@ -17,6 +17,8 @@ export interface ContactSettings {
   provider: "codex" | "claude" | "devin";
   accountId?: string;
   disclosure: { character: string; begin: string; end: string };
+  /** Owner-approved public HTTPS repository URLs the contact's agent may sync. */
+  repos?: readonly string[];
 }
 /** Owner configuration for one conversation's learned response plan. */
 export interface ContactHabitatPlan {
@@ -28,6 +30,9 @@ export interface ContactHabitatPlan {
   webSearch: boolean;
   memeSearch: boolean;
   personality?: { tone: "neutral" | "warm" | "playful" | "direct"; formality: "casual" | "balanced" | "formal" };
+  /** Owner opt-in: the contact's agent may sync and inspect allowlisted public
+   * repositories. Absent means off; candidates can never widen it. */
+  repoAccess?: boolean;
 }
 export interface Contact { id: string; name: string; subtitle: string; settings: ContactSettings;
   messaging?: { provider: "imessage" | "whatsapp" | "beeper"; state: "active" | "missing" | "revocation-pending" | "recovery-required"; detail: string; grantExpiresAt: string | null } }
@@ -261,6 +266,7 @@ function settings(value: unknown): ContactSettings {
     keyword: text(row.keyword, 40), provider: oneOf(row.provider, ["codex", "claude", "devin"]),
     ...(row.accountId === undefined ? {} : { accountId: text(row.accountId, 80) }),
     ...(row.selfChat === undefined ? {} : { selfChat: bool(row.selfChat) }),
+    ...(row.repos === undefined ? {} : { repos: list(row.repos, 16).map(url => { const repo = text(url, 512); if (!repo.startsWith("https://")) throw new Error("Invalid repository URL."); return repo; }) }),
     disclosure: { character: text(symbols.character, 16), begin: text(symbols.begin, 16), end: text(symbols.end, 16) },
   };
   const error = validateContactSettings(result); if (error) throw new Error(error);
