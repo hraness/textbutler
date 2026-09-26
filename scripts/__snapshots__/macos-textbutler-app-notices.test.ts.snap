@@ -1,0 +1,11 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`iMessage app setup notices a denial explains where to turn it on and offers the pane: denied 1`] = `
+"🔐 macOS will ask to let Textbutler control Messages.
+   Textbutler only sends replies in chats you turn on. Change this any time in System Settings › Privacy & Security › Automation.
+   Press Enter to continue · s to skip
+✗ Textbutler can't control Messages: macOS access is off for Textbutler.
+  Turn on Textbutler in System Settings › Privacy & Security › Automation.
+→ textbutler doctor · press o to open Settings
+"
+`;

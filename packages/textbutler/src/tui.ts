@@ -110,7 +110,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
         const provider = providers.length ? await pick(io, "Choose a connection", [...providers, "configure" as const], value =>
           value === "configure" ? "Add another messaging app" : value === "beeper" ? "Beeper — linked messaging apps" : value === "imessage" ? "iMessage — native Messages" : "WhatsApp — native linked device") : "configure";
         if (provider === "configure") {
-          io.write("Sign in and grant messaging permissions in Ghostget first. Beeper must be open with its linked apps. Adding connections requires the Textbutler service to be stopped.\n");
+          io.write("Sign in to each app with Ghostget first. iMessage also needs macOS access for Textbutler (textbutler help permissions). Beeper must be open with its linked apps. Adding connections requires the Textbutler service to be stopped.\n");
           const config = await loadHostConfig(dataDir).catch(() => null);
           const executable = config?.ghostget?.executable ?? await io.ask("Physical path to Ghostget executable (Enter to cancel): ");
           if (!executable?.trim()) continue;

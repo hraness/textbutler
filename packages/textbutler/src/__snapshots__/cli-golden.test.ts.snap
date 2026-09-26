@@ -57,7 +57,7 @@ Options
   --data-dir <path>          Use another private data folder (absolute path)
 
 Topics: setup, contacts, replies, messaging, providers, daemon, menubar,
-advanced. Most commands print JSON so agents can read them.
+permissions, advanced. Most commands print JSON so agents can read them.
 
 Optional support: textbutler support · Turn off: HRANESS_SUPPORT=off"
 `;
@@ -195,7 +195,8 @@ See docs/textbutler/agent-cli.md."
 "Usage: textbutler messaging list | start <app>
 
 Show configured messaging apps, or connect one: imessage, whatsapp
-or beeper. Sign-in and permissions for each app happen in Ghostget.
+or beeper. Sign in to each app with Ghostget first. iMessage also
+needs macOS access for Textbutler: see textbutler help permissions.
 
 Example
   textbutler messaging start imessage"
@@ -204,6 +205,25 @@ Example
 "Usage: textbutler pause
 
 Pause automatic replies for every chat. Replies you send yourself still work."
+,
+  "permissions": 
+"Usage: textbutler help permissions
+
+iMessage works through the Textbutler app on this Mac, and macOS needs
+two settings for it. Textbutler never changes them for you.
+
+Full Disk Access: read your Messages
+  macOS doesn't ask for this. Turn on Textbutler in System Settings ›
+  Privacy & Security › Full Disk Access. Only the chats you pick are read.
+
+Automation: send replies through Messages
+  macOS asks once, during app setup. Textbutler only sends replies in chats
+  you turn on. If you said no, turn on Textbutler in System Settings ›
+  Privacy & Security › Automation, then run app setup again.
+
+Install the app and run app setup from a source checkout: see "Give
+iMessage access" in docs/textbutler/getting-started.md. Then run
+textbutler doctor to check both."
 ,
   "providers": 
 "Usage: textbutler providers list | check <account>

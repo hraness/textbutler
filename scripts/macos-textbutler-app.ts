@@ -7,10 +7,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { appFileDigest, appPhysicalDirectory, MACOS_APP_BUNDLE_ID, macosAppExecutable, macosAppPath, macosAppReceiptPath, macosLaunchGeneration, readMacosAppReceipt, verifyMacosApp, type MacosAppIdentity } from "../packages/textbutler/src/macos-app.ts";
 import { physicalDirectory, readArtifact, validateBun, verifyDistribution } from "./textbutler-distribution.ts";
 import { acquireOwnerDatabase } from "../packages/textbutler/src/daemon-custody.ts";
+import { MESSAGES_AUTOMATION, MESSAGES_FDA } from "../packages/textbutler/src/permission-copy.ts";
+import { prePrompt, recover, terminalPromptIO, type PromptIO } from "../packages/textbutler/src/permission-prompt.ts";
 
 const SOURCE = fileURLToPath(new URL("../native/textbutler-launcher.c", import.meta.url));
 const EXECUTION_ENV = { PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
-const INFO = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${MACOS_APP_BUNDLE_ID}</string><key>CFBundleExecutable</key><string>TextButler</string><key>CFBundleName</key><string>TextButler</string><key>CFBundleDisplayName</key><string>TextButler</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>1</string><key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/><key>NSAppleEventsUsageDescription</key><string>TextButler uses Messages to send replies that you enable.</string></dict></plist>\n`;
+const INFO = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${MACOS_APP_BUNDLE_ID}</string><key>CFBundleExecutable</key><string>TextButler</string><key>CFBundleName</key><string>Textbutler</string><key>CFBundleDisplayName</key><string>Textbutler</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>1</string><key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/><key>NSAppleEventsUsageDescription</key><string>Textbutler sends replies through Messages only in the chats you turn on.</string></dict></plist>\n`;
 async function run(args: readonly string[]): Promise<string> {
   const child = Bun.spawn([...args], { cwd: "/", env: EXECUTION_ENV, stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: 120_000, killSignal: "SIGKILL" });
   let total = 0, overflow = false;
@@ -505,6 +507,20 @@ export async function launchTextbutlerImessageSetup(options: { dataDir: string; 
     await Bun.sleep(Math.min(1000, Math.max(1, deadline - performance.now())));
   }
 }
+type SetupLauncher = (options: { dataDir: string }) => Promise<{ status: "completed" | "blocked" | "recovery-required" | "pending"; resultPath: string; code?: string }>;
+/** App setup with the Automation notice first and plain recovery after a
+ * denial. stdout keeps its one JSON result; notices go to stderr. */
+export async function runImessageSetupWithNotices(dataDir: string, io: PromptIO, launch: SetupLauncher, write: (text: string) => void = text => { process.stdout.write(text); }): Promise<number> {
+  // macOS shows the Automation dialog to the person at the Mac even when an
+  // agent runs this, so an unattended run still proceeds.
+  const outcome = await prePrompt({ ...MESSAGES_AUTOMATION, whenUnattended: "proceed" }, io);
+  if (outcome === "skip") { write(`${JSON.stringify({ ok: false, status: "skipped", detail: "App setup was skipped. Nothing changed." })}\n`); return 1; }
+  const result = await launch({ dataDir });
+  write(`${JSON.stringify({ ok: result.status === "completed", ...result })}\n`);
+  if (result.code === "automation-permission-denied") await recover(MESSAGES_AUTOMATION, "denied", io);
+  else if (result.code === "automation-permission-unavailable" || result.code === "automation-permission-unverified") await recover(MESSAGES_AUTOMATION, "unknown", io);
+  return result.status === "completed" ? 0 : 1;
+}
 if (import.meta.main) {
   try {
     const [action, ...args] = process.argv.slice(2), values = new Map<string, string>(); let upgrade = false;
@@ -514,9 +530,12 @@ if (import.meta.main) {
       const value = args[at++]; if (!["--from", "--output", "--app-path", "--data-dir", "--signing-identity"].includes(key) || value === undefined || values.has(key)) throw new Error("Use build --from ABS --output ABS [--app-path ABS] [--data-dir ABS] [--signing-identity NAME], or install --from ABS [--upgrade]."); values.set(key, key === "--signing-identity" ? signingIdentity(value) : macosAppPath(value));
     }
     const from = values.get("--from");
-    if (action === "imessage-setup" && values.size === 1 && values.has("--data-dir")) { const result = await launchTextbutlerImessageSetup({ dataDir: values.get("--data-dir")! }); process.stdout.write(`${JSON.stringify({ ok: result.status === "completed", ...result })}\n`); if (result.status !== "completed") process.exitCode = 1; }
+    if (action === "imessage-setup" && values.size === 1 && values.has("--data-dir")) process.exitCode = await runImessageSetupWithNotices(values.get("--data-dir")!, terminalPromptIO(), launchTextbutlerImessageSetup);
     else if (action === "build" && from !== undefined) { const output = values.get("--output"); if (!output) throw new Error("Choose a new --output directory."); const appPath = values.get("--app-path"), dataDir = values.get("--data-dir"), signer = values.get("--signing-identity"); const result = await buildTextbutlerMacosApp({ from, output, ...(appPath === undefined ? {} : { appPath }), ...(dataDir === undefined ? {} : { dataDir }), ...(signer === undefined ? {} : { signingIdentity: signer }) }); process.stdout.write(`${JSON.stringify({ ok: true, ...result, detail: result.identity.signing === "certificate" ? "Local certificate-signed app built; macOS permission grants stay bound to this signing identity across rebuilds." : "Local ad-hoc signed app built; no service or permission was changed. Approval must be verified again after rebuilding this identity." })}\n`); }
-    else if (action === "install" && from !== undefined && values.size === 1) process.stdout.write(`${JSON.stringify({ ok: true, ...await installTextbutlerMacosApp({ from, upgrade }), detail: "App installed inertly. Owner settings and services are unchanged. Verify macOS permissions for the new app identity; use normal System Settings if reapproval is required." })}\n`);
+    else if (action === "install" && from !== undefined && values.size === 1) {
+      process.stdout.write(`${JSON.stringify({ ok: true, ...await installTextbutlerMacosApp({ from, upgrade }), detail: "App installed inertly. Owner settings and services are unchanged. Verify macOS permissions for the new app identity; use normal System Settings if reapproval is required." })}\n`);
+      await prePrompt({ ...MESSAGES_FDA, whenUnattended: "proceed" }, terminalPromptIO());
+    }
     else throw new Error("Use build or install with its exact arguments.");
   } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : "TextButler app operation failed."}\n`); process.exitCode = 1; }
 }

@@ -143,8 +143,10 @@ bun run textbutler:app build \
 bun run textbutler:app install --from /absolute/new/app-build-directory
 ```
 
-The default destination is `~/Applications/TextButler.app`. Building and
-installing the app does not start replies or change macOS permissions. In
+The default destination is `~/Applications/TextButler.app`, which macOS lists
+as Textbutler. Building and installing the app does not start replies or change
+macOS permissions. macOS never asks for Full Disk Access, so `install` ends
+with a notice; at a terminal, press Enter to open the Full Disk Access pane. In
 **System Settings → Privacy & Security → Full Disk Access**, click **+**, press
 **Command-Shift-G**, enter `~/Applications/TextButler.app`, and choose **Open**.
 Enable its switch. macOS may require your password in its own dialog.
@@ -166,6 +168,12 @@ app launch:
 bun run textbutler:app imessage-setup \
   --data-dir "$HOME/Library/Application Support/Textbutler"
 ```
+
+Before macOS asks to let Textbutler control Messages, setup prints a notice;
+press Enter to continue or `s` to skip. If you choose Don't Allow, macOS won't
+ask again: turn on Textbutler in **System Settings → Privacy & Security →
+Automation**, then run the setup command again. `textbutler doctor` shows
+which of these steps is left.
 
 After app setup completes, use the installed `daemon install` command to
 register its background service. If an older service is installed, first use

@@ -56,7 +56,7 @@ Options
   --data-dir <path>          Use another private data folder (absolute path)
 
 Topics: setup, contacts, replies, messaging, providers, daemon, menubar,
-advanced. Most commands print JSON so agents can read them.
+permissions, advanced. Most commands print JSON so agents can read them.
 
 Optional support: textbutler support · Turn off: HRANESS_SUPPORT=off`;
 
@@ -119,7 +119,7 @@ A contact is an exact ID or a unique name from textbutler contacts list.`,
 Choosing an account never turns a chat on, and resume never does either.`,
     example: "textbutler contacts mode Alex keyword --keyword butler" },
   conversations: { usage: "textbutler conversations list", summary: "List recent one-to-one chats from your connected apps. Add one with\ntextbutler contacts add <candidate>. The list expires after five minutes." },
-  messaging: { usage: "textbutler messaging list | start <app>", summary: "Show configured messaging apps, or connect one: imessage, whatsapp\nor beeper. Sign-in and permissions for each app happen in Ghostget.",
+  messaging: { usage: "textbutler messaging list | start <app>", summary: "Show configured messaging apps, or connect one: imessage, whatsapp\nor beeper. Sign in to each app with Ghostget first. iMessage also\nneeds macOS access for Textbutler: see textbutler help permissions.",
     example: "textbutler messaging start imessage" },
   providers: { usage: "textbutler providers list | check <account>", summary: "Show your AI accounts, or check that one is signed in and ready.\nSubscription accounts are native-claude-code, native-codex and native-devin.",
     example: "textbutler providers check native-codex" },
@@ -161,6 +161,19 @@ macOS shows a "Background Items Added" notice when you install it.` },
 
 Compose, react and attach create drafts; send one with replies send.
 See docs/textbutler/agent-cli.md.` },
+  permissions: { usage: "textbutler help permissions", summary: "iMessage works through the Textbutler app on this Mac, and macOS needs\ntwo settings for it. Textbutler never changes them for you.",
+    body: `Full Disk Access: read your Messages
+  macOS doesn't ask for this. Turn on Textbutler in System Settings ›
+  Privacy & Security › Full Disk Access. Only the chats you pick are read.
+
+Automation: send replies through Messages
+  macOS asks once, during app setup. Textbutler only sends replies in chats
+  you turn on. If you said no, turn on Textbutler in System Settings ›
+  Privacy & Security › Automation, then run app setup again.
+
+Install the app and run app setup from a source checkout: see "Give
+iMessage access" in docs/textbutler/getting-started.md. Then run
+textbutler doctor to check both.` },
   advanced: { usage: "textbutler <command>", summary: "Commands for agents and for fixing unusual states.",
     body: `Commands
   init                       Create private settings without the checklist
