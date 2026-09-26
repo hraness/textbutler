@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -33,7 +34,12 @@ export class RunJournal {
       CREATE TABLE IF NOT EXISTS api_reservations (id TEXT PRIMARY KEY, day INTEGER NOT NULL, microUsd INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS api_reservations_day ON api_reservations(day);
       CREATE TABLE IF NOT EXISTS api_settlements (id TEXT PRIMARY KEY, generationId TEXT UNIQUE NOT NULL, microUsd INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS habitat_evidence (contactId TEXT NOT NULL, digest TEXT NOT NULL, value TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(contactId,digest));`);
+      CREATE TABLE IF NOT EXISTS habitat_evidence (contactId TEXT NOT NULL, digest TEXT NOT NULL, value TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(contactId,digest));
+      CREATE TABLE IF NOT EXISTS repo_requests (
+        id TEXT PRIMARY KEY, contactId TEXT NOT NULL, url TEXT NOT NULL,
+        state TEXT NOT NULL, requestedAt INTEGER NOT NULL, decidedAt INTEGER,
+        UNIQUE(contactId, url, state)
+      );`);
   }
   static async open(path: string): Promise<RunJournal> {
     const absolute = resolve(path);
@@ -225,5 +231,27 @@ export class RunJournal {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new Error("Invalid activity limit");
     return this.database.query<RunRecord, [string, number]>("SELECT * FROM runs WHERE contactId = ? ORDER BY startedAt DESC, id DESC LIMIT ?").all(contactId, limit);
   }
+  /** Agent-requested repository URLs awaiting an owner self-chat decision. One
+   * row per (contact, url, state); a decided state is terminal evidence. */
+  requestRepoApproval(contactId: string, url: string, now: number): "created" | "pending" | "approved" | "denied" {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(contactId) || typeof url !== "string" || Buffer.byteLength(url) > 256 || !Number.isSafeInteger(now) || now < 0) throw Error("Invalid repo request");
+    return this.database.transaction(() => {
+      const existing = this.database.query<{ state: string }, [string, string]>("SELECT state FROM repo_requests WHERE contactId=? AND url=? ORDER BY requestedAt DESC LIMIT 1").get(contactId, url);
+      if (existing) return existing.state === "pending" ? "pending" : existing.state === "approved" ? "approved" : "denied";
+      if ((this.database.query<{ count: number }, [string]>("SELECT COUNT(*) AS count FROM repo_requests WHERE contactId=? AND state='pending'").get(contactId)?.count ?? 0) >= 16) throw Error("Repo approval capacity reached");
+      this.database.query("INSERT INTO repo_requests VALUES(?,?,?,?,?,NULL)").run(`repo:${randomUUID()}`, contactId, url, "pending", now);
+      return "created";
+    })() as "created" | "pending" | "approved" | "denied";
+  }
+  repoRequests(state?: "pending" | "approved" | "denied"): readonly RepoRequest[] {
+    return (state === undefined
+      ? this.database.query<RepoRequest, []>("SELECT * FROM repo_requests ORDER BY requestedAt DESC LIMIT 256").all()
+      : this.database.query<RepoRequest, [string]>("SELECT * FROM repo_requests WHERE state=? ORDER BY requestedAt DESC LIMIT 256").all(state));
+  }
+  resolveRepoRequest(id: string, state: "approved" | "denied", now: number): boolean {
+    if (!Number.isSafeInteger(now) || now < 0) throw Error("Invalid repo decision");
+    return this.database.query("UPDATE repo_requests SET state=?, decidedAt=? WHERE id=? AND state='pending'").run(state, now, id).changes === 1;
+  }
   close(): void { this.database.close(); }
 }
+export type RepoRequest = Readonly<{ id: string; contactId: string; url: string; state: "pending" | "approved" | "denied"; requestedAt: number; decidedAt: number | null }>;

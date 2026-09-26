@@ -4,6 +4,7 @@ import { assertAutomationBinding, type AutomationBinding } from "./automation-ow
 import { messageAuthor, pendingCluster, type MessageAuthor } from "./attribution.ts";
 import type { OwnerRuntimeState, TextbutlerControlService } from "./control-service.ts";
 import { boundedHistory } from "./enrollment.ts";
+import type { RunJournal } from "./journal.ts";
 import type { ContactSettings, Settings } from "./config.ts";
 import { keywordPresent, type MessageEvent } from "./decision.ts";
 import type { Hooks } from "./hooks.ts";
@@ -15,8 +16,11 @@ import { createHabitatEvolutionExecutor } from "./habitat-evolution.ts";
 import { boundHabitatObservation } from "./contact-habitat.ts";
 import type { HabitatHostConfig } from "./host-config.ts";
 import type { FastDriver } from "./fast-driver.ts";
+import { createRepoShelf, type RepoShelf } from "./contact-repos.ts";
+import { parseRepoUrl } from "./config.ts";
+import type { JsonValue } from "@hraness/algal";
 
-type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "onHabitatChanged" | "notePending"> & { setReplyAgent?: (agent: ButlerAgent) => void };
+type LoopService = Pick<TextbutlerControlService, "dataDir" | "providers" | "runtimeState" | "runJournal" | "delegatedGrant" | "onSettingsChanged" | "onHabitatChanged" | "notePending" | "allowContactRepo" | "notifySelfChat"> & { setReplyAgent?: (agent: ButlerAgent) => void };
 type ContactLoop = { binding: AutomationBinding; settingsRevision: number; initialized: boolean; runtime: ButlerRuntime; pending?: MessageEvent; pendingFirstAt: number | null; blocked?: string; running: boolean; runningPinned: boolean; lastOwnerAt: number | null; lastEnrollment: AutomationEnrollment | null; historyRevision: number | null; syncFailures: number; runFailures: number };
 const RECONCILE_DETAIL = "A previous send needs reconciliation. Check Messages, then run `textbutler replies reconcile`.";
 const SYNC_FAILURE_THRESHOLD = 3;
@@ -29,7 +33,40 @@ export interface ReplyLoopOptions {
   now?: () => number;
   automatic?: boolean;
   habitat?: { config: HabitatHostConfig; driver: FastDriver };
+  /** Synthetic tests inject a repo shelf so approval never spawns real git. */
+  repos?: RepoShelf;
   onStatus?: (value: { state: "running" | "paused" | "unavailable"; detail: string }) => void;
+}
+
+/** Self-chat owner intents resolve repo requests without the driver: the model
+ * never sees or rewrites an approval decision. An intent that does not match
+ * returns null and the ordinary agent path answers instead. */
+export function createRepoOwnerIntents(ports: { journal: RunJournal; contacts(): readonly ContactSettings[];
+  allow(contactId: string, url: string): Promise<"added" | "full" | "skipped">; sync(contactId: string, url: string): void; now(): number }) {
+  const show = (rows: ReturnType<RunJournal["repoRequests"]>, label: (id: string) => string) => rows.slice(0, 16).map(row => `- ${row.url} (${label(row.contactId)})`).join("\n")
+    + (rows.length > 16 ? `\n… and ${rows.length - 16} more` : "");
+  return async (contact: ContactSettings, text: string): Promise<string | null> => {
+    const intent = new RegExp(`^\\s*${contact.keyword.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\s+(allow|deny|approvals?|pending)\\b`, "iu").exec(text);
+    if (intent === null) return null;
+    const verb = intent[1]!.toLocaleLowerCase("en-US"), arg = text.slice(intent.index + intent[0].length).trim().split(/\s+/u)[0] ?? "";
+    const pending = ports.journal.repoRequests("pending"), label = (id: string) => ports.contacts().find(value => value.id === id)?.label ?? id;
+    if (verb === "approvals" || verb === "approval" || verb === "pending") {
+      if (!pending.length) return "No pending repository approvals.";
+      return `Pending repository approvals:\n${show(pending, label)}`;
+    }
+    if (!pending.length) return "No pending repository approvals.";
+    if (arg === "" && pending.length > 1) return `${pending.length} requests pending; reply with more of the URL or the contact name:\n${show(pending, label)}`;
+    const matches = pending.filter(row => arg === "" || row.url.includes(arg) || label(row.contactId).toLocaleLowerCase("en-US").includes(arg.toLocaleLowerCase("en-US")));
+    if (!matches.length) return `No pending repository request matches "${arg || "that"}". Reply "${contact.keyword} approvals" for the list.`;
+    if (matches.length > 1) return `${matches.length} requests match; reply with more of the URL or the contact name:\n${show(matches, label)}`;
+    const row = matches[0]!;
+    if (verb === "deny") { ports.journal.resolveRepoRequest(row.id, "denied", ports.now()); return `Denied ${row.url} for ${label(row.contactId)}.`; }
+    const outcome = await ports.allow(row.contactId, row.url);
+    if (outcome === "full") return `The repo allowlist for ${label(row.contactId)} is full — remove one first, then allow ${row.url} again.`;
+    if (!ports.journal.resolveRepoRequest(row.id, "approved", ports.now())) return "That request was already decided.";
+    ports.sync(row.contactId, row.url);
+    return outcome === "skipped" ? `${row.url} was already allowed for ${label(row.contactId)}; refreshing it now.` : `Approved ${row.url} for ${label(row.contactId)}; syncing it now.`;
+  };
 }
 
 /** Polling schedules only current inbound messages. Initialization, downtime and
@@ -50,7 +87,41 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
   };
   let setCursor: string | null = null, lastSetKey = "";
   const active = (id: string, revision: number) => !closed && !settings.paused && settings.contacts.some(contact => contact.id === id && contact.enabled && contact.revision === revision && contact.pausedUntil <= now());
+  const shelf = options.repos ?? createRepoShelf({ dataDir: service.dataDir, now });
+  /** Repo requests the agent could not resolve locally ask the owner through
+   * the self conversation; a repeated pending request never re-notifies. */
+  const requestRepo = async (contact: ContactSettings, url: string, signal: AbortSignal): Promise<JsonValue> => {
+    signal.throwIfAborted();
+    const normalized = parseRepoUrl(url);
+    if (normalized === null) throw Error("Invalid repository URL");
+    if (contact.repos.includes(normalized)) return await shelf.sync(contact.id, normalized);
+    const state = journal.requestRepoApproval(contact.id, normalized, now());
+    // The live allowlist outranks journal history: a past approval whose URL
+    // was removed from the contact's settings is decided, not approved.
+    if (state === "approved") return { denied: true, url: normalized, note: "The owner approved this before but removed it; adding it back is their decision." };
+    if (state === "denied") return { denied: true, url: normalized };
+    if (state === "created") {
+      const keyword = settings.contacts.find(value => value.selfChat)?.keyword ?? "butler";
+      void service.notifySelfChat(`The butler in your chat with ${contact.label} wants to sync ${normalized}. Reply "${keyword} allow ${normalized}" or "${keyword} deny ${normalized}"; "${keyword} approvals" lists pending.`).catch(() => {});
+    }
+    return { pending: true, url: normalized, note: "The owner was asked in their self chat; this repo works after they allow it." };
+  };
+  // The live allowlist gates every shelf operation, not just sync: removing a
+  // URL revokes read/search/list even though the checkout may linger on disk.
+  const approvedEntry = async (contact: ContactSettings, repo: string) => {
+    const entry = (await shelf.list(contact.id)).find(value => value.name === repo);
+    if (entry === undefined || !contact.repos.includes(entry.url)) throw new Error("Repository is not owner-approved");
+    return entry;
+  };
+  const resolveOwnerIntent = createRepoOwnerIntents({ journal, contacts: () => settings.contacts, allow: (contactId, url) => service.allowContactRepo(contactId, url), sync: (contactId, url) => void shelf.sync(contactId, url).catch(() => {}), now });
   const habitat = options.habitat?.config.enabled ? createHabitatAgent({ journal, driver: options.habitat.driver, getWorkspace: workspace, now,
+    repos: {
+      sync: (contact, url, signal) => requestRepo(contact, url, signal),
+      read: async (contact, repo, path) => { await approvedEntry(contact, repo); return await shelf.read(contact.id, repo, path); },
+      search: async (contact, repo, query) => { await approvedEntry(contact, repo); return await shelf.search(contact.id, repo, query); },
+      list: async contact => (await shelf.list(contact.id)).filter(entry => contact.repos.includes(entry.url)) as JsonValue[],
+    },
+    resolveOwnerIntent,
     active: contact => active(contact.id, contact.revision),
     async capabilities(contact) {
       const binding = owner.bindings[contact.id]; if (binding?.version !== 2) throw Error("Habitat conversation is unavailable");

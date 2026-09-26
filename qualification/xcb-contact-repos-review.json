@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "devin-cli-subagent/explore-review",
+    "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and diff read-only and produced only the review verdict; findings were re-verified and patched by the integrating agent before this record. A post-fix re-review was not run; each fix is covered by a focused test."
+  },
+  "sourceState": {
+    "branch": "claude/contact-repos",
+    "baseCommit": "c9e3e21",
+    "headCommit": "claude/contact-repos working tree at gate time",
+    "identity": "Source digests identify the reviewed bytes; commits alone do not."
+  },
+  "scope": "Owner-approved per-contact repository access: config.ts repos[] allowlist and parseRepoUrl/repoName validators, journal.ts repo_requests table, contact-repos.ts bounded git shelf (locked-env clone/fetch, staged clone + sweep, remote-identity check, bounded read/search/list), control-service.ts settings round-trip plus allowContactRepo/notifySelfChat, contact-habitat.ts repoAccess plan flag with promotion pin, habitat-agent.ts repo tools and self-chat owner-intent short-circuit, reply-loop.ts shelf wiring and createRepoOwnerIntents grammar, control/src ContactSettings.repos and ContactHabitatPlan.repoAccess, and the admission inventory addition of contact-repos.ts.",
+  "method": "Independent read-only inspection of the diff plus attribution.ts messageAuthor classification, decision.ts invoked semantics, the receive()/pending author path, ghostget wire shapes, journal uniqueness and terminal-state model, git environment completeness, walk/read/search containment checks, settings snapshot and update round-trips, promotion pinning, and test fixture review. The integrating agent ran the focused suites and the full check.",
+  "result": "Ship after the five blocking findings were fixed and re-validated: the owner-approval channel is reachable through createDaemonReplyLoop end to end, read/search/list enforce the live allowlist, the allowlist write precedes the terminal journal decision so a full list leaves the request pending, the typed control client parses repos, and parseRepoUrl rejects IP literals, single-label names and local/reserved domain suffixes.",
+  "findings": [
+    {
+      "severity": "high",
+      "status": "fixed",
+      "file": "packages/textbutler/src/habitat-agent.ts:149 (with attribution.ts:15-28 and reply-loop.ts:174-200)",
+      "finding": "The owner-intent short-circuit required contact.selfChat && event.author === \"owner\", but a selfChat contact's inbound owner text is always classified \"contact\" — the gate was dead code and approvals could never resolve through the designed channel.",
+      "recommendation": "Gate on the self-chat's attainable inbound author class.",
+      "resolution": "Applied: the gate is now contact.selfChat && event.author === \"contact\" — self-chat inbound is the owner's by construction since only the owner's number participates. A new createDaemonReplyLoop end-to-end test drives a real inbound \"butler allow\" event through claim, deterministic resolve, allowlist write, terminal journal decision, shelf sync and send, proving the channel is reachable."
+    },
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "file": "packages/textbutler/src/reply-loop.ts:107 (with contact-repos.ts:145-195)",
+      "finding": "The live allowlist was checked only on repo-sync; repo-read, repo-search and the context listing bypassed it, so removing a URL did not revoke access to the lingering checkout, and name-collision could serve a swapped-in checkout for a removed URL.",
+      "recommendation": "Enforce the allowlist at the ports layer for every operation and filter the listing to allowlisted entries.",
+      "resolution": "Applied: read/search resolve the repo name through shelf.list and require the entry's URL in contact.repos before touching the checkout (approvedEntry); the context listing filters to allowlisted URLs."
+    },
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "file": "packages/textbutler/src/reply-loop.ts:60-64",
+      "finding": "resolve-then-allow ordering wedged permanently: resolveRepoRequest(\"approved\") committed before allow(), so a \"full\" allowlist, a throw, or a crash left the journal approved while the URL was unlisted — unreachable by the pending-only grammar and denied by the allowlist-authoritative requestRepo.",
+      "recommendation": "Allow first and resolve only after the allowlist write lands; report \"skipped\" distinctly.",
+      "resolution": "Applied: allow() runs first, \"full\" returns early leaving the request pending with retry instructions, resolveRepoRequest runs after a successful or already-present allow, and \"skipped\" reports as a refresh."
+    },
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "file": "packages/control/src/index.ts:262-273",
+      "finding": "The client-side settings() parser dropped repos even though the interface declares it, so no typed control surface could display, edit, or revoke the allowlist.",
+      "recommendation": "Parse repos in settings() as a bounded https:// string list.",
+      "resolution": "Applied: repos parses as at most 16 bounded strings each requiring the https:// scheme, then passes validateContactSettings."
+    },
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "file": "packages/textbutler/src/config.ts:86-100",
+      "finding": "parseRepoUrl admitted IP literals in every WHATWG-normalized form (127.0.0.1, 2130706433, 0x7f.0.0.1), IPv6 brackets, localhost, and single-label intranet names — an approved 'public repository' could be a loopback, LAN or link-local endpoint.",
+      "recommendation": "Reject IP literals, single-label hostnames, and local/reserved domain suffixes.",
+      "resolution": "Applied: normalized hostname must contain a dot, must not be bracketed IPv6 or dotted-quad IPv4 (all numeric IPv4 forms normalize to dotted-quad), and must not end in .local, .localhost, .internal, .lan, .corp, .home.arpa, or the reserved .test/.example/.invalid TLDs; covered by new parse tests."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "packages/textbutler/src/reply-loop.ts:45-58",
+      "finding": "Grammar weaknesses: the verb matched anywhere in the text, an accidental argument could substring-match a pending URL, identical URLs across contacts were undecidable, and the pending listing could exceed the send bound.",
+      "recommendation": "Anchor the verb immediately after the keyword, disambiguate by contact label, and cap the listing.",
+      "resolution": "Applied: commands must be \"<keyword> <verb> [arg]\" at text start; matching also checks the contact label; listings cap at 16 rows with a remainder line."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "packages/textbutler/src/contact-repos.ts:60-76, 165-189",
+      "finding": "search had no total-bytes budget (up to ~8GB of IO per call) and file paths were not re-verified between enumeration and open (directory-swap symlink TOCTOU).",
+      "recommendation": "Realpath each candidate before open and add a total scanned-bytes cap.",
+      "resolution": "Applied: each walked file is realpath-verified inside the checkout before open, and scanning stops with truncated=true once 8 MiB have been read."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "packages/textbutler/src/habitat-agent.ts:158, 254",
+      "finding": "The shelf listing was injected into context for every contact regardless of plan.repoAccess, and the reflection prompt omitted repoAccess from the preserved owner-flag list.",
+      "recommendation": "Gate the context listing on plan.repoAccess and name repoAccess among preserved flags.",
+      "resolution": "Applied to both sites."
+    },
+    {
+      "severity": "low",
+      "status": "accepted",
+      "file": "packages/textbutler/src/contact-repos.ts:130-131",
+      "finding": "checkoutBytes is enforced only after git clone completes, so a huge approved repo consumes its footprint before rejection; the 120s SIGKILL is the only fetch bound.",
+      "recommendation": "Consider a blob filter so oversized objects are never fetched.",
+      "resolution": "Accepted: the URL is owner-approved, the sync timeout bounds duration, staged dirs are swept, and lazy partial-clone filters would complicate the read path; the post-clone bound plus sweep is the backstop."
+    },
+    {
+      "severity": "low",
+      "status": "accepted",
+      "file": "packages/textbutler/src/reply-loop.ts:99-103 (with journal.ts:241)",
+      "finding": "Each owner decision frees a pending slot, so a persistent contact can generate unlimited owner self-chat notifies over time in owner-paced batches of at most 16.",
+      "recommendation": "Consider a lifetime notify cap per (contact, url).",
+      "resolution": "Accepted: notifies fire only on journal \"created\", dedupe across contacts by UNIQUE(contactId,url,state), are bounded by the 16-pending cap, and are owner-paced by design."
+    }
+  ],
+  "notes": "Post-fix verification: focused suites 63 pass / 0 fail on touched files plus the new end-to-end self-chat approval test, bun run typecheck clean, and the full bun run check passed 1114 tests / 0 fail with the refreshed 43-source admission inventory."
+}

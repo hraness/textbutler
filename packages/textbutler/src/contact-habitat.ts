@@ -10,11 +10,11 @@ const personalitySchema = z.strictObject({ tone: z.enum(["neutral", "warm", "pla
 const soulCoreSchema = z.strictObject({ voice: text(512), relationshipContext: text(512), sharedContext: text(512), boundaries: text(512) });
 // Optional fields stay absent in older plans: filling defaults here would change
 // the identities of retained champions, rollback tombstones and ALGAL receipts.
-const planInputSchema = z.strictObject({ version: z.literal(1), guidance: text(4096), contextMessages: z.number().int().min(4).max(32), maxReplyCharacters: z.number().int().min(80).max(1600), humor: z.enum(["off", "light", "match"]), webSearch: z.boolean(), memeSearch: z.boolean(), personality: personalitySchema.optional(), javascript: z.boolean().optional(), memorySearch: z.boolean().optional(), soulCore: soulCoreSchema.optional() });
-export type HabitatPlan = Omit<z.infer<typeof planInputSchema>, "personality" | "javascript" | "memorySearch" | "soulCore"> & { personality?: z.infer<typeof personalitySchema>; javascript?: boolean; memorySearch?: boolean; soulCore?: z.infer<typeof soulCoreSchema> };
+const planInputSchema = z.strictObject({ version: z.literal(1), guidance: text(4096), contextMessages: z.number().int().min(4).max(32), maxReplyCharacters: z.number().int().min(80).max(1600), humor: z.enum(["off", "light", "match"]), webSearch: z.boolean(), memeSearch: z.boolean(), personality: personalitySchema.optional(), javascript: z.boolean().optional(), memorySearch: z.boolean().optional(), soulCore: soulCoreSchema.optional(), repoAccess: z.boolean().optional() });
+export type HabitatPlan = Omit<z.infer<typeof planInputSchema>, "personality" | "javascript" | "memorySearch" | "soulCore" | "repoAccess"> & { personality?: z.infer<typeof personalitySchema>; javascript?: boolean; memorySearch?: boolean; soulCore?: z.infer<typeof soulCoreSchema>; repoAccess?: boolean };
 const planSchema = planInputSchema.transform((value): HabitatPlan => {
-  const { personality, javascript, memorySearch, soulCore, ...plan } = value;
-  return { ...plan, ...(personality === undefined ? {} : { personality }), ...(javascript === undefined ? {} : { javascript }), ...(memorySearch === undefined ? {} : { memorySearch }), ...(soulCore === undefined ? {} : { soulCore }) };
+  const { personality, javascript, memorySearch, soulCore, repoAccess, ...plan } = value;
+  return { ...plan, ...(personality === undefined ? {} : { personality }), ...(javascript === undefined ? {} : { javascript }), ...(memorySearch === undefined ? {} : { memorySearch }), ...(soulCore === undefined ? {} : { soulCore }), ...(repoAccess === undefined ? {} : { repoAccess }) };
 });
 export const DEFAULT_HABITAT_PLAN: HabitatPlan = Object.freeze({ version: 1, guidance: "Be useful, concise, and honest. Match explicit preferences; do not manufacture familiarity. Stay silent when help is not wanted.", contextMessages: 12, maxReplyCharacters: 640, humor: "match", webSearch: false, memeSearch: true, javascript: false, memorySearch: true });
 export const parseHabitatPlan = (value: unknown): HabitatPlan => Object.freeze(planSchema.parse(value));
@@ -38,7 +38,7 @@ const memoryList = z.array(memorySchema).max(HABITAT_LIMITS.memoryEntries).refin
 const memorySnapshot = z.array(memorySchema.extend({ text: text(HABITAT_LIMITS.memorySnapshotTextBytes) })).max(HABITAT_LIMITS.memorySnapshotEntries).refine(values => new Set(values.map(value => value.id)).size === values.length);
 const rememberSchema = z.array(id).max(HABITAT_LIMITS.memoryChanges).refine(values => new Set(values).size === values.length);
 const memoryUpdateSchema = z.strictObject({ remember: z.array(z.strictObject({ id, category: memoryCategory })).max(HABITAT_LIMITS.memoryChanges), forget: rememberSchema }).refine(value => new Set(value.remember.map(entry => entry.id)).size === value.remember.length && value.remember.every(entry => !value.forget.includes(entry.id)));
-const toolSchema = z.strictObject({ kind: z.enum(["web-search", "meme-search", "meme-image", "javascript", "memory-search"]), query: text(256), result: text(4096) }).refine(value => value.kind !== "javascript" || /^sha256:[a-f0-9]{64}$/u.test(value.query));
+const toolSchema = z.strictObject({ kind: z.enum(["web-search", "meme-search", "meme-image", "javascript", "memory-search", "repo-sync", "repo-read", "repo-search"]), query: text(256), result: text(4096) }).refine(value => value.kind !== "javascript" || /^sha256:[a-f0-9]{64}$/u.test(value.query));
 const actionKind = z.enum(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"]);
 const priorMemorySchema = z.array(z.strictObject({ id, sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u) })).max(HABITAT_LIMITS.memoryExposureReferences).refine(values => new Set(values.map(value => value.id)).size === values.length);
 const replySchema = z.strictObject({ runId: id, at: timestamp, intent: text(1024), trigger: observationSchema, context: z.array(observationSchema).max(32), messageIds: z.array(id).max(8), text: text(8192), planDigest: z.string().regex(/^[a-f0-9]{64}$/u).nullable(), tools: z.array(toolSchema).max(2).optional(), actionKinds: z.array(actionKind).max(8).optional(), memory: memorySnapshot.optional(), priorMemory: priorMemorySchema.optional() });
@@ -181,6 +181,7 @@ export class ContactHabitat {
       && habitatDigest(assessment.candidate) !== checkpoint.baseDigest && !state.denied.includes(habitatDigest(assessment.candidate))
       && assessment.candidate.webSearch === state.champion.webSearch && assessment.candidate.memeSearch === state.champion.memeSearch
       && assessment.candidate.javascript === state.champion.javascript && assessment.candidate.memorySearch === state.champion.memorySearch
+      && assessment.candidate.repoAccess === state.champion.repoAccess
       && habitatDigest(assessment.candidate.soulCore ?? null) === habitatDigest(state.champion.soulCore ?? null)
       && assessment.scores.length === cases.length && scores.size === cases.length
       && cited.size > 0 && [...cited].every(id => cases.some(value => value.followups.some(message => message.id === id)))

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "scope": "Current synthetic source validation of the 42-file TextButler XCB composition admission inventory after the run-intake latency change: snapshot() reuses the set-poll enrollment instead of spending a second provider session per run, and runtime.process fetches the capability and qualification gates concurrently after the reply decision. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone package isolation, both package test suites, and all chained typechecks.",
+  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the owner-approved repository-access change: contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone package isolation, both package test suites, and all chained typechecks.",
   "toolchain": "Bun 1.3.14",
   "command": "bun run check",
   "result": {
     "exitCode": 0,
-    "passed": 1097,
+    "passed": 1114,
     "failed": 0,
-    "assertions": 13377,
-    "files": 105
+    "assertions": 13543,
+    "files": 106
   },
   "invocations": [
     {
@@ -19,84 +19,85 @@
         "exitCode": 0,
         "passed": 481,
         "failed": 0,
-        "assertions": 8013,
+        "assertions": 8034,
         "files": 54
       },
       "plus": {
         "command": "bun test packages",
         "result": {
           "exitCode": 0,
-          "passed": 616,
+          "passed": 633,
           "failed": 0,
-          "assertions": 5364,
-          "files": 51
+          "assertions": 5509,
+          "files": 52
         }
       },
       "log": "qualification/xcb-textbutler-v1-current-check.log"
     }
   ],
-  "sourceInventoryCount": 42,
-  "sourceDigest": "18bb00655fce40206d352dbfd3a1815424575279d2f57be3d0d17ae13b6c6661",
+  "sourceInventoryCount": 43,
+  "sourceDigest": "6bcc5095d3a020bb6e7f0b09a91b2320f3c2d62fc5f5799e84bef0d8a37cccc7",
   "sourceSha256": {
-    "bun.lock": "d7275c271129b75f91181da97a3af8450127f7b1d1e0d1c8000b1e829f0be216",
-    "package.json": "f7662cd480547dd92a0de558b472e1438e2ddebb39a66f44b8a0a1e7f8f3b83e",
-    "packages/control/src/index.ts": "76e11bb995f826314e0a54e8af78ead79fc6a96fdc3cb36af554b956d7ba35e1",
-    "packages/textbutler/src/cli.ts": "1847462b11d007925b0096733fb393fbc6dcd4667b4f895cd0e07fd30ed20d1c",
-    "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
-    "packages/textbutler/src/contact-habitat.ts": "fbc9b350bf9346108289ec487a528046e92c7c6c34dbaac2969eec26cf980776",
-    "packages/textbutler/src/control-service.ts": "ba1bd87d6ee295e20e6a764f177901cc45c170fec641e420773b367318006707",
-    "packages/textbutler/src/daemon.ts": "158a15c0404de06c4b318a338ed7ba7e1727617b49f9301d095cf6406e1aa95c",
-    "packages/textbutler/src/fast-driver.ts": "1b2263f783e575aa43e5ee30f19d0d05b7ee346056969a0ddb79fbb3ca6300d2",
-    "packages/textbutler/src/gateway-search.ts": "5706ed2c486f186658d536fe7b92426945b51f8871a196a99dd0048d5bca78a4",
-    "packages/textbutler/src/habitat-agent.ts": "138acf79088f42f4dbc4a09d7ab8bd8b98c31f4d3fb1b313ea7d685d03da8204",
-    "packages/textbutler/src/habitat-evolution.ts": "9a006281b9315693cdcc96582dc1c4018319711db023a98886fe89cc46d80380",
-    "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
-    "packages/textbutler/src/host-config.ts": "c0a59527d9427aaa3ca26ca469ce73e7edb1153607d1ac5d9c50e84dd825ccd0",
-    "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
-    "packages/textbutler/src/javascript-tool.ts": "6ae01458d0eb16c44c5a5c06e7d4790245ed592cb0885d81c4f6a8d082a66ad7",
-    "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
-    "packages/textbutler/src/journal.ts": "d3d8b5df70ca6cd88441ab0457b8b615de6f2ba829210a36fdfb6b3447eb5f56",
-    "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
-    "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
-    "packages/textbutler/src/meme-search.ts": "ad422591ece4d981dd97d66928984fd7512d303b8773503bcf79283813914c95",
-    "packages/textbutler/src/memory-search.ts": "39036b33a3e573d1bb5f4f26d7b4520013224ee20f0a6004de09b2199867abcd",
-    "packages/textbutler/src/message-summary.ts": "75163888ce53a7535a93f23a8228853d984af7a3677a4c8d0709cf6384187523",
-    "packages/textbutler/src/messages-cli.ts": "44e5db75549e212ab2686d3673c5433908f1f9554bf133e98fd574d09255e66f",
+    "packages/control/src/index.ts": "fc1b72eb57f26137a1cc7387e7b5a879aa0682c8acb6c916ce3f4598dd5d010d",
+    "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
+    "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
+    "packages/textbutler/src/xcb-host.ts": "27395d6bb942dfb297ceb852c097bfa62263d893c94e273d2fb217bda853120b",
+    "packages/textbutler/src/xcb-client.ts": "bba78d7db3ccb6df794b4e59a554b392c632042a8fd0279de614283c8fc59be3",
+    "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
     "packages/textbutler/src/native-subscription.ts": "f448154b264237ac1e854f3f1a3cf8fb2d38266b71fbb2fb8ebec52cb842c91b",
     "packages/textbutler/src/native-task.ts": "122ba7b346ba9cbaca3d1c71270c32e6d6dda37e4c59c8a34c4051c8241859f4",
+    "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
+    "packages/textbutler/src/control-service.ts": "185874912a60352805e346234fa9b4eb8d60e510702cdbb2a1313b2f561d7d86",
+    "packages/textbutler/src/contact-habitat.ts": "bea4ecdba1f74ee7591e6a06799e3c9d01cb41d5d287bc78802f0f81255c45fe",
+    "packages/textbutler/src/contact-repos.ts": "6b51b022526f98e4ea360e5cd730ce6053f0447d5204f1eef08fe04301fa6783",
+    "packages/textbutler/src/habitat-agent.ts": "61ed52739f8863a4d9904b045a87826588e4c60360f601ba0b5594509f0af02c",
+    "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
+    "packages/textbutler/src/javascript-tool.ts": "6ae01458d0eb16c44c5a5c06e7d4790245ed592cb0885d81c4f6a8d082a66ad7",
+    "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
+    "packages/textbutler/src/memory-search.ts": "39036b33a3e573d1bb5f4f26d7b4520013224ee20f0a6004de09b2199867abcd",
+    "packages/textbutler/src/habitat-evolution.ts": "9a006281b9315693cdcc96582dc1c4018319711db023a98886fe89cc46d80380",
+    "packages/textbutler/src/reply-loop.ts": "6350bc1ceff4437acdfc22e08237ebe0db5395d7357d86f23f277fed1df01283",
+    "packages/textbutler/src/fast-driver.ts": "1b2263f783e575aa43e5ee30f19d0d05b7ee346056969a0ddb79fbb3ca6300d2",
+    "packages/textbutler/src/gateway-search.ts": "5706ed2c486f186658d536fe7b92426945b51f8871a196a99dd0048d5bca78a4",
+    "packages/textbutler/src/meme-search.ts": "ad422591ece4d981dd97d66928984fd7512d303b8773503bcf79283813914c95",
+    "packages/textbutler/src/journal.ts": "8c35a860e42087acdacf8ff0748096499ca35b65443463790f6a6bb32c8914e1",
+    "packages/textbutler/src/message-summary.ts": "75163888ce53a7535a93f23a8228853d984af7a3677a4c8d0709cf6384187523",
+    "packages/textbutler/src/messages-cli.ts": "44e5db75549e212ab2686d3673c5433908f1f9554bf133e98fd574d09255e66f",
     "packages/textbutler/src/owner-cli.ts": "2d3d5db9bc0a4d5cfa7366f91493006cf028f7fe4269f652d5ee2d1f0b8b3fee",
     "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
     "packages/textbutler/src/owner-replies.ts": "586002d4acef0b2a1fc95abb35709a78f4b79122594ce309be0c3882d9d527d6",
-    "packages/textbutler/src/provider-host.ts": "81f9b55d8d47882429a31331994db5195530a599090ceef96986fe237cd64d2e",
-    "packages/textbutler/src/reply-loop.ts": "b19941dd53bc59d7d0b9bcbc5c2b7e1f3c4bfdfa716e14116e380d20cb17d626",
     "packages/textbutler/src/routed-agent.ts": "63897e366965b77ac8bcce8b1b8c08b218c20605923dd86bf468e0b9a65f22b3",
-    "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
-    "packages/textbutler/src/runtime.ts": "527aa7c8b71d9e566171ade6bf6713b7d85e63bfc62e23e1613eba383b46cc3c",
+    "packages/textbutler/src/provider-host.ts": "81f9b55d8d47882429a31331994db5195530a599090ceef96986fe237cd64d2e",
+    "packages/textbutler/src/daemon.ts": "158a15c0404de06c4b318a338ed7ba7e1727617b49f9301d095cf6406e1aa95c",
+    "packages/textbutler/src/host-config.ts": "c0a59527d9427aaa3ca26ca469ce73e7edb1153607d1ac5d9c50e84dd825ccd0",
     "packages/textbutler/src/workspace.ts": "70b2fbec3a14c835f9ec2a4fcc1c2535e1fd2e5fde4907486cef6d6a8fc599b4",
-    "packages/textbutler/src/xcb-client.ts": "bba78d7db3ccb6df794b4e59a554b392c632042a8fd0279de614283c8fc59be3",
-    "packages/textbutler/src/xcb-host.ts": "27395d6bb942dfb297ceb852c097bfa62263d893c94e273d2fb217bda853120b",
-    "packages/textbutler/src/xcb-integration.ts": "7fbb9e8e65ac9e0920990b8bee965f2dcaeec6ad5250713ccf3adda429dc0cad",
-    "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
-    "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
+    "packages/textbutler/src/runtime.ts": "527aa7c8b71d9e566171ade6bf6713b7d85e63bfc62e23e1613eba383b46cc3c",
+    "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
+    "packages/textbutler/src/cli.ts": "1847462b11d007925b0096733fb393fbc6dcd4667b4f895cd0e07fd30ed20d1c",
+    "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
+    "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
+    "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
     "scripts/build-textbutler.ts": "89645b8c85058de94641de3f67291f802094e2be6b9261da5605e8a7797db272",
-    "scripts/xcb-integration-admission.ts": "ecd15c2e67528106a2c7dd038af02bf420b6b595bd8de65095573d7744758cda"
+    "scripts/xcb-integration-admission.ts": "6d2843d10d2be3ee2bb77bcb993bda2f3b58e013f5e74edbfa9793a5bf2c69af",
+    "package.json": "f7662cd480547dd92a0de558b472e1438e2ddebb39a66f44b8a0a1e7f8f3b83e",
+    "bun.lock": "d7275c271129b75f91181da97a3af8450127f7b1d1e0d1c8000b1e829f0be216"
   },
   "review": {
-    "artifact": "/Users/benguo/Documents/textbutler-tool-nullish-20260925/qualification/xcb-poll-lane-review.json",
-    "sha256": "3a8a1229823d85a93b1bcc1a881c9bb9a5f95dbc14af19ab8d60cb69cd63c361",
+    "artifact": "qualification/xcb-contact-repos-review.json",
+    "sha256": "c16e2efa0726d8966d5e1c496141ddc0a95842b31d4baca947a74a771d8f08a6",
     "kind": "independent-ai-source-review",
-    "result": "Ship after the two capacity fixes were applied: the poll waiter bound was raised to 64 (> the 50-contact active limit plus concurrent owner polls) removing deterministic positional starvation, and polls now dispatch only while fewer than six frames are pending, reserving wire slots seven through nine for priority and ordinary work. Reviewer verified the lane state machine: no stranded waiters, no deadlock, exact accounting on every failure path, and results apply in contact order."
+    "result": "Ship after five blocking fixes: reachable self-chat owner approvals proven end to end, allowlist enforcement on every shelf operation, allow-before-resolve ordering, typed client repos parsing, and public-host-only URL admission; lows fixed or accepted."
   },
   "log": {
     "path": "qualification/xcb-textbutler-v1-current-check.log",
-    "bytes": 133147,
-    "sha256": "b828dc6b7e1ec5595d6cfb31addbade1eb6f5549588962d80ff23eb1dc4f1e00",
-    "note": "Complete successful bun run check output for the enrollment poll-lane branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
+    "bytes": 134818,
+    "sha256": "d077c4eb2a870ab8e967ee636c98999f90c233ae54f933cb1a9b1aa4bcaa8510",
+    "note": "Complete successful bun run check output for the owner-approved repository-access branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",
     "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
     "unchangedAcrossValidation": true
   },
-  "createdAt": "2026-09-25"
+  "createdAt": "2026-09-26"
 }

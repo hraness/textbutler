@@ -15,7 +15,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 const replyOutput = { respond: true, confidence: 0.95, reason: "requested", summary: "Explain briefly", actions: [{ kind: "text", text: "A useful answer" }], tool: null };
 const driverEvidence = (body: string): { history: { id: string }[]; results: { file?: string; [key: string]: unknown }[]; tools: string[]; memory: HabitatMemory[]; memoryOmitted: number } => JSON.parse(JSON.parse(body).messages[1].content).context.inputs.context.evidence;
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
-async function fixture(output: unknown, evolution?: Parameters<typeof createHabitatAgent>[0]["evolution"], overrides: Partial<Pick<Parameters<typeof createHabitatAgent>[0], "memes" | "getWorkspace">> = {}) {
+async function fixture(output: unknown, evolution?: Parameters<typeof createHabitatAgent>[0]["evolution"], overrides: Partial<Pick<Parameters<typeof createHabitatAgent>[0], "memes" | "getWorkspace" | "repos" | "resolveOwnerIntent">> = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "butler-habitat-"))), journal = RunJournal.memory(), workspace = await ContactWorkspace.create(root);
   const contact = { ...newContact("synthetic-contact", "Synthetic", "route"), enabled: true }, now = Date.parse("2026-09-20T12:00:00.000Z");
   await workspace.write("history/recent.json", JSON.stringify({ messages: [{ id: "message", at: now - 1000, author: "contact", text: "butler help" }] }));
@@ -493,4 +493,71 @@ test("reflection memory deltas preserve older contact notes when learning a new 
   expect(habitat.snapshot().memory?.map(value => [value.id, value.text, value.category])).toEqual([
     ["memory-0", "They prefer concise answers", undefined], ["message", "butler help", "shared-reference"],
   ]);
+});
+
+test("repo tools stay hidden without owner opt-in and dispatch through the shelf port when enabled", async () => {
+  const calls: [string, string][] = [];
+  const repos = {
+    sync: async (_contact: unknown, url: string) => { calls.push(["sync", url]); return { name: "bio", url, commit: "a1b2", syncedAt: 1 }; },
+    read: async (_contact: unknown, repo: string, path: string) => { calls.push(["read", `${repo}:${path}`]); return { file: path, text: "# bio", truncated: false }; },
+    search: async (_contact: unknown, repo: string, query: string) => { calls.push(["search", `${repo}:${query}`]); return { matches: [], scanned: 0, truncated: false }; },
+    list: async () => [{ name: "bio", url: "https://github.com/hraness/bio", commit: "a1b2", syncedAt: 1 }],
+  };
+  const denied = await fixture((body: string) => {
+    expect(driverEvidence(body).tools).not.toContain("repo-read");
+    return { ...replyOutput, actions: [], tool: { kind: "repo-read", repo: "bio", path: "README.md" } };
+  }, undefined, { repos: repos as never });
+  await expect(denied.habitat.agent.compose(denied.request)).rejects.toThrow("not available");
+  expect(denied.calls()).toBe(1); expect(calls).toEqual([]);
+  const f = await fixture((body: string, call: number) => {
+    const evidence = driverEvidence(body);
+    expect(evidence.tools).toEqual(expect.arrayContaining(["repo-sync", "repo-read", "repo-search"]));
+    if (call === 1) return { ...replyOutput, actions: [], tool: { kind: "repo-read", repo: "bio", path: "README.md" } };
+    expect(evidence.results[0]).toEqual({ tool: "repo-read", result: { file: "README.md", text: "# bio", truncated: false } });
+    return replyOutput;
+  }, undefined, { repos: repos as never });
+  new ContactHabitat(f.journal, f.request.contact.id).configure(0, { ...DEFAULT_HABITAT_PLAN, repoAccess: true });
+  await f.habitat.agent.compose(f.request);
+  expect(calls).toEqual([["read", "bio:README.md"]]); expect(f.calls()).toBe(2);
+  f.habitat.submitted({ ...f.request, actions: [{ kind: "text", text: "A useful answer" }], messageIds: ["accepted"], at: f.now });
+  expect(new ContactHabitat(f.journal, f.request.contact.id).snapshot().episodes[0]?.reply.tools).toEqual([
+    { kind: "repo-read", query: "bio:README.md", result: JSON.stringify({ tool: "repo-read", result: { file: "README.md", text: "# bio", truncated: false } }) },
+  ]);
+});
+
+test("owner intents on the self conversation answer deterministically without a model call", async () => {
+  const resolved: string[] = [];
+  const f = await fixture(replyOutput, undefined, {
+    resolveOwnerIntent: async (_contact, text) => { resolved.push(text); return text.includes("allow") ? "Approved https://github.com/hraness/bio for Mom; syncing it now." : null; },
+  });
+  const selfContact = { ...f.request.contact, selfChat: true };
+  // Self-chat inbound arrives with the "contact" author class: the only other
+  // participant in the owner's self conversation is the owner.
+  const owner = { ...f.request, contact: selfContact, event: { ...f.request.event, author: "contact" as const, text: "butler allow https://github.com/hraness/bio" } };
+  const result = await f.habitat.agent.compose(owner) as { actions: { kind: string; text: string }[] };
+  expect(f.calls()).toBe(0);
+  expect(result.actions).toEqual([{ kind: "text", text: "Approved https://github.com/hraness/bio for Mom; syncing it now." }]);
+  const ordinary = { ...f.request, runId: "synthetic-run-2", contact: selfContact, event: { ...f.request.event, author: "contact" as const, text: "butler what is the plan today" } };
+  await f.habitat.agent.compose(ordinary);
+  expect(f.calls()).toBe(1);
+  expect(resolved).toEqual([owner.event.text, ordinary.event.text]);
+});
+
+test("events on ordinary chats never reach the owner intent resolver", async () => {
+  const resolved: string[] = [];
+  const f = await fixture(replyOutput, undefined, {
+    resolveOwnerIntent: async (_contact, text) => { resolved.push(text); return "Approved"; },
+  });
+  // Contact-authored inbound on a normal (non-self-chat) contact is never
+  // offered owner intents.
+  await f.habitat.agent.compose(f.request);
+  expect(resolved).toEqual([]);
+  expect(f.calls()).toBe(1);
+  // Nor is owner-authored outbound text on a normal contact.
+  const other = await fixture(replyOutput, undefined, {
+    resolveOwnerIntent: async (_contact, text) => { resolved.push(text); return "Approved"; },
+  });
+  await other.habitat.agent.compose({ ...other.request, event: { ...other.request.event, author: "owner" as const } });
+  expect(resolved).toEqual([]);
+  expect(other.calls()).toBe(1);
 });
