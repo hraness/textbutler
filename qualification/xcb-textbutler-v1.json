@@ -25,7 +25,7 @@
     "packages/textbutler/src/control-service.ts": "185874912a60352805e346234fa9b4eb8d60e510702cdbb2a1313b2f561d7d86",
     "packages/textbutler/src/contact-habitat.ts": "bea4ecdba1f74ee7591e6a06799e3c9d01cb41d5d287bc78802f0f81255c45fe",
     "packages/textbutler/src/contact-repos.ts": "6b51b022526f98e4ea360e5cd730ce6053f0447d5204f1eef08fe04301fa6783",
-    "packages/textbutler/src/habitat-agent.ts": "4d485ac70f44c8fe0b59c57d0a866467d20c4f69bdc8682ea7c49340fe35f0b4",
+    "packages/textbutler/src/habitat-agent.ts": "51ba8d39757d5e5822b2d519b950063cb73628884691b502fcd427928a0caef3",
     "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
     "packages/textbutler/src/javascript-tool.ts": "6ae01458d0eb16c44c5a5c06e7d4790245ed592cb0885d81c4f6a8d082a66ad7",
     "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
@@ -59,6 +59,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "eccf1d3a269f6193c3a8f1f8fd7b644edf421c08570f5e2fb39c435f09285b04"
+    "receiptSha256": "a32207faa781aed2a876caf4166734a3ae95a5ae291539f3c37fd74fc3f808a8"
   }
 }

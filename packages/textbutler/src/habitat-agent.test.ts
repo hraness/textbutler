@@ -572,3 +572,55 @@ test("a stray action beside a tool request is discarded while the tool runs", as
   expect(result.actions[0]?.text).toBe("A useful answer");
   expect(f.calls()).toBe(2);
 });
+
+test("a tool nested inside the actions array is salvaged and run", async () => {
+  const calls: [string, string][] = [];
+  const repos = {
+    sync: async (_contact: unknown, url: string) => { calls.push(["sync", url]); return { name: "bio", url, commit: "a1b2", syncedAt: 1 }; },
+    read: async () => ({ file: "README.md", text: "# bio", truncated: false }),
+    search: async () => ({ matches: [], scanned: 0, truncated: false }),
+    list: async () => [],
+  };
+  const f = await fixture((_body: string, call: number) => call === 1
+    ? { ...replyOutput, actions: [{ kind: "text", text: "Syncing now." }, { kind: "repo-sync", url: "https://github.com/hraness/bio" }], tool: null }
+    : replyOutput, undefined, { repos: repos as never });
+  new ContactHabitat(f.journal, f.request.contact.id).configure(0, { ...DEFAULT_HABITAT_PLAN, repoAccess: true });
+  const result = await f.habitat.agent.compose(f.request) as { actions: [{ kind: string; text: string }] };
+  expect(calls).toEqual([["sync", "https://github.com/hraness/bio"]]);
+  expect(result.actions[0]?.text).toBe("A useful answer");
+  expect(f.calls()).toBe(2);
+});
+
+test("a {tool:{...}} wrapper inside the actions array is salvaged and run", async () => {
+  const f = await fixture((_body: string, call: number) => call === 1
+    ? { ...replyOutput, actions: [{ kind: "text", text: "I'll check." }, { tool: { kind: "memory-search", query: "anything" } }], tool: null }
+    : replyOutput);
+  const result = await f.habitat.agent.compose(f.request) as { actions: [{ kind: string; text: string }] };
+  expect(result.actions[0]?.text).toBe("A useful answer");
+  expect(f.calls()).toBe(2);
+});
+
+test("an invalid tool-shaped action stays an action and fails closed", async () => {
+  const f = await fixture((_body: string, call: number) => call === 1
+    ? { ...replyOutput, actions: [{ kind: "repo-sync" }], tool: null }
+    : replyOutput);
+  await expect(f.habitat.agent.compose(f.request)).rejects.toThrow();
+});
+
+test("an explicit top-level tool wins over a salvaged action tool", async () => {
+  const calls: [string, string][] = [];
+  const repos = {
+    sync: async (_contact: unknown, url: string) => { calls.push(["sync", url]); return { name: "bio", url, commit: "a1b2", syncedAt: 1 }; },
+    read: async () => ({ file: "README.md", text: "# bio", truncated: false }),
+    search: async () => ({ matches: [], scanned: 0, truncated: false }),
+    list: async () => [],
+  };
+  const f = await fixture((_body: string, call: number) => call === 1
+    ? { ...replyOutput, actions: [{ kind: "repo-sync", url: "https://github.com/hraness/bio" }], tool: { kind: "memory-search", query: "anything" } }
+    : replyOutput, undefined, { repos: repos as never });
+  new ContactHabitat(f.journal, f.request.contact.id).configure(0, { ...DEFAULT_HABITAT_PLAN, repoAccess: true });
+  await f.habitat.agent.compose(f.request);
+  // The top-level memory-search ran; the nested repo-sync was dropped, not run.
+  expect(calls).toEqual([]);
+  expect(f.calls()).toBe(2);
+});

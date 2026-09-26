@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the owner-approved repository-access change: contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface, and the fast gateway driver now tolerates a stray proposed action beside a tool request (the tool executes, the action is dropped) while the two-step tool budget still fails closed. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone package isolation, both package test suites, and all chained typechecks.",
+  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the owner-approved repository-access change: contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface, and the fast gateway driver now tolerates a stray proposed action beside a tool request and salvages a schema-valid tool nested inside the actions array (bare tool object or {tool:{...}} wrapper), while malformed tool-shaped entries remain actions and fail closed; the two-step tool budget still fails closed. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone package isolation, both package test suites, and all chained typechecks.",
   "toolchain": "Bun 1.3.14",
   "command": "bun run check",
   "result": {
     "exitCode": 0,
-    "passed": 1115,
+    "passed": 1119,
     "failed": 0,
-    "assertions": 13546,
+    "assertions": 13558,
     "files": 106
   },
   "invocations": [
@@ -26,9 +26,9 @@
         "command": "bun test packages",
         "result": {
           "exitCode": 0,
-          "passed": 634,
+          "passed": 638,
           "failed": 0,
-          "assertions": 5512,
+          "assertions": 5524,
           "files": 52
         }
       },

@@ -24,6 +24,22 @@ const toolSchema = z.discriminatedUnion("kind", [
 ]);
 const outputSchema = z.strictObject({ respond: z.boolean(), confidence: z.number().min(0).max(1), reason: z.enum(["requested", "helpful", "human_active", "not_needed", "uncertain"]),
   summary: z.string().min(1).max(1024), actions: z.array(z.unknown()).max(7), tool: toolSchema.nullish() });
+/** Small gateway models often nest a tool request inside the actions array —
+ * either as a bare {kind:tool-kind,...} entry or wrapped as {tool:{...}}.
+ * Salvage lifts a schema-valid tool out of actions so it can run; entries that
+ * do not validate stay in place and fail closed as bad actions downstream. */
+function salvageToolRequest(result: z.infer<typeof outputSchema>): z.infer<typeof outputSchema> {
+  const actions: unknown[] = [];
+  let tool = result.tool ?? null;
+  for (const action of result.actions) {
+    const candidate = action !== null && typeof action === "object" && !Array.isArray(action)
+      ? ("tool" in action ? (action as { tool: unknown }).tool : action) : undefined;
+    const parsed = candidate === undefined ? null : toolSchema.safeParse(candidate);
+    if (parsed?.success) { tool ??= parsed.data; continue; }
+    actions.push(action);
+  }
+  return { ...result, actions, tool };
+}
 const outputContract = { respond: "boolean", confidence: "number 0..1; below 0.85 stays silent", reason: "requested|helpful|human_active|not_needed|uncertain", summary: "brief intended purpose of this response", actions: "0..7 action objects", tool: "null, {kind:web-search|meme-search|meme-image|memory-search,query:string}, {kind:javascript,code:string,input:JSON}, {kind:repo-sync,url:string}, {kind:repo-read,repo:string,path:string}, or {kind:repo-search,repo:string,query:string}" };
 const actionContract = [
   { kind: "text", text: "The response" }, { kind: "attachment", file: "an existing outbox path", name: "file.png", mimeType: "image/png" },
@@ -179,7 +195,7 @@ export function createHabitatAgent(ports: { journal: RunJournal; driver: FastDri
       const run = await executeHabitatProgram({ phase: "respond", plan, context: context as JsonValue, executor: ports.driver.executor(`${request.runId}-driver-${step}`), signal });
       assertCurrent();
       ports.journal.recordHabitatEvidence(request.contact.id, run.receipt.digest, JSON.stringify(run), now());
-      let result = outputSchema.parse(run.output);
+      let result = salvageToolRequest(outputSchema.parse(run.output));
       if (!result.respond || result.confidence < 0.85) result = { ...result, respond: false, actions: [], tool: null };
       if (result.tool) {
         // Small models often send a text action alongside the tool request
