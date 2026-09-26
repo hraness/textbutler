@@ -182,7 +182,10 @@ export function createHabitatAgent(ports: { journal: RunJournal; driver: FastDri
       let result = outputSchema.parse(run.output);
       if (!result.respond || result.confidence < 0.85) result = { ...result, respond: false, actions: [], tool: null };
       if (result.tool) {
-        if (step >= 2 || result.actions.length) throw Error("Fast driver tool budget exceeded");
+        // Small models often send a text action alongside the tool request
+        // despite the contract. The tool wins; stray proposed actions are
+        // discarded and the tool-result step produces the real reply.
+        if (step >= 2) throw Error("Fast driver tool budget exceeded");
         const tool = result.tool;
         if (!availableTools.includes(tool.kind)) throw Error("Tool is not available for this reply");
         if (tool.kind === "javascript") {

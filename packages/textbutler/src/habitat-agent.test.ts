@@ -561,3 +561,14 @@ test("events on ordinary chats never reach the owner intent resolver", async () 
   expect(resolved).toEqual([]);
   expect(other.calls()).toBe(1);
 });
+
+test("a stray action beside a tool request is discarded while the tool runs", async () => {
+  const f = await fixture((_body: string, call: number) => call === 1
+    ? { ...replyOutput, actions: [{ kind: "text", text: "Let me check." }], tool: { kind: "memory-search", query: "anything" } }
+    : replyOutput);
+  const result = await f.habitat.agent.compose(f.request) as { actions: [{ kind: string; text: string }] };
+  // The tool executed and the real reply comes from the post-tool step — the
+  // stray "Let me check." proposal is never sent.
+  expect(result.actions[0]?.text).toBe("A useful answer");
+  expect(f.calls()).toBe(2);
+});
