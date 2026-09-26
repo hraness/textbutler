@@ -848,6 +848,8 @@ nav.message-like-me-ask-ai + footer {
 .development-status > div { border-block-start: 1px solid var(--line); padding-block-start: 1.5rem; }
 .development-status h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
 .development-status p { margin-block: 0.75rem 1rem; color: var(--muted); max-width: 55ch; }
+.provider-marks { display: flex; flex-wrap: wrap; gap: 0.45rem 1rem; align-items: center; }
+.development-status .provider-marks, .about-grid .provider-marks { margin: 0.4rem 0 0; color: inherit; }
 .legacy-note { margin-block: 1.5rem 0; padding-block-start: 1.5rem; border-block-start: 1px solid var(--line); color: var(--muted); font-size: 0.95rem; max-width: 75ch; }
 .document-page > .legacy-note { margin-bottom: 1.5rem; }
 ::selection { background: var(--primary); color: var(--primary-foreground); }

@@ -1,3 +1,4 @@
+import { ProviderMarkChip } from '@hraness/design-kit/react/server';
 import Link from 'next/link';
 import { SiteFooter, SiteHeader } from '../_components/site-chrome';
 import { absoluteUrl, ARCHITECTURE_URL, GITHUB_URL, pageMetadata, serializeJsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_STATUS } from '../_lib/site';
@@ -10,7 +11,7 @@ export default function AboutPage() {
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(aboutJsonLd) }} />
     <header className="document-hero"><h1>Why Textbutler works the way it does</h1><p>Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats you choose on your Mac. Turn it on for one person, and it replies as a clearly marked assistant that knows your history with them.</p><a href={GITHUB_URL}>View the open-source project</a></header>
     <section className="about-grid" aria-label="Product principles">
-      <article><h2>Let your agent do the work</h2><p>Connect a Claude Code or Codex subscription through xcb, and the butler reads the conversations you choose, sums up what needs an answer, and drafts or sends replies within what each contact allows. An agent you run yourself can use the same JSON commands.</p></article>
+      <article><h2>Let your agent do the work</h2><p className="provider-marks"><ProviderMarkChip mark="claudecode" size={20} /><ProviderMarkChip mark="codex" size={20} /></p><p>Connect a Claude Code or Codex subscription through xcb, and the butler reads the conversations you choose, sums up what needs an answer, and drafts or sends replies within what each contact allows. An agent you run yourself can use the same JSON commands.</p></article>
       <article><h2>Give each relationship its own context</h2><p>A contact folder holds standing guidance the butler reads but can’t change, dated memories, preferences, and sources. It learns from conversation, and you can inspect and edit every file. Settings and permission grants live outside the agent’s editable context.</p></article>
       <article><h2>Keep the decision with you</h2><p>Text replies carry a disclosure by default, starting with {'🤖{ hello this is my response }'}. You can change or clear its three symbols, and you see the complete text of any reply before you send or approve it. Choose the contacts it may help, set the active limit, and pause it globally or per contact. Smart response is designed to yield while you are talking; keyword-only mode waits for a direct invitation.</p></article>
     </section>
