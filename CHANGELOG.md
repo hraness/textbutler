@@ -1,28 +1,34 @@
 # Changelog
 
-## 0.8.21 (2026-09-24)
+Each version's section is copied onto its GitHub Release page: a summary
+paragraph, then one bullet per change. Write the section in the version bump
+pull request.
+
+## 0.8.21 - 2026-09-24
+
+A LaunchAgent service installed by 0.8.19 now verifies and uninstalls under this release. In 0.8.20 it failed verification, because 0.8.19 had changed the service template without changing the receipt schema.
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.21` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Complete the LaunchAgent contract fix: receipts written before schema 4 recorded an artifact now verify the installed service definition against every exact render a shipped template produced (the template changed `ProcessType` within the same receipt schema), so a service installed by the previous release verifies and uninstalls under this binary. When advancing an absent service's older receipt, the rewritten plist lands before the receipt so an interruption still verifies against the older contract's historical renders.
 
-## 0.8.20 (2026-09-24)
+## 0.8.20 - 2026-09-24
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.20` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Make the LaunchAgent receipt record the exact rendered plist it installed (schema version 4): installation verification now compares the on-disk service definition with the recorded artifact instead of re-rendering it under the current binary, so a launch-template change can no longer make a newer `textbutler` unable to verify or uninstall a service an older binary installed. Older receipts keep verifying against their historical template bytes, `daemon install` refuses to mutate an owned service on an earlier contract until it is removed and reinstalled, and an absent service's older receipt advances to the recorded-artifact contract in place.
 
-## 0.8.19 (2026-09-23)
+## 0.8.19 - 2026-09-23
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.19` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Run the Textbutler daemon at standard launchd priority instead of `Background`: on a loaded host the previous setting starved the messaging child's spawn-synchronous startup, so automation initialization could outlast its request deadline and cycle through recovery without ever answering inbound messages.
 - Make the automation child's initialize watchdog progress-aware: it re-arms only while the recorded process group proves CPU progress, so a slowly starting child is adopted instead of orphaned while a genuinely frozen child still dies on the original deadline under the same hard cap.
 - Escalate failed-child cleanup to the recorded process group whenever that group may be alive rather than only while the direct child process entry is absent, so same-group helpers left behind by a closed child meet SIGKILL instead of surviving as orphans.
 
-## 0.8.18 (2026-09-23)
+## 0.8.18 - 2026-09-23
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.18` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Let the local TextButler app build against a persistent owner signing identity with `--signing-identity`, so macOS permission grants such as Full Disk Access and Apple Events bind to a stable certificate instead of each ad-hoc rebuild's changing code hash. The managed app receipt records the signing class explicitly (`ad-hoc` or `certificate`), treats a signing-class change as a new permission target that requires reinstall, and rejects unreviewed signing classes at startup. Ad-hoc signing remains the default for development builds.
 
-## 0.8.17 (2026-09-23)
+## 0.8.17 - 2026-09-23
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.17` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Add isolated per-contact habitats: each enrolled contact gets a private workspace whose bounded evolution loop proposes, evaluates and promotes reply-guidance updates through the admitted subscription driver, with journaled budgets and reservations.
@@ -31,28 +37,28 @@
 - Keep the automatic loop honest under load: inbound events drain in batches, a degraded transport keeps pending work and only reports attention after repeated failures, reactions and echoes can no longer erase or trigger pending replies, and a continuous inbound stream is answered within a bounded debounce instead of starving.
 - Accept bare-object driver output, map silent suggestions to an explicit outcome, supervise the messaging transport child with custody-verified recovery, keep injected contact-workspace guidance out of trusted policy, and reseal the reviewed XCB composition receipt over the current sources.
 
-## 0.8.16 (2026-09-22)
+## 0.8.16 - 2026-09-22
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.16` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Treat an owner text naming the butler in an enrolled contact conversation as a deliberate invocation: it now queues a disclosed reply through the same grant, rate-limit, capability, and freshness checks instead of marking the thread answered. Only a strictly newer owner message suppresses it as a takeover, and invocations no longer count as owner presence, so they cannot cool the butler down or swallow the next inbound. `inbox` and `replies suggest` report the same owner run the loop sees.
 
-## 0.8.15 (2026-09-21)
+## 0.8.15 - 2026-09-21
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.15` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Keep an admitted automatic reply alive while it is drafted: the post-composition recheck measures event age from admission instead of the live clock, so a slow provider call can no longer cancel a live reply as stale, while owner activity, superseded events, sync, and settings still cancel it.
 - Treat the butler's own echoed messages as loop traffic only: they no longer cancel an in-flight reply or clear a newer pending inbound, and echo-only traffic cannot supersede a live reply.
 
-## 0.8.14 (2026-09-21)
+## 0.8.14 - 2026-09-21
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.14` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Let the owner mark a conversation as their own address with `contacts self CONTACT on|off`. iMessage self chats deliver each owner text as an inbound copy plus an outgoing echo; the echo is no longer mistaken for the owner's answer, and the butler's own wrapped sends echoing back inbound cannot trigger another reply. Marking requires a visible butler wrap so the echo signal cannot be cleared away, and stored contacts default off.
 
-## 0.8.13 (2026-09-21)
+## 0.8.13 - 2026-09-21
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.13` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Accept the renamed XCB account identity fields (`name` plus optional `email`, with `label` retained as an alias) in subscription capability discovery, so a verified Textbutler bundle works against both pre- and post-rename XCB runtimes.
 
-## 0.8.12 (2026-09-21)
+## 0.8.12 - 2026-09-21
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.12` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Add the native TextButler desktop app with scoped guided setup, a menu bar companion, and per-contact review-first controls. New installations start paused and automatic replies stay off per contact.
@@ -61,13 +67,13 @@
 - Restore native iMessage discovery and history through the reviewed Ghostget connector, including literal modern coordinates, and provision the pinned private transport during setup so a reviewed connector upgrade cannot leave a stale helper.
 - Refresh the informational site's identity and keep it informational only; it receives no messages or contact data.
 
-## 0.8.11 (2026-09-16)
+## 0.8.11 - 2026-09-16
 
 - Bind legacy installation to the exact public `@hraness/message-like-me@0.8.11` npm package, with the same reviewed bytes mirrored in the immutable GitHub Release. This does not install the Textbutler menu companion or enable automatic replies.
 - Add optional development support to CLI discovery, the Message Like Me skill, the Textbutler menu, and the public website. Task output and private message boundaries stay unchanged.
 - Bundle the shared local support protocol separately from all public SDK graphs. Paid support remains a human choice; no newsletter is offered for this product.
 
-## 0.8.10 (2026-09-13)
+## 0.8.10 - 2026-09-13
 
 - Show a compact ASCII robot before interactive root help. Piped output,
   machine-readable commands, version output, and command help stay unchanged.
@@ -75,20 +81,20 @@
   Textbutler app remains in development; this package does not enable replies.
 - Route legacy installation to the exact public `@hraness/message-like-me@0.8.10` npm package after release admission, with the same reviewed bytes mirrored in the immutable GitHub Release.
 
-## 0.8.9 (2026-09-10)
+## 0.8.9 - 2026-09-10
 
 - Use the shared Paper theme on the informational website, with warm neutral surfaces, compact Nebula Sans headings, and a blue action color in light and dark appearances.
 - Verify the theme snapshot's immutable source and file digests independently of the existing component package versions.
 - Route installation to the exact public `@hraness/message-like-me@0.8.9` npm package after release admission, with the same reviewed bytes mirrored in the immutable GitHub Release. CLI behavior and private data boundaries remain unchanged.
 
-## 0.8.8 (2026-09-09)
+## 0.8.8 - 2026-09-09
 
 - Route installation to the exact public `@hraness/message-like-me@0.8.8` npm package after release admission, with the same reviewed bytes in the immutable GitHub Release.
 - Use Ghostget in current CLI options, SDK names, source guidance, and the public site. Keep the original Wrench options and exports as compatibility aliases.
 - Accept `ghostgetContext` when preparing a handoff while preserving the existing serialized handoff, receipt, contract hashes, and local history. Reject simultaneous context aliases.
 - Point Ghostget setup to its exact canonical GitHub Release archive.
 
-## 0.8.7 (2026-09-09)
+## 0.8.7 - 2026-09-09
 
 - Make the exact public `@hraness/message-like-me@0.8.7` npm package the
   supported default install, with the same reviewed bytes mirrored in the
@@ -102,7 +108,7 @@
 - Strengthen the development Effect architecture checker. Public protocols,
   the source readers, and command behavior are unchanged.
 
-## 0.8.6 (2026-09-07)
+## 0.8.6 - 2026-09-07
 
 - Make the exact public `@hraness/message-like-me@0.8.6` npm package the
   supported default install, with the same reviewed bytes mirrored in the
@@ -118,7 +124,7 @@
 - Strengthen the development Effect checker with generator alias and wrapper
   regressions. Public protocol graphs and local-only behavior remain unchanged.
 
-## 0.8.5 (2026-09-06)
+## 0.8.5 - 2026-09-06
 
 - Make the exact public `@hraness/message-like-me@0.8.5` npm package the
   supported default install, with the same reviewed bytes mirrored in the
@@ -135,7 +141,7 @@
 - Bound private JSON read allocation to the admitted file size, including
   short reads and files that grow during inspection.
 
-## 0.8.4 (2026-09-06)
+## 0.8.4 - 2026-09-06
 
 - Make the exact public `@hraness/message-like-me@0.8.4` npm package the
   supported default install, with the same reviewed bytes mirrored in the
@@ -150,7 +156,7 @@
   skip-aware condition, and a terminal admission fails unless verification and
   provider admission both succeeded.
 
-## 0.8.3 (2026-09-06)
+## 0.8.3 - 2026-09-06
 
 - Let Beeper users bring a finished private Wrench bundle into the same local
   evidence corpus as Apple Messages and the other supported sources. The exact

@@ -266,7 +266,11 @@ const [releasePayload, githubLatestPayload] = await Promise.all([
 if ((githubLatestPayload as Readonly<{ tag_name?: unknown }>).tag_name !== verifiedTag) {
   throw new Error("Latest GitHub Release does not match the admitted annotated tag.");
 }
-const release = distribution.parseGitHubRelease(releasePayload, releaseVersion);
+const release = distribution.parseGitHubRelease(releasePayload, releaseVersion, {
+  // The release page notes must byte-match this checkout's changelog section.
+  changelog: await readFile(resolve(import.meta.dir, "..", "CHANGELOG.md"), "utf8"),
+  commit: verifiedSha,
+});
 const [githubTarball, githubChecksum] = await Promise.all([
   fetchArtifact(release.tarball.browserDownloadUrl, "GitHub Release tarball"),
   fetchArtifact(release.checksum.browserDownloadUrl, "GitHub Release checksum"),

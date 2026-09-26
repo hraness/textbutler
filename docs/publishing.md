@@ -528,6 +528,22 @@ The first automated trusted-publisher version must be newer than the manual
 `v0.8.0` bootstrap coordinate, whether npm currently maps only `legacy` or both
 `legacy` and `latest` to `0.8.0`.
 
+The version commit also adds `## <version> - <date>` to the top of
+`CHANGELOG.md`, with a summary paragraph followed by one bullet per
+change. That section becomes the Release page. The page is titled
+`Textbutler v<version>`; its body is the summary, `## Changes`, and generated
+`## Install` and `## Verify` sections, and it ends with the identity record
+`<!-- Automated public release of @hraness/message-like-me@<version> from
+v<version>. -->`. The GitHub Release writer reads `CHANGELOG.md` at the
+verified commit and fails before creating the release when the section is
+missing, empty, or still says Unreleased. Every later admission reads the
+identity from the last `<!-- ` marker, requires the body to end with `-->`,
+and requires the notes above it to match the page rendered from its checkout's
+`CHANGELOG.md` byte for byte, so an edited page fails admission. Releases
+through `v0.8.21` were published with the title `Message Like Me v<version>`
+and the identity sentence as their whole body; admission still accepts that
+exact legacy page for those versions only.
+
 The tag-triggered Release workflow:
 
 1. checks out only the requested tag at depth one with tags and persisted

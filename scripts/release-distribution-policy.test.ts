@@ -1,15 +1,22 @@
 import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import {
   assertReleaseAssetBytes,
+  changelogSection,
   parseGitHubRelease,
   parseNpmRelease,
   releaseArchiveName,
+  releaseBody,
   releaseDistribution,
   releasePackageForName,
   releaseVersionForCurrentAdmission,
+  releaseTitle,
   rootReleasePackage,
+  splitReleaseBody,
 } from "./release-distribution-policy";
 
 const version = "0.8.1";
@@ -190,5 +197,133 @@ describe("public release distribution policy", () => {
       (bytes) => createHash("sha256").update(bytes).digest("hex"),
     )).not.toThrow();
     expect(() => parseGitHubRelease(release({ assets: [] }), version)).toThrow("exactly two");
+  });
+
+  test("renders the standard page from the changelog section and parses its identity", () => {
+    const next = "0.8.22";
+    const commit = "c".repeat(40);
+    const changelog = [
+      "# Changelog",
+      "",
+      "## Unreleased",
+      "",
+      "Nothing yet.",
+      "",
+      "- Pending.",
+      "",
+      `## ${next} - 2026-09-30`,
+      "",
+      "Replies now wait for the owner.",
+      "",
+      "- `replies pause` stops the loop.",
+      "- Paused contacts keep their queue.",
+      "",
+      "## 0.8.21 - 2026-09-24",
+      "",
+      "Older summary.",
+      "",
+      "- Older change.",
+      "",
+    ].join("\n");
+    const source = { changelog, commit };
+    const body = releaseBody(next, source);
+    expect(releaseTitle(next)).toBe(`Textbutler v${next}`);
+    expect(body.startsWith("Replies now wait for the owner.\n\n## Changes\n\n- `replies pause` stops the loop.\n- Paused contacts keep their queue.\n\n## Install\n")).toBe(true);
+    expect(body).toContain(`bun add --global https://github.com/hraness/textbutler/releases/download/v${next}/hraness-message-like-me-${next}.tgz`);
+    expect(body).toContain(`bun add --global @hraness/message-like-me@${next}`);
+    expect(body).toContain("\n## Verify\n");
+    expect(body).toContain(`https://github.com/hraness/textbutler/commit/${commit}`);
+    expect(body).toContain(`https://github.com/hraness/textbutler/blob/v${next}/docs/publishing.md#legacy-package-publication`);
+    expect(body).not.toContain("latest");
+    expect(body).not.toContain("Older");
+    expect(body.endsWith(
+      `\n\n<!-- Automated public release of @hraness/message-like-me@${next} from v${next}. -->`,
+    )).toBe(true);
+    expect(body.indexOf("## Changes")).toBeLessThan(body.indexOf("## Install"));
+    expect(body.indexOf("## Install")).toBeLessThan(body.indexOf("## Verify"));
+    const page = splitReleaseBody(body);
+    expect(page.identity).toBe(`Automated public release of @hraness/message-like-me@${next} from v${next}.`);
+    expect(`${page.notes}\n\n<!-- ${page.identity} -->`).toBe(body);
+
+    const standard = (overrides: Readonly<Record<string, unknown>> = {}) => ({
+      ...release(),
+      assets: release().assets.map((asset) => ({
+        ...asset,
+        browser_download_url: asset.browser_download_url.replaceAll(version, next),
+        name: asset.name.replaceAll(version, next),
+      })),
+      body,
+      name: `Textbutler v${next}`,
+      tag_name: `v${next}`,
+      ...overrides,
+    });
+    expect(() => parseGitHubRelease(standard(), next, source)).not.toThrow();
+    expect(() => parseGitHubRelease(standard(), next)).toThrow("changelog source");
+    expect(() => parseGitHubRelease(standard({ body: body.replace("stops the loop", "starts the loop") }), next, source))
+      .toThrow("differ from the rendered changelog");
+    expect(() => parseGitHubRelease(standard({ body: body.replace("Replies now", "<!-- x -->\n\nReplies now") }), next, source))
+      .toThrow("differ from the rendered changelog");
+    expect(() => parseGitHubRelease(standard({ body: `${body}\n` }), next, source)).toThrow("identity record");
+    expect(() => parseGitHubRelease(standard({ body: `${body}\n\n<!-- extra -->` }), next, source))
+      .toThrow("wrong identity record");
+    expect(() => parseGitHubRelease(standard({ body: body.replace("@0.8.22 from", "@0.8.23 from") }), next, source))
+      .toThrow("wrong identity record");
+    expect(() => parseGitHubRelease(standard({ name: `Message Like Me v${next}` }), next, source))
+      .toThrow("wrong title");
+    expect(() => parseGitHubRelease(standard(), next, { changelog, commit: "d".repeat(40) }))
+      .toThrow("differ from the rendered changelog");
+    expect(() => parseGitHubRelease(standard({
+      body: `Automated public release of @hraness/message-like-me@${next} from v${next}.`,
+      name: `Message Like Me v${next}`,
+    }), next, source)).toThrow();
+  });
+
+  test("keeps accepting the exact legacy page only for releases published before the standard", () => {
+    const legacyVersion = "0.8.21";
+    const legacy = {
+      ...release(),
+      assets: release().assets.map((asset) => ({
+        ...asset,
+        browser_download_url: asset.browser_download_url.replaceAll(version, legacyVersion),
+        name: asset.name.replaceAll(version, legacyVersion),
+      })),
+      body: `Automated public release of @hraness/message-like-me@${legacyVersion} from v${legacyVersion}.`,
+      name: `Message Like Me v${legacyVersion}`,
+      tag_name: `v${legacyVersion}`,
+    };
+    expect(() => parseGitHubRelease(legacy, legacyVersion)).not.toThrow();
+    expect(() => parseGitHubRelease({ ...legacy, name: `Textbutler v${legacyVersion}` }, legacyVersion)).toThrow();
+    expect(() => parseGitHubRelease({ ...legacy, body: `${legacy.body}\n` }, legacyVersion)).toThrow();
+  });
+
+  test("fails closed when the changelog section is missing, empty, malformed, or Unreleased", () => {
+    const section = (heading: string, body: string) => `# Changelog\n\n${heading}\n\n${body}\n\n## 0.1.0\n\nOld.\n\n- Old.\n`;
+    const good = "Summary.\n\n- Change.";
+    expect(changelogSection(section("## 0.9.0", good), "0.9.0")).toEqual({ changes: "- Change.", summary: "Summary." });
+    expect(changelogSection(section("## v0.9.0 - 2026-10-01", good), "0.9.0").summary).toBe("Summary.");
+    expect(() => changelogSection(section("## 0.9.1", good), "0.9.0")).toThrow("no section");
+    expect(() => changelogSection(section("## 0.9.00", good), "0.9.0")).toThrow("no section");
+    expect(() => changelogSection(section("## Unreleased", good), "0.9.0")).toThrow("no section");
+    expect(() => changelogSection(section("## 0.9.0", ""), "0.9.0")).toThrow("empty");
+    expect(() => changelogSection(section("## 0.9.0 - Unreleased", good), "0.9.0")).toThrow("Unreleased");
+    expect(() => changelogSection(section("## 0.9.0 (Unreleased)", good), "0.9.0")).toThrow("Unreleased");
+    expect(() => changelogSection(section("## 0.9.0", "Unreleased.\n\n- Change."), "0.9.0")).toThrow("Unreleased");
+    expect(() => changelogSection(section("## 0.9.0 (2026-10-01)", good), "0.9.0")).toThrow("optional");
+    expect(() => changelogSection(section("## 0.9.0", "- Only bullets."), "0.9.0")).toThrow("summary paragraph");
+    expect(() => changelogSection(section("## 0.9.0", "Only a summary."), "0.9.0")).toThrow("summary paragraph");
+    expect(() => changelogSection(section("## 0.9.0", "Summary.\n\n### Sub\n\n- Change."), "0.9.0")).toThrow("only a summary");
+    expect(() => changelogSection(section("## 0.9.0", "Summary <!-- x -->.\n\n- Change."), "0.9.0")).toThrow("only a summary");
+    expect(() => changelogSection(`${section("## 0.9.0", good)}\n## 0.9.0\n\n${good}\n`, "0.9.0")).toThrow("more than one");
+    expect(() => changelogSection("", "0.9.0")).toThrow("no section");
+  });
+
+  test("the repository changelog carries a renderable section for the current package version", () => {
+    const root = resolve(import.meta.dir, "..");
+    const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as { version: string };
+    const changelog = readFileSync(resolve(root, "CHANGELOG.md"), "utf8");
+    const body = releaseBody(manifest.version, { changelog, commit: "0".repeat(40) });
+    expect(splitReleaseBody(body).identity).toBe(
+      `Automated public release of @hraness/message-like-me@${manifest.version} from v${manifest.version}.`,
+    );
   });
 });
