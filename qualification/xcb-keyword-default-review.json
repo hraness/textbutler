@@ -1,0 +1,43 @@
+{
+ "version": 1,
+ "reviewer": {
+  "kind": "independent-ai-source-review",
+  "agent": "devin-cli-subagent/explore-review",
+  "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and diff read-only against the pinned base digests and produced only a review verdict. Source digests it could not hash itself were verified by the integrating agent with sha256 and are re-derived fail-closed by validateXcbIntegrationAdmission."
+ },
+ "sourceState": {
+  "branch": "devin/default-keyword-mode",
+  "baseCommit": "6621c49",
+  "headCommit": "devin/default-keyword-mode tip",
+  "identity": "Source digests identify the reviewed bytes; commits alone do not."
+ },
+ "scope": "Make keyword the shipped default response mode for newly created conversations across all messaging providers, keeping smart mode per-contact configurable. newContact() (packages/textbutler/src/config.ts) and DEFAULT_CONTACT_SETTINGS (packages/control/src/index.ts, the only bundled source changed) now seed mode \"keyword\" with keyword \"butler\"; enabled stays false so activation remains explicit. Smart-mode test fixtures that relied on the implicit default are made explicit (policy.test.ts, reply-loop.test.ts, runtime.test.ts); enrollment.test.ts expects the new default; a new policy.test.ts pin covers the keyword-absent ignore path; PRODUCT.md, packages/textbutler/README.md and docs/textbutler/architecture.md no longer claim a smart default. Existing persisted contacts are unaffected by the source change and were flipped separately through the owner control surface.",
+ "method": "Read-only repo-wide audit of every seed path (newContact/parseContact usages, control-service.ts:548/:785 production callers, initializeOwnerState, TUI/menubar/CLI/onboarding surfaces), decideReply keyword-mode semantics (decision.ts keywordPresent, owner-keyword invocation, keyword-absent ignore), all 39 newContact( test fixtures for silent mode drift, persistence/migration handling (parseContact requires explicit stored mode), regression surface (disclosure/enabled/provider/keyword/classifier/thresholds), and a docs sweep for stale default-mode claims. The control/index.ts bundled-source digest refresh was performed by the integrating agent (sha256); the admission validator re-derives every digest fail-closed at build and check time.",
+ "result": "Ship. Only two seed sites exist and both default to keyword with keyword \"butler\"; no other production path creates contacts, so the default now applies uniformly across iMessage, WhatsApp and Beeper. Keyword mode is enforced in code: decision.ts admits a reply only on a whole-word, case-insensitive keyword match and returns keyword-absent otherwise; owner-authored keyword invocations still reply. Persisted settings are insulated — parseContact requires an explicit stored mode and never defaults, so no migration is needed and existing contacts keep their modes until the owner changes them. Smart mode remains reachable via contacts mode CONTACT smart and is now explicitly pinned in the fixtures that exercise it.",
+ "findings": [
+  {
+   "severity": "note",
+   "status": "resolved",
+   "file": "qualification/xcb-textbutler-v1.json",
+   "finding": "Refreshing the bundled-source digest bound the receipt to validation evidence generated over pre-change bytes.",
+   "recommendation": "Re-run bun run check, regenerate the validation record and check log, and update validation.receiptSha256.",
+   "resolution": "Done: a clean bun run check over the final tree regenerated xcb-textbutler-v1-current-check.log and xcb-textbutler-v1-current-validation.json (new sourceSha256 and sourceDigest), and validation.receiptSha256 binds the new evidence."
+  },
+  {
+   "severity": "note",
+   "status": "resolved",
+   "file": "PRODUCT.md:35, packages/textbutler/README.md:32",
+   "finding": "Two canonical docs still described smart as the default mode after activation / in config.ts defaults.",
+   "recommendation": "Update both to the keyword default.",
+   "resolution": "Fixed: \"keyword response is the default mode after activation\" and \"keyword-mode defaults\"."
+  },
+  {
+   "severity": "note",
+   "status": "accepted",
+   "file": "packages/textbutler/src/config.ts",
+   "finding": "newContact() still seeds enabled:false, so the keyword default only takes effect when the owner activates the contact; it does not auto-enable conversations.",
+   "recommendation": "Keep explicit activation; this is the requested semantics (default mode, not default activation).",
+   "resolution": "Accepted; owner-controlled activation is preserved by design."
+  }
+ ]
+}

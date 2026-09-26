@@ -32,7 +32,7 @@ developers building on xcb's native application API.
 
 ## Operating Context
 
-The Mac must be awake and signed in for local messaging. Quitting the menu companion leaves the separately installed user agent running. A global pause is always available. Contacts are selected explicitly; smart response is the default mode after activation. The keyword defaults to `butler`. The three disclosure fields default to `🤖`, `{`, and `}` and produce `🤖{ hello this is my response }`. Each field may be cleared individually or together; cleared fields remove the visible wrap while the daemon still attributes butler output through its send journal.
+The Mac must be awake and signed in for local messaging. Quitting the menu companion leaves the separately installed user agent running. A global pause is always available. Contacts are selected explicitly; keyword response is the default mode after activation. The keyword defaults to `butler`. The three disclosure fields default to `🤖`, `{`, and `}` and produce `🤖{ hello this is my response }`. Each field may be cleared individually or together; cleared fields remove the visible wrap while the daemon still attributes butler output through its send journal.
 
 ## Capabilities and Constraints
 

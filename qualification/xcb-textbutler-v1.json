@@ -13,7 +13,7 @@
     }
   },
   "sources": {
-    "packages/control/src/index.ts": "fc1b72eb57f26137a1cc7387e7b5a879aa0682c8acb6c916ce3f4598dd5d010d",
+    "packages/control/src/index.ts": "614f56a989dabf8f212449493399bc355ddfd812e22148bfa91cd103b553d058",
     "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
     "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
     "packages/textbutler/src/xcb-host.ts": "27395d6bb942dfb297ceb852c097bfa62263d893c94e273d2fb217bda853120b",
@@ -59,6 +59,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "e9b81e1d2188b86f951cacfa1ad28ad2bc2466e86651364301d7f1bf671d5afb"
+    "receiptSha256": "873fe811d6f65dfe5b5063d00176a5cb794f27cf9d9d5c2893e4e4e7c3c8c1aa"
   }
 }

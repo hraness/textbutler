@@ -29,7 +29,7 @@ The menu companion uses the shared Rust runner; no local Rust build is needed.
 
 ## Modules
 
-- `config.ts`: strict contact settings, smart-mode defaults, activation limits,
+- `config.ts`: strict contact settings, keyword-mode defaults, activation limits,
   and the `🤖{ … }` disclosure formatter.
 - `decision.ts`: keyword matching, debounce, owner cooldown, stale-state
   rejection, rate limits, and classifier admission.

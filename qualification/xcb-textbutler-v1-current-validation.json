@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the owner-approved repository-access change and the smart-mode explicit-ask classifier fix: the respond-phase instruction, the model-context rules contract, the standalone CLASSIFIER_INSTRUCTIONS and the default plan guidance now require an explicit question, task request or direct address before any reply, treat bare shared links, documents, media and forwarded content without an explicit ask as context that wants no reply, keep share-inferred intent below the 0.85 reply threshold, and carry regression pins on all four decision surfaces. contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface, and the fast gateway driver now tolerates a stray proposed action beside a tool request and salvages a schema-valid tool nested inside the actions array (bare tool object or {tool:{...}} wrapper), while malformed tool-shaped entries remain actions and fail closed; the two-step tool budget still fails closed. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone isolation/build and chained TypeScript checks.",
+  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the keyword-default-mode change: newContact() and DEFAULT_CONTACT_SETTINGS now seed response mode \"keyword\" with keyword \"butler\" for newly created conversations across every messaging provider, smart mode remains a per-contact option, persisted contacts are unaffected (parseContact requires an explicit stored mode and never defaults), and enabled still seeds false so activation stays owner-explicit. This follows the smart-mode explicit-ask classifier fix: the respond-phase instruction, the model-context rules contract, the standalone CLASSIFIER_INSTRUCTIONS and the default plan guidance now require an explicit question, task request or direct address before any reply, treat bare shared links, documents, media and forwarded content without an explicit ask as context that wants no reply, keep share-inferred intent below the 0.85 reply threshold, and carry regression pins on all four decision surfaces. contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface, and the fast gateway driver now tolerates a stray proposed action beside a tool request and salvages a schema-valid tool nested inside the actions array (bare tool object or {tool:{...}} wrapper), while malformed tool-shaped entries remain actions and fail closed; the two-step tool budget still fails closed. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone isolation/build and chained TypeScript checks.",
   "toolchain": "Bun 1.3.14",
   "command": "bun run check",
   "result": {
     "exitCode": 0,
-    "passed": 1123,
+    "passed": 1124,
     "failed": 0,
-    "assertions": 13574,
+    "assertions": 13577,
     "files": 106
   },
   "invocations": [
@@ -26,9 +26,9 @@
         "command": "bun test packages",
         "result": {
           "exitCode": 0,
-          "passed": 642,
+          "passed": 643,
           "failed": 0,
-          "assertions": 5540,
+          "assertions": 5543,
           "files": 52
         }
       },
@@ -36,9 +36,9 @@
     }
   ],
   "sourceInventoryCount": 43,
-  "sourceDigest": "e935a075cd39dabdef5feecc58d2e4688b25dd87e92b44ddcccc357480a4f761",
+  "sourceDigest": "4fe35bd78a364043bc9eee26efd93c1af20145104e0fcb8af36e4fdb64ae49eb",
   "sourceSha256": {
-    "packages/control/src/index.ts": "fc1b72eb57f26137a1cc7387e7b5a879aa0682c8acb6c916ce3f4598dd5d010d",
+    "packages/control/src/index.ts": "614f56a989dabf8f212449493399bc355ddfd812e22148bfa91cd103b553d058",
     "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
     "packages/transport/src/automation-diagnostics.ts": "c3ae9b6f666a73887b53d276095ca02e0ca99b2cb19832150337fee441cbf535",
     "packages/textbutler/src/xcb-host.ts": "27395d6bb942dfb297ceb852c097bfa62263d893c94e273d2fb217bda853120b",
@@ -83,16 +83,16 @@
     "bun.lock": "d7275c271129b75f91181da97a3af8450127f7b1d1e0d1c8000b1e829f0be216"
   },
   "review": {
-    "artifact": "qualification/xcb-classifier-silence-review.json",
-    "sha256": "265dbf080e82d45f77fd77f581dca55b9d3597decc72e871a8cb6ff1e6d44153",
+    "artifact": "qualification/xcb-keyword-default-review.json",
+    "sha256": "aaae27800aceff667ee61062301701b642ad55f07fae78b4aca2c15c8c8f62d6",
     "kind": "independent-ai-source-review",
-    "result": "Ship. Threshold enforcement is code, not prose: respond=true below 0.85 is ignored and stripped of actions/tool, classify runs tool-less, and the explicit-ask rules live in non-evolvable host text. All four decision surfaces carry regression pins; no schema, identity, routing or permission text changed. Notes: rules-vs-program share wording divergence accepted (silence-favoring), threshold wording corrected to 'at or above 0.85', pre-existing dead export tracked separately."
+    "result": "Ship. Only two seed sites exist and both default to keyword with keyword \"butler\"; no other production path creates contacts, so the default now applies uniformly across iMessage, WhatsApp and Beeper. Keyword mode is enforced in code: decision.ts admits a reply only on a whole-word, case-insensitive keyword match and returns keyword-absent otherwise; owner-authored keyword invocations still reply. Persisted settings are insulated \u2014 parseContact requires an explicit stored mode and never defaults, so no migration is needed and existing contacts keep their modes until the owner changes them. Smart mode remains reachable via contacts mode CONTACT smart and is now explicitly pinned in the fixtures that exercise it."
   },
   "log": {
     "path": "qualification/xcb-textbutler-v1-current-check.log",
-    "bytes": 135542,
-    "sha256": "c48b736b72ed8f5c747fbf25cc31497eddc2d538bc36bf492730b25a6fdcea34",
-    "note": "Complete successful bun run check output for the smart-mode explicit-ask classifier branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
+    "bytes": 135763,
+    "sha256": "8db63e767ff2b1325da6f7b442445d45f3e4ec497f770cfa822696f6bb2606f4",
+    "note": "Complete successful bun run check output for the keyword-default-mode branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",
