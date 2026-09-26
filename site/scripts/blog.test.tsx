@@ -103,9 +103,13 @@ describe('blog admission records', () => {
     }
   });
 
-  test('keeps the integration posts without a registered relation out of indexes', () => {
-    expect(indexableBlogPosts().map(blogPostPath)).toEqual(['/blog/introducing-textbutler']);
-    for (const slug of ['how-textbutler-uses-xcb', 'how-textbutler-uses-algal', 'how-textbutler-uses-ghostget']) {
+  test('keeps the integration post without a covering relation out of indexes', () => {
+    expect(indexableBlogPosts().map(blogPostPath)).toEqual([
+      '/blog/introducing-textbutler',
+      '/blog/how-textbutler-uses-xcb',
+      '/blog/how-textbutler-uses-algal',
+    ]);
+    for (const slug of ['how-textbutler-uses-ghostget']) {
       const post = BLOG_POSTS.find((candidate) => candidate.slug === slug);
       expect(post, slug).toBeDefined();
       if (post !== undefined) expect(admissionFor(post).lifecycle, slug).toBe('quarantined');
