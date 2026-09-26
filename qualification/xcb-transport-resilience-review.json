@@ -1,0 +1,36 @@
+{
+  "kind": "independent-ai-source-review",
+  "scope": "Automation transport resilience: liveness-probe watchdog replacing request-timeout-equals-dead-child, bounded client read/mutation lanes beside priority work, caller-abort release with late-response frame matching, provider intent-ledger arbitration of refused submits (dispatch-failed), reply-loop auto-reconcile from positive run evidence, extended plan/run/event windows, and journaled intake drops.",
+  "rounds": [
+    {
+      "round": 1,
+      "design": "Kill the child when any invoke exceeds the request watchdog; serialize all non-priority invokes behind one chain; treat every submit failure as indeterminate; drop intake ignores silently; 120s plan/run/event budgets.",
+      "verdict": "blockers",
+      "blockers": [
+        "A saturated serialized lane makes every invoke exceed 180s: the watchdog then kills a healthy child, the respawn re-verifies pins under load, dies the same way, and the connector never converges — observed as a live respawn loop on the owner host.",
+        "Submit failure -> indeterminate with no arbitration surface: a response lost after the server refused the dispatch could never be distinguished from a real in-flight send, so contacts wedged until manual reconcile.",
+        "Stale drops at intake left no journal record, and the 120s event window silently discarded every inbound the slow lane surfaced late."
+      ]
+    },
+    {
+      "round": 2,
+      "design": "Stall triggers a priority-lane cancel probe (probe:watchdog); any protocol response re-arms the invoke and only probe silence stops the child; invoke hard cap releases unresolved ops while keeping wire entries for late responses; read/mutation lanes with bounded waiters beside the priority path; run.by-intent arbitrates refused submits; reconcile settles only on terminal provider evidence; intake drops journal under a namespaced drop:<eventId>.",
+      "verdict": "blockers-fixed",
+      "blockers": [
+        "Wiring caller-signal release into submit would discard the authoritative late response the client deliberately retains custody of — fixed by exempting submit from abort-release while keeping its pre-dispatch abort check.",
+        "Client read-lane methods (events, enrollments, status, run, grant lookups) outpaced the server's scoped-admission list and would collide on normalBusy -> not-ready under concurrency — fixed by aligning the server scoped set.",
+        "runByIntent called through .catch on a fixture or older client without the method throws synchronously before catch attaches — fixed by wrapping invocation in Promise.resolve().then().",
+        "ackReceipt.value dereferenced after a failed receipt — fixed by gating all access on ackReceipt.ok and mapping only dispatch-failed to a provable skip.",
+        "Initial wakeLane order let a sustained read flood cut ahead of a queued submit — fixed by claiming freed wire slots for mutation waiters first."
+      ],
+      "acceptedNits": [
+        "Probe uses cancel with a reserved plan id: unknown-plan cancel returns a result or bounded remote error, both prove liveness; a child answering probes but never the invoke is abandoned only at the 15-minute hard cap.",
+        "Abandoned wire entries stay in pending until the response so frame matching cannot fault; they are bounded because a child that never answers eventually trips the probe watchdog or exits.",
+        "dispatch-failed is issued only on provider-stage refusal with a proven-absent intent row — a response lost after commit still finds the terminal or started row and stays indeterminate.",
+        "Intake drop journaling uses drop:<eventId> under the UNIQUE(contactId,eventId) claim so it can never collide with or replay the original event."
+      ],
+      "verification": "655 textbutler+transport tests green including new stall/probe, lane, abort-matching, disambiguation, reconcile and stale-window coverage; ghostget server tests green for run.by-intent and scoped reads (pre-existing bound-state-helper spawn failures reproduce identically on clean HEAD under host load); typecheck clean on both trees."
+    }
+  ],
+  "result": "Ship. A slow lane no longer reads as a dead child, reads proceed beside held sends, provable non-sends fail clean instead of wedging contacts, auto-reconcile settles only on positive provider evidence, and pipeline-trouble intake drops are journaled instead of silent."
+}
