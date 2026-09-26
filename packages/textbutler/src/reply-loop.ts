@@ -187,7 +187,9 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
         }
         if (reply.state === "failed") { journal.reconcile(run.id, "failed", "reconciled: provider recorded the send failed", now()); continue; }
       }
-      if (run.reason !== "ack-dispatch-unknown") continue;
+      // Ack arbitration needs the reply row provably absent: an unreadable
+      // or nonterminal reply row stays blocked rather than claim non-send.
+      if (run.reason !== "ack-dispatch-unknown" || reply !== null) continue;
       const ack = await byIntent(`${run.id}:ack`);
       if (ack === undefined || ack === null || ack.enrollmentId !== state.binding.enrollmentId) continue;
       if (ack.state === "accepted") {
