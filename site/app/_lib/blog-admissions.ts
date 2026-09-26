@@ -68,16 +68,14 @@ export const BLOG_ADMISSIONS = [
     ],
   },
   {
-    // Quarantined: runtime:message-like-me:xcb:drafts-replies-through is not a
-    // registered portfolio relation in @hraness/design-kit v0.17.0, and a
-    // "How X uses Y" post needs one. Index it only after the relation and its
-    // detail sentence ship in the portfolio facts.
+    // runtime:message-like-me:xcb:drafts-replies-through is registered in the
+    // portfolio facts since @hraness/design-kit v0.18.2.
     href: '/blog/how-textbutler-uses-xcb',
-    lifecycle: 'quarantined',
+    lifecycle: 'indexable',
     readerJob: 'Decide whether to connect an existing Claude Code or Codex subscription to Textbutler through xcb, and know what each side holds before setting it up.',
     nonObviousAnswer: 'xcb holds the login and runs a tool-free model; Textbutler pins the xcb executable by SHA-256, sends prompts on stdin, rejects replies whose account, model or JSON keys do not match, and carries out every contact action itself. A failed subscription call waits and never falls through to the billed Claude API.',
     originalContribution: 'Traces the xcb call path from Textbutler source: hash pin, stdin prompt, duplicate-key rejection, step limits, and the separate API route.',
-    hostFit: 'A "How Textbutler uses xcb" post on the consumer host. The relation is not yet registered in the portfolio facts, so the post stays out of indexes.',
+    hostFit: 'A "How Textbutler uses xcb" post on the consumer host. The registered runtime:message-like-me:xcb:drafts-replies-through relation carries the detail sentence this post explains.',
     nearestUrls: [
       { url: 'https://xcb.sh/blog/introducing-xcb', distinction: 'The xcb introduction covers xcb itself; this post covers only how Textbutler calls it.' },
       { url: 'https://textbutler.app/blog/introducing-textbutler', distinction: 'The introduction mentions xcb in one paragraph and links here for the details.' },
@@ -118,14 +116,14 @@ export const BLOG_ADMISSIONS = [
     ],
   },
   {
-    // Quarantined: runtime:message-like-me:algal:runs-reply-habitats-on is not
-    // a registered portfolio relation in @hraness/design-kit v0.17.0.
+    // runtime:message-like-me:algal:runs-reply-habitats-on is registered in the
+    // portfolio facts since @hraness/design-kit v0.18.2.
     href: '/blog/how-textbutler-uses-algal',
-    lifecycle: 'quarantined',
+    lifecycle: 'indexable',
     readerJob: 'Decide whether to turn on Textbutler\'s per-contact habitats, and know what the learning can change, what it cannot, and how to undo it.',
     nonObviousAnswer: 'The plan schema has no field for recipient, provider, permissions or disclosure, so no learned plan can express a change to them; a candidate plan wins only if a blinded judge marks it safe on both replayed cases, scores it no lower on either, and finds an average gain of at least 0.1, and replays run no tools, so tool choice is never measured.',
     originalContribution: 'Lays out the habitat plan schema, run limits, and promotion rule from Textbutler source, and states what the replay does not measure.',
-    hostFit: 'A "How Textbutler uses ALGAL" post on the consumer host. The relation is not yet registered in the portfolio facts, so the post stays out of indexes.',
+    hostFit: 'A "How Textbutler uses ALGAL" post on the consumer host. The registered runtime:message-like-me:algal:runs-reply-habitats-on relation carries the detail sentence this post explains.',
     nearestUrls: [
       { url: 'https://algal.computer/blog/built-on-algal/', distinction: 'The ALGAL hub lists every product built on it; this post explains Textbutler\'s use only.' },
       { url: 'https://textbutler.app/blog/introducing-textbutler', distinction: 'The introduction describes habitats as the product direction and links here for how they run.' },
