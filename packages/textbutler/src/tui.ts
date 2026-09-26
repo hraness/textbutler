@@ -7,7 +7,8 @@ import { requestDaemon } from "./daemon.ts";
 import { loadHostConfig } from "./host-config.ts";
 import { disclose } from "./config.ts";
 import { runSetup } from "./onboarding.ts";
-import { CliUsageError } from "./cli-style.ts";
+import { CliUsageError, symbolsFor } from "./cli-style.ts";
+import { describeControlResult, describeMenuBarResult, describeServiceInstall } from "./tui-results.ts";
 import { awaitOwnerJob, handleOwnerCommand, OwnerCliError, type OwnerControlClient } from "./owner-cli.ts";
 
 export interface TerminalSession {
@@ -66,11 +67,8 @@ async function pick<T>(io: TerminalSession, title: string, values: readonly T[],
     } else filtered = values.filter(item => label(item).toLowerCase().includes(value.trim().toLowerCase()));
   }
 }
-function printResponse(io: TerminalSession, response: ControlResponse): void {
-  if (!response.ok) { io.write(`${terminalText(response.message)}\n`); return; }
-  if (response.kind === "job") { io.write(`Still pending: ${response.jobId}. Use textbutler jobs show ${response.jobId}. Do not repeat this operation.\n`); return; }
-  if (response.kind === "snapshot") { io.write("Settings updated.\n"); return; }
-  io.write(`${terminalText(JSON.stringify(response, null, 2))}\n`);
+function printResponse(io: TerminalSession, response: ControlResponse, done = "Settings updated."): void {
+  io.write(`${terminalText(describeControlResult(response, symbolsFor(), done))}\n`);
 }
 
 /** A thin owner client, following XCB's separation between interaction and
@@ -83,8 +81,8 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
     const response = await client({ protocol: CONTROL_PROTOCOL, command: "snapshot" }).catch(() => null);
     return response?.ok && response.kind === "snapshot" ? response.snapshot : null;
   };
-  const owner = async (args: readonly string[]): Promise<void> => {
-    await handleOwnerCommand(args, { request: client, print: value => io.write(`${terminalText(JSON.stringify(value, null, 2))}\n`) });
+  const owner = async (args: readonly string[], done: string): Promise<void> => {
+    await handleOwnerCommand(args, { request: client, print: value => io.write(`${terminalText(describeControlResult(value, symbolsFor(), done))}\n`) });
   };
   while (true) {
     const snapshot = await current();
@@ -100,7 +98,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
           io.write("Next choose Connect messaging apps (2). After saving your connections, return here to start the background service.\n");
         } else if (!snapshot && (await io.ask("Start the background service at login? [y/N]: "))?.trim().toLowerCase() === "y") {
           const result = await lifecycle().install(dataDir);
-          io.write(`${terminalText(JSON.stringify(result, null, 2))}\n`);
+          io.write(`${terminalText(describeServiceInstall(result, symbolsFor()))}\n`);
         }
         continue;
       }
@@ -137,7 +135,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
         if (history === null) continue;
         const confirmed = await io.ask(`Add ${terminalLabel(candidate.name)} with automatic replies OFF? [y/N]: `);
         if (confirmed?.trim().toLowerCase() !== "y") continue;
-        await owner(["contacts", "add", candidate.id, ...(history.trim().toLowerCase() === "y" ? ["--history"] : [])]);
+        await owner(["contacts", "add", candidate.id, ...(history.trim().toLowerCase() === "y" ? ["--history"] : [])], `Added ${terminalLabel(candidate.name)}. Automatic replies are off.`);
       } else if (choice.trim() === "4") {
         const response = await job({ protocol: CONTROL_PROTOCOL, command: "replies.scan" });
         if (!response.ok || response.kind !== "replies") { printResponse(io, response); continue; }
@@ -173,22 +171,22 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
         const action = await io.ask("[a] Choose agent  [e] Enable automatic replies  [d] Disable  [k] Keyword mode  [Enter] Back: ");
         if (action?.trim() === "a") {
           const account = await pick(io, "Choose an agent account", snapshot!.providerAccounts ?? [], value => `${value.label} · ${value.status}\n     ${value.detail}`);
-          if (account) await owner(["contacts", "account", contact.id, account.id]);
-        } else if (action?.trim() === "d") await owner(["contacts", "disable", contact.id]);
+          if (account) await owner(["contacts", "account", contact.id, account.id], `${terminalLabel(contact.name)} now uses ${terminalLabel(account.label)}.`);
+        } else if (action?.trim() === "d") await owner(["contacts", "disable", contact.id], `Automatic replies are off for ${terminalLabel(contact.name)}.`);
         else if (action?.trim() === "e") {
-          if ((await io.ask(`Allow automatic replies to ${terminalLabel(contact.name)} when unpaused? [y/N]: `))?.trim().toLowerCase() === "y") await owner(["contacts", "enable", contact.id]);
+          if ((await io.ask(`Allow automatic replies to ${terminalLabel(contact.name)} when unpaused? [y/N]: `))?.trim().toLowerCase() === "y") await owner(["contacts", "enable", contact.id], `Automatic replies are on for ${terminalLabel(contact.name)} whenever Textbutler isn't paused.`);
         } else if (action?.trim() === "k") {
           const keyword = await io.ask("Keyword (Enter keeps butler): ");
-          if (keyword !== null) await owner(["contacts", "mode", contact.id, "keyword", "--keyword", keyword.trim() || "butler"]);
+          if (keyword !== null) await owner(["contacts", "mode", contact.id, "keyword", "--keyword", keyword.trim() || "butler"], `Keyword mode is on for ${terminalLabel(contact.name)} (keyword: ${terminalLabel(keyword.trim() || "butler")}).`);
         }
-      } else if (choice.trim() === "6") await owner(["pause"]);
+      } else if (choice.trim() === "6") await owner(["pause"], "Automatic replies are paused.");
       else if (choice.trim() === "7") {
-        if ((await io.ask("Resume automatic replies for enabled contacts? [y/N]: "))?.trim().toLowerCase() === "y") await owner(["resume"]);
+        if ((await io.ask("Resume automatic replies for enabled contacts? [y/N]: "))?.trim().toLowerCase() === "y") await owner(["resume"], "Automatic replies resumed for contacts that have them on.");
       } else if (choice.trim() === "8") {
         const action = await io.ask("[s] Start menu  [l] Start menu at login  [x] Stop menu  [Enter] Back: ");
         const command = action === "s" ? "start" : action === "l" ? "install" : action === "x" ? "stop" : null;
         if (command) await runMenuBarCommand([command], dataDir, entrypoint,
-          result => io.write(`${terminalText(JSON.stringify(result, null, 2))}\n`));
+          result => io.write(`${terminalText(describeMenuBarResult(command, result, symbolsFor()))}\n`));
       } else io.write("Choose a number from 1 to 8, or q to quit.\n");
     } catch (error) {
       if (error instanceof OwnerCliError) { io.write(`${terminalText(error.message)}\n`); continue; }

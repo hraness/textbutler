@@ -1,0 +1,33 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`control results read as one plain line, never JSON 1`] = `
+{
+  "enrolled": "✓ Added Alex spoof. Automatic replies are off. Imported 42 recent messages as context (3 skipped).",
+  "enrolled without history": "✓ Added the contact. Automatic replies are off.",
+  "pending": "↻ Still waiting for a result. Check it with textbutler jobs show job-1. Don't repeat this action: it may already have taken effect.",
+  "pending (owner output)": "↻ Still waiting for a result. Check it with textbutler jobs show job-2. Don't repeat this action: it may already have taken effect.",
+  "refused": "✗ Settings changed. Review them and try again.",
+  "reply failed": "✗ Messages rejected the reply.",
+  "reply sent": "✓ Sent to Alex.",
+  "reply uncertain": "⚠ Messages didn't confirm the send. Don't send it again; check the chat first.",
+  "settings changed": "✓ Automatic replies are paused.",
+}
+`;
+
+exports[`service and menu bar results 1`] = `
+{
+  "already": "✓ The Textbutler menu is already running.",
+  "conflict": 
+"⚠ Another background service uses this name. Nothing was changed.
+→ textbutler doctor"
+,
+  "installed": "✓ The background service starts at login and is running.",
+  "login": "✓ The Textbutler menu will start when you log in.",
+  "not started": 
+"✗ The Textbutler menu didn't start.
+→ textbutler doctor"
+,
+  "started": "✓ The Textbutler menu is running.",
+  "stopped": "OK The Textbutler menu stopped.",
+}
+`;
