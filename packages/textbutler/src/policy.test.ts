@@ -3,14 +3,14 @@ import { configureContact, DEFAULT_ACTIVE_LIMIT, disclose, disclosedText, disclo
 import { CLASSIFIER_INSTRUCTIONS, decideReply, keywordPresent, type ConversationState, type MessageEvent } from "./decision.ts";
 
 const now = 1_800_000_000_000;
-const contact = { ...newContact("c1", "Example", "r1"), enabled: true };
+const contact = { ...newContact("c1", "Example", "r1"), enabled: true, mode: "smart" as const };
 const settings = parseSettings({ schemaVersion: 1, paused: false, maxActiveContacts: DEFAULT_ACTIVE_LIMIT, contacts: [contact] });
 const event: MessageEvent = { id: "m1", contactId: "c1", routeId: "r1", revision: "v1", occurredAt: now - 10_000, observedAt: now - 10_000, author: "contact", kind: "message", text: "Butler, can you help?", historical: false, group: false };
 const state: ConversationState = { latestRevision: "v1", lastOwnerAt: null, ownerTyping: false, synchronizedAt: now, repliesInLastHour: 0 };
 
 describe("contact settings", () => {
-  test("default smart mode, explicit activation, and atomic cap", () => {
-    expect(newContact("x", "Example", "rx")).toMatchObject({ enabled: false, mode: "smart", keyword: "butler" });
+  test("default keyword mode, explicit activation, and atomic cap", () => {
+    expect(newContact("x", "Example", "rx")).toMatchObject({ enabled: false, mode: "keyword", keyword: "butler" });
     const full = parseSettings({ ...settings, maxActiveContacts: 1, contacts: [contact, newContact("c2", "Second", "r2")] });
     expect(() => configureContact(full, "c2", { enabled: true })).toThrow("limit");
     expect(full.contacts[1]?.enabled).toBe(false);
@@ -62,6 +62,12 @@ describe("reply admission", () => {
     // A newer owner message is a takeover and still ends the invocation.
     expect(decideReply(settings, contact, invoke, { ...state, lastOwnerAt: event.occurredAt + 1000 }, now).reason).toBe("owner-active");
     expect(decideReply(settings, contact, { ...invoke, kind: "reaction" as const }, state, now).outcome).toBe("ignore");
+  });
+  test("keyword mode ignores every ordinary message without the trigger word", () => {
+    const keyed = { ...contact, mode: "keyword" as const };
+    expect(decideReply(settings, keyed, { ...event, text: "Can you find a recipe?" }, state, now).outcome).toBe("ignore");
+    expect(decideReply(settings, keyed, { ...event, text: "https://docs.google.com/document/d/abc" }, state, now).outcome).toBe("ignore");
+    expect(decideReply(settings, keyed, event, state, now).outcome).toBe("reply");
   });
   test("debounce, stale sync, rate cap, and smart classifier are separate gates", () => {
     expect(decideReply(settings, contact, { ...event, observedAt: now - 100 }, state, now).reason).toBe("collecting-messages");

@@ -129,13 +129,17 @@ test("a habitat change preserves a send that has already entered dispatch", asyn
   expect(f.sent).toHaveLength(1); expect(f.journal.recent("contact-1")[0]?.state).toBe("submitted");
 });
 test("smart mode classifies once and disabling prevents subsequent turns", async () => {
-  const f = await fixture(); await f.loop.tick(); f.add("Could you find a useful explanation?"); await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
+  const f = await fixture();
+  f.change({ ...f.settings(), contacts: f.settings().contacts.map(contact => ({ ...contact, mode: "smart" as const })) });
+  await f.loop.tick(); f.add("Could you find a useful explanation?"); await f.loop.tick(); f.advance(9000); await f.loop.tick(); await f.loop.idle();
   expect(f.stats().classifications).toBe(1); expect(f.sent).toHaveLength(1);
   f.change({ ...f.settings(), contacts: f.settings().contacts.map(contact => ({ ...contact, enabled: false, revision: contact.revision + 1 })) });
   f.add("butler answer again"); f.advance(9000); await f.loop.tick(); await f.loop.idle(); expect(f.sent).toHaveLength(1);
 });
 test("the optional habitat driver replies after its short debounce with one inference and records follow-ups", async () => {
-  const f = await fixture(true); await f.loop.tick();
+  const f = await fixture(true);
+  f.change({ ...f.settings(), contacts: f.settings().contacts.map(contact => ({ ...contact, mode: "smart" as const })) });
+  await f.loop.tick();
   f.add("Could you explain this?"); await f.loop.tick(); f.advance(1100); await f.loop.tick(); await f.loop.idle();
   expect(f.sent).toHaveLength(1); expect(f.stats().compositions).toBe(1);
   const habitat = new ContactHabitat(f.journal, "contact-1");

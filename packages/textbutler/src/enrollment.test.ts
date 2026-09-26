@@ -30,7 +30,7 @@ describe("owner enrollment", () => {
     const id = await candidate(service);
     expect(calls).toEqual(["list"]);
     const result = await finish(service, await service.request({ protocol, command: "contact.enroll", candidateId: id, expectedRevision: 1, initializeHistory: true }));
-    expect(result).toMatchObject({ ok: true, kind: "enrolled", historyCount: 1, historyOmittedCount: 0, historyShortenedCount: 0, historyInitialized: true, snapshot: { settings: { paused: true }, contacts: [{ settings: { enabled: false, responseMode: "smart", keyword: "butler" } }] } });
+    expect(result).toMatchObject({ ok: true, kind: "enrolled", historyCount: 1, historyOmittedCount: 0, historyShortenedCount: 0, historyInitialized: true, snapshot: { settings: { paused: true }, contacts: [{ settings: { enabled: false, responseMode: "keyword", keyword: "butler" } }] } });
     if (!result.ok || result.kind !== "enrolled") throw new Error("No enrolled contact");
     const state = JSON.parse(await readFile(join(dataDir, "state/settings.json"), "utf8"));
     expect(state.bindings[result.contactId]).toEqual(conversation.binding);

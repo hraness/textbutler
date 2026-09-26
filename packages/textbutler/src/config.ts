@@ -110,7 +110,7 @@ export function repoName(url: string): string | null {
   return /^[\w][\w.-]{0,79}$/u.test(base) ? base : null;
 }
 export function newContact(id: string, label: string, routeId: string): ContactSettings {
-  return parseContact({ id, label, routeId, enabled: false, selfChat: false, mode: "smart", keyword: "butler", provider: "codex", accountId: "default", replyModel: null, classifierModel: null, disclosure: DEFAULT_DISCLOSURE, revision: 1, pausedUntil: 0, humanCooldownMs: 300_000, debounceMs: 8_000, maxRepliesPerHour: 12, repos: [] });
+  return parseContact({ id, label, routeId, enabled: false, selfChat: false, mode: "keyword", keyword: "butler", provider: "codex", accountId: "default", replyModel: null, classifierModel: null, disclosure: DEFAULT_DISCLOSURE, revision: 1, pausedUntil: 0, humanCooldownMs: 300_000, debounceMs: 8_000, maxRepliesPerHour: 12, repos: [] });
 }
 export function parseContact(value: unknown): ContactSettings {
   const input = record(value);

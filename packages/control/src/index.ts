@@ -146,7 +146,7 @@ export type ControlResponse =
 export interface DesktopControlPort { request(request: ControlRequest): Promise<ControlResponse> }
 
 export const DEFAULT_CONTACT_SETTINGS: ContactSettings = {
-  enabled: false, responseMode: "smart", keyword: "butler", provider: "codex",
+  enabled: false, responseMode: "keyword", keyword: "butler", provider: "codex",
   disclosure: { character: "🤖", begin: "{", end: "}" },
 };
 export function disclosurePreview(settings: ContactSettings, text = "Hello, this is my response."): string {
