@@ -24,13 +24,19 @@ async function privateJson(path: string): Promise<{ presence: Presence; value?: 
   } catch { return { presence: "unreadable" }; }
 }
 
+/** A path the owner can paste into a shell. The default data folder,
+ * ~/Library/Application Support/Textbutler, contains a space. */
+export function shellWord(value: string): string {
+  return /^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 /** Returns undefined when iMessage isn't set up or this isn't a Mac. */
 export async function macosAccessStep(input: { dataDir: string; imessageConfigured: boolean; platform?: string }): Promise<PermissionStep | undefined> {
   if (!input.imessageConfigured || (input.platform ?? process.platform) !== "darwin") return undefined;
   const state = join(input.dataDir, "state");
   const step = (status: PermissionStep["status"], detail: string, extra: Partial<Pick<PermissionStep, "command" | "settingsUrl">> = {}): PermissionStep =>
     ({ id: "macos-access", title: TITLE, status, detail, ...extra });
-  const setup = `bun run textbutler:app imessage-setup --data-dir ${input.dataDir}`;
+  const setup = `bun run textbutler:app imessage-setup --data-dir ${shellWord(input.dataDir)}`;
   const app = await privateJson(join(state, "macos-app.json"));
   if (app.presence === "absent") return step("action-needed",
     `iMessage works through the Textbutler app on this Mac. Install it, then turn on Textbutler in ${FDA}.`,

@@ -6,7 +6,7 @@ import { discoveryFailureDetail } from "./automation-owner.ts";
 import { symbolsFor } from "./cli-style.ts";
 import { formatNotice, formatRecovery, MESSAGES_AUTOMATION, MESSAGES_FDA, recoverySentence, renderPrePrompt, SETTINGS_URLS, settingsUrl } from "./permission-copy.ts";
 import { prePrompt, recover, type Key, type PromptIO } from "./permission-prompt.ts";
-import { macosAccessStep } from "./permission-readiness.ts";
+import { macosAccessStep, shellWord } from "./permission-readiness.ts";
 
 const UTF8 = symbolsFor({ LANG: "en_US.UTF-8" }), ASCII = symbolsFor({ TERM: "dumb" });
 
@@ -130,6 +130,11 @@ describe("doctor's macOS access step", () => {
     expect(rows.map(row => row.status)).toEqual(["action-needed", "action-needed", "blocked", "blocked", "action-needed", "done"]);
     expect(rows[2]!.settingsUrl).toBe(settingsUrl("automation"));
     expect(rows).toMatchSnapshot("access steps");
+  });
+  test("the suggested setup command survives a data folder with a space or quote", () => {
+    expect(shellWord("/Volumes/Data/Application Support/Textbutler")).toBe("'/Volumes/Data/Application Support/Textbutler'");
+    expect(shellWord("/tmp/it's")).toBe("'/tmp/it'\\''s'");
+    expect(shellWord("/private/data")).toBe("/private/data");
   });
   test("a group-readable app record is reported, not trusted", async () => {
     const dir = await dataDir({ "macos-app.json": { schemaVersion: 1 } });
