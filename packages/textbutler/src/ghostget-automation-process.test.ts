@@ -109,17 +109,18 @@ test("polls run through a bounded parallel lane beside the serialized ordinary l
 });
 
 test("bounded child request queue reports capacity without bypassing cancellation or close", async () => {
-  const process = await createGhostgetAutomationProcess(await options());
-  try {
-    const controller = new AbortController();
-    const submitting = process.client.submit("plan:fixture", "grant:fixture", controller.signal);
-    await new Promise<void>(resolve => setImmediate(resolve));
-    const queued = Array.from({ length: 15 }, () => process.client.conversations("imessage").catch(error => automationFailure(error)));
-    expect(automationFailure(await process.client.conversations("imessage").catch(error => error)))
-      .toEqual({ stage: "transport", code: "queue-capacity" });
-    controller.abort(); await submitting;
-    await Promise.all(queued);
-  } finally { await process.close(); }
+  // The fixture never answers `conversations`: the first call occupies the
+  // serialized ordinary chain forever, so queued ordinary work proves its
+  // bound while priority cancellation and scoped polls still bypass it.
+  const process = await createGhostgetAutomationProcess(await options("hold-conversations"));
+  const calls = Array.from({ length: 16 }, () => process.client.conversations("imessage").catch(error => automationFailure(error)));
+  expect(automationFailure(await process.client.conversations("imessage").catch(error => error)))
+    .toEqual({ stage: "transport", code: "queue-capacity" });
+  expect(await process.invoke("cancel", { planId: "plan:none" })).toMatchObject({ cancelled: true });
+  expect((await process.client.poll("enrollment:during-queue")).id).toBe("enrollment:during-queue");
+  await process.close().catch(() => undefined);
+  // The held call and everything queued behind it fail closed on shutdown.
+  for (const failure of await Promise.all(calls)) expect(failure).toEqual({ stage: "transport", code: "transport-unavailable" });
 });
 
 const custodyRecord = (hostPid: number, processGroup: number | null) => JSON.stringify({ schemaVersion: 1, operationId: randomUUID(), hostPid, processGroup, configurationSha256: "0".repeat(64), startedAt: new Date().toISOString(), status: "in-flight-or-unreconciled" }) + "\n";
@@ -135,7 +136,7 @@ async function untilResponseSchema(client: Pick<GhostgetAutomationClient, "conve
   // The fixture answers `conversations` with schema-invalid data: reaching that
   // failure proves an invoke completed a full round trip on a healthy child.
   let failure: AutomationFailure = { stage: "unknown", code: "unknown" };
-  for (let attempt = 0; attempt < 200 && failure.code !== "response-schema"; attempt++) {
+  for (let attempt = 0; attempt < 600 && failure.code !== "response-schema"; attempt++) {
     failure = automationFailure(await client.conversations("imessage").catch(error => error));
     if (failure.code !== "response-schema") await new Promise<void>(resolve => setTimeout(resolve, 10));
   }
@@ -189,20 +190,56 @@ test("custody from a provably dead owner is reclaimed with its evidence preserve
     expect(preserved.hostPid).toBe(dead.pid); expect(preserved.status).toBe("in-flight-or-unreconciled");
   } finally { await supervised.close(); }
 });
-test("a progressing initialize outlives the watchdog while a frozen one still dies on it", async () => {
-  // The fixture's same-group helper burns CPU past the watchdog: rising group
-  // CPU evidence re-arms it, so the late response is adopted instead of
-  // orphaned. The probe is injected because Linux ps reports CPU at whole-
-  // second granularity, which cannot see this sub-second fixture progress.
+test("a stalled initialize survives while its child answers probes, dies on the hard cap or probe silence", async () => {
+  // The fixture answers initialize late but probes at once: each answered
+  // probe re-arms the watchdog, so the late response is adopted rather than
+  // orphaned. Before liveness probing this child was killed mid-initialize.
   const slow = await options("slow-initialize");
-  let ticks = 0;
-  const process = await createGhostgetAutomationProcess(slow, { requestWatchdogMs: 250, initializeProgressSampleMs: 40, initializeHardCapMs: 30_000, probeGroupCpuMs: () => ++ticks });
+  const process = await createGhostgetAutomationProcess(slow, { requestWatchdogMs: 250, probeWatchdogMs: 1_000, invokeHardCapMs: 30_000 });
   await process.close();
 
-  // Constant CPU evidence never extends the watchdog: a deaf child dies on it.
+  // A child that answers probes but never completes the invoke is abandoned
+  // at the invoke hard cap: the caller is released and the child is stopped.
   const deaf = await options("deaf-initialize");
-  await expect(createGhostgetAutomationProcess(deaf, { requestWatchdogMs: 200, initializeProgressSampleMs: 40, probeGroupCpuMs: () => 0 })).rejects.toThrow();
+  await expect(createGhostgetAutomationProcess(deaf, { requestWatchdogMs: 200, probeWatchdogMs: 200, invokeHardCapMs: 500 })).rejects.toThrow();
   expect((await lstat(join(deaf.custodyDirectory, AUTOMATION_CUSTODY_FILE))).isFile()).toBe(true);
+
+  // A genuinely frozen child cannot answer even a priority probe: the probe's
+  // own bounded window stops it while the initialize is still outstanding.
+  const frozen = await options("frozen-child");
+  await expect(createGhostgetAutomationProcess(frozen, { requestWatchdogMs: 200, probeWatchdogMs: 200 })).rejects.toThrow();
+  expect((await lstat(join(frozen.custodyDirectory, AUTOMATION_CUSTODY_FILE))).isFile()).toBe(true);
+});
+test("a slow invoke outlives the request watchdog while the child answers probes", async () => {
+  // The poll response arrives past the request watchdog; the answered probe
+  // proves the frame loop is alive, so the invoke resolves instead of dying.
+  const process = await createGhostgetAutomationProcess(await options("slow-op"), { requestWatchdogMs: 250, probeWatchdogMs: 250 });
+  try {
+    expect((await process.client.poll("enrollment:slow")).id).toBe("enrollment:slow");
+    // The surviving child still serves later requests on the same transport.
+    expect(automationFailure(await process.client.conversations("imessage").catch(error => error)))
+      .toEqual({ stage: "response-schema", code: "response-schema" });
+  } finally { await process.close(); }
+});
+test("a held send does not starve concurrent lane reads, and a caller abort stays matched", async () => {
+  const process = await createGhostgetAutomationProcess(await options(), { requestWatchdogMs: 60_000 });
+  try {
+    const controller = new AbortController();
+    const submitting = process.client.submit("plan:fixture", "grant:fixture", controller.signal);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    // The fixture holds the send, yet a poll through the scoped lane answers:
+    // a serialized chain could never let this read complete first.
+    expect((await process.client.poll("enrollment:during-send")).id).toBe("enrollment:during-send");
+    controller.abort(); expect((await submitting).state).toBe("partial");
+
+    // An aborted caller is released at once; the late wire response still
+    // matches its frame instead of tripping protocol checks.
+    const aborted = new AbortController();
+    const held = process.client.poll("enrollment:abandoned", aborted.signal).catch(error => error);
+    aborted.abort();
+    expect(String(await held)).toContain("cancelled");
+    expect((await process.client.poll("enrollment:after-abort")).id).toBe("enrollment:after-abort");
+  } finally { await process.close(); }
 });
 test("the group CPU probe observes real process-group work", async () => {
   // A detached burner over one second: macOS ps shows centisecond progress

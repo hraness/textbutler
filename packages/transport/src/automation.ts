@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { AUTOMATION_ACTIONS, automationBoolean, automationHash, automationId, automationProvider, automationRecord, parseAutomationConversation, parseAutomationCoordinate, parseAutomationEnrollment, parseAutomationGrant, parseAutomationIdentity, parseAutomationMessage, parseAutomationRun, parseAutomationStatus, type AutomationAction, type AutomationCoordinate, type AutomationEnrollment, type AutomationEvent, type AutomationGrantRequest, type AutomationPlan, type AutomationProvider } from "./automation-contract";
 import { array, canonicalJson, digest, failure, integer, parseActionIntent, string, success, timestamp } from "./validation";
 import { TRANSPORT_PROTOCOL, type ActionPlan, type HistoryMessage, type TextbutlerTransport } from "./types";
-import { AutomationOperationError } from "./automation-diagnostics.ts";
+import { AutomationOperationError, automationFailure } from "./automation-diagnostics.ts";
 export * from "./automation-contract";
 export * from "./automation-diagnostics.ts";
 
@@ -105,7 +105,7 @@ export function createGhostgetAutomationClient(invoke: GhostgetAutomationInvoker
       const expiresAt = timestamp(r.expiresAt), bindingDigest = digest(r.bindingDigest), enrollment = known.get(request.enrollmentId);
       const bound = { ...request, bindingDigest, expiresAt }, planDigest = digest(r.digest);
       if (!enrollment || enrollment.bindingDigest !== bindingDigest || r.enrollmentId !== request.enrollmentId || r.expectedRevision !== request.expectedRevision || r.intentId !== request.intentId || canonicalJson(r.actions) !== canonicalJson(request.actions)
-        || Date.parse(expiresAt) <= now() || Date.parse(expiresAt) > now() + 125000 || r.id !== `plan:${planDigest}` || automationHash(bound) !== planDigest) throw new Error("Prepared actions changed their context or content");
+        || Date.parse(expiresAt) <= now() || Date.parse(expiresAt) > now() + 305000 || r.id !== `plan:${planDigest}` || automationHash(bound) !== planDigest) throw new Error("Prepared actions changed their context or content");
       return Object.freeze({ ...bound, actions: structuredClone(request.actions), id: r.id, digest: planDigest });
     },
     async submit(planId: string, grantId: string, signal?: AbortSignal) {
@@ -122,6 +122,10 @@ export function createGhostgetAutomationClient(invoke: GhostgetAutomationInvoker
       } finally { signal?.removeEventListener("abort", cancel); }
     },
     async run(runId: string, signal?: AbortSignal) { const result = parseAutomationRun(await invoke("run", { runId: automationId(runId) }, signal)); if (result.id !== runId) throw new Error("Run identity changed"); return result; },
+    async runByIntent(intentId: string, signal?: AbortSignal) {
+      const result = automationRecord(await invoke("run.by-intent", { intentId: automationId(intentId) }, signal), ["run"]);
+      return result.run === null ? null : parseAutomationRun(result.run);
+    },
   };
 }
 export type GhostgetAutomationClient = ReturnType<typeof createGhostgetAutomationClient>;
@@ -191,7 +195,23 @@ export function createGhostgetAutomationTransport(options: { client: GhostgetAut
         const result = await client.submit(known.upstream.id, authorization.grantId, signal);
         if (result.enrollmentId !== enrollmentId || result.intentId !== plan.intentId || result.totalActions !== plan.actions.length) throw new Error("Run scope changed");
         return success({ planId: plan.id, runId: result.id, state: result.state === "accepted" ? "submitted" : result.state === "started" ? "indeterminate" : result.state, submittedCount: result.accepted.length, totalCount: result.totalActions, acceptedMessageIds: result.accepted.map(part => part.messageId), recordedAt: new Date(now()).toISOString(), delivery: "unknown", retryable: false });
-      } catch { return failure("indeterminate", "Ghostget send outcome is uncertain. Reconcile the recorded intent before another send."); }
+      } catch (error) {
+        // A remote refusal means the host finished the dispatch attempt: the
+        // intent ledger then arbitrates. A terminal row carries its outcome;
+        // no row at all is proof the run insert never committed, so the send
+        // provably did not start. Local transport faults and in-flight rows
+        // stay indeterminate — the dispatch may still be live upstream.
+        if (automationFailure(error).stage === "provider") {
+          try {
+            const observed = await client.runByIntent(known.upstream.intentId);
+            if (observed === null) return failure("dispatch-failed", "The provider proved this send never started. A new message may be sent.");
+            if (observed.state === "accepted" || observed.state === "failed") {
+              return success({ planId: plan.id, runId: observed.id, state: observed.state === "accepted" ? "submitted" : "failed", submittedCount: observed.accepted.length, totalCount: observed.totalActions, acceptedMessageIds: observed.accepted.map(part => part.messageId), recordedAt: new Date(now()).toISOString(), delivery: "unknown", retryable: false });
+            }
+          } catch { /* The arbiter read failed too: the outcome stays unproven. */ }
+        }
+        return failure("indeterminate", "Ghostget send outcome is uncertain. Reconcile the recorded intent before another send.");
+      }
     },
   };
 }

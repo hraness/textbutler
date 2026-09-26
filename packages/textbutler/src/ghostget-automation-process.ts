@@ -17,9 +17,12 @@ const MAX_RESPONSE = 32 * 1024 * 1024;
 const MAX_ERROR = 65536;
 const CLEANUP_GRACE = 36000;
 const REQUEST_WATCHDOG_MS = 180_000;
-const INITIALIZE_PROGRESS_SAMPLE_MS = 10_000;
-const INITIALIZE_HARD_CAP_MS = 15 * 60_000;
+const PROBE_WATCHDOG_MS = 30_000;
+const INVOKE_HARD_CAP_MS = 15 * 60_000;
 const RECOVERY_DELAYS_MS = [2_000, 10_000, 60_000, 300_000] as const;
+/** Priority `cancel` reaches a live child even while every ordinary and scoped
+ * lane is occupied; the id collides with no real plan. */
+const PROBE_PLAN_ID = "probe:watchdog";
 const RECOVERED_CUSTODY_LIMIT = 8;
 export const AUTOMATION_CUSTODY_FILE = "ghostget-automation-custody.json";
 
@@ -121,19 +124,17 @@ export function probeGroupCpuMs(processGroup: number): number | undefined {
  * A failed/forced shutdown preserves custody, including separately grouped
  * provider children. Exit of this immediate child alone is never sufficient. */
 export async function createGhostgetAutomationProcess(input: GhostgetAutomationProcessOptions, dependencies: {
-  /** Synthetic tests only: bounded timing and the group-CPU probe. */
+  /** Synthetic tests only: bounded timing. */
   requestWatchdogMs?: number;
-  initializeProgressSampleMs?: number;
-  initializeHardCapMs?: number;
+  probeWatchdogMs?: number;
+  invokeHardCapMs?: number;
   cleanupGraceMs?: number;
-  probeGroupCpuMs?: (processGroup: number) => number | undefined;
 } = {}) {
   const options = structuredClone(input);
   const requestWatchdogMs = dependencies.requestWatchdogMs ?? REQUEST_WATCHDOG_MS;
-  const initializeProgressSampleMs = dependencies.initializeProgressSampleMs ?? INITIALIZE_PROGRESS_SAMPLE_MS;
-  const initializeHardCapMs = dependencies.initializeHardCapMs ?? INITIALIZE_HARD_CAP_MS;
+  const probeWatchdogMs = dependencies.probeWatchdogMs ?? PROBE_WATCHDOG_MS;
+  const invokeHardCapMs = dependencies.invokeHardCapMs ?? INVOKE_HARD_CAP_MS;
   const cleanupGraceMs = dependencies.cleanupGraceMs ?? CLEANUP_GRACE;
-  const probeCpu = dependencies.probeGroupCpuMs ?? probeGroupCpuMs;
   for (const path of [options.executable, options.custodyDirectory, options.runtimeExecutable, options.stateHome]) if (path !== undefined && !isAbsolute(path)) throw new Error("Ghostget host paths must be absolute");
   if (!options.providers.length || options.providers.length > 3 || new Set(options.providers.map(row => row.provider)).size !== options.providers.length) throw new Error("One explicit account per messaging network is required");
   for (const row of options.providers) { automationProvider(row.provider); automationId(row.authId); }
@@ -164,7 +165,7 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
     child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
     throw new Error("Ghostget automation child failed to start", { cause: spawnFailure });
   }
-  type Pending = { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>; abort?: () => void; signal?: AbortSignal };
+  type Pending = { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>; dispatchedAt: number; abort?: () => void; signal?: AbortSignal; stalled?: boolean; abandoned?: boolean; probe?: boolean };
   const pending = new Map<string, Pending>();
   const chunks: Buffer[] = [];
   let buffered = 0, scanned = 0, errors = 0, fault = false, closing = false, exited = false, cleanAcknowledgment = false;
@@ -172,20 +173,24 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
   let rejectSettlement: ((reason: Error) => void) | undefined, resolveClosed: (() => void) | undefined, rejectClosed: ((reason: Error) => void) | undefined;
   const groupExists = () => { if (child.pid === undefined) return false; return groupAlive(child.pid); };
   const kill = (signal: NodeJS.Signals) => { if (child.pid !== undefined) { try { process.kill(-child.pid, signal); } catch { /* close owns the result */ } } };
-  const progress = new Map<string, ReturnType<typeof setInterval>>();
-  let pollInFlight = 0;
-  const pollWaiters: (() => void)[] = [];
-  // Polls dispatch only while the wire still reserves three frames for
-  // priority and ordinary work, so a poll burst can never crowd out a
-  // cancel, revoke, close, drain or dispatch.
-  const pollReady = () => pollInFlight < 6 && pending.size < 6;
-  const wakePoll = () => { if (pollWaiters.length !== 0 && pollReady()) pollWaiters.shift()?.(); };
+  let laneInFlight = 0;
+  const readWaiters: (() => void)[] = [], mutationWaiters: (() => void)[] = [];
+  // Scoped work dispatches only while the wire reserves frames for priority
+  // and ordinary requests, so a burst can never crowd out a cancel, revoke,
+  // close, drain or dispatch. Mutations hold the tighter budget: reads keep
+  // flowing while a send occupies the wire, the starvation this lane exists
+  // to prevent.
+  const laneReady = (mutation: boolean) => laneInFlight < 6 && pending.size < (mutation ? 4 : 6);
+  const wakeLane = () => {
+    // Mutations claim freed wire slots first: a read flood must not starve a
+    // queued dispatch, the starvation this lane exists to prevent.
+    if (mutationWaiters.length !== 0 && laneReady(true)) mutationWaiters.shift()?.();
+    if (readWaiters.length !== 0 && laneReady(false)) readWaiters.shift()?.();
+  };
   const clear = (id: string, entry: Pending) => {
     pending.delete(id); clearTimeout(entry.timer);
-    const monitor = progress.get(id);
-    if (monitor !== undefined) { clearInterval(monitor); progress.delete(id); }
     if (entry.abort) entry.signal?.removeEventListener("abort", entry.abort);
-    wakePoll();
+    wakeLane();
   };
   const stop = () => {
     if (fault) return; fault = true;
@@ -270,49 +275,87 @@ export async function createGhostgetAutomationProcess(input: GhostgetAutomationP
     } catch { stop(); }
   });
   child.stdin.on("error", stop);
-  const send: GhostgetAutomationInvoker = (method, params, signal) => {
+  /** Writes one frame and matches its response. A stalled invoke is evidence
+   * of a slow lane, never of a dead child: the watchdog answers a stall with
+   * one priority-lane probe whose response proves the frame loop is alive and
+   * re-arms every stalled invoke. Only a child that cannot answer a priority
+   * frame inside its own bounded window is stopped. A caller abort releases
+   * the caller at once while the wire entry stays, so the child's eventual
+   * response still matches its frame instead of tripping protocol checks. */
+  const dispatch = (method: string, params: Readonly<Record<string, unknown>>, signal: AbortSignal | undefined, probe: boolean): Promise<unknown> => {
     if (fault || exited || closing && method !== "close") return Promise.reject(new AutomationOperationError("transport-unavailable"));
-    if (pending.size >= 9) return Promise.reject(new AutomationOperationError("queue-capacity"));
+    if (!probe && pending.size >= 9) return Promise.reject(new AutomationOperationError("queue-capacity"));
     try { signal?.throwIfAborted(); } catch { return Promise.reject(new Error("Ghostget operation cancelled before dispatch")); }
     const id = randomUUID(), frame = JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id, method, params }) + "\n";
     if (Buffer.byteLength(frame) > MAX_FRAME) return Promise.reject(new Error("Ghostget request exceeds its frame bound"));
     return new Promise((resolve, reject) => {
-      const entry: Pending = { resolve, reject, timer: setTimeout(stop, requestWatchdogMs) };
-      pending.set(id, entry);
-      // Startup is legitimately slow on a loaded host: the watchdog re-arms
-      // only while the recorded group proves CPU progress, so a frozen child
-      // still dies on the original deadline and a working one is never cut
-      // off mid-initialize. Nothing about progress weakens the hard cap.
-      if (method === "initialize" && child.pid !== undefined) {
-        const dispatchedAt = Date.now(), pgid = child.pid;
-        let observed: number | undefined;
-        const monitor = setInterval(() => {
-          const current = probeCpu(pgid);
-          if (current === undefined) return;
-          if (observed !== undefined && current > observed && Date.now() - dispatchedAt < initializeHardCapMs) {
-            clearTimeout(entry.timer); entry.timer = setTimeout(stop, requestWatchdogMs);
-          }
-          observed = current;
-        }, initializeProgressSampleMs);
-        monitor.unref?.(); progress.set(id, monitor);
+      const entry: Pending = { resolve, reject, dispatchedAt: Date.now(), probe, timer: setTimeout(() => stall(id), probe ? probeWatchdogMs : requestWatchdogMs) };
+      // Submit alone keeps result custody after an abort: the client's own
+      // priority cancel stops later actions, but only the dispatch's eventual
+      // response proves what was sent. Every other caller releases at once;
+      // the wire entry stays so the late response still matches its frame.
+      if (signal !== undefined && method !== "submit") {
+        entry.signal = signal;
+        entry.abort = () => {
+          entry.abandoned = true; clearTimeout(entry.timer);
+          entry.reject(new Error("Ghostget operation cancelled", { cause: signal.reason }));
+        };
+        signal.addEventListener("abort", entry.abort, { once: true });
       }
+      pending.set(id, entry);
       child.stdin.write(frame, error => { if (error) stop(); });
     });
   };
+  const send: GhostgetAutomationInvoker = (method, params, signal) => dispatch(method, params, signal, false);
+  let probeActive = false;
+  const revive = () => {
+    if (fault) return;
+    for (const [id, entry] of pending) {
+      if (!entry.stalled || entry.abandoned || entry.probe) continue;
+      entry.stalled = false; clearTimeout(entry.timer);
+      entry.timer = setTimeout(() => stall(id), requestWatchdogMs);
+    }
+  };
+  const kick = () => {
+    if (probeActive || fault || exited) return;
+    probeActive = true;
+    // Any settled probe — result or remote error — is a protocol response and
+    // therefore proof the child's frame loop still serves requests.
+    dispatch("cancel", { planId: PROBE_PLAN_ID }, undefined, true).then(revive, revive).finally(() => { probeActive = false; });
+  };
+  function stall(id: string): void {
+    const entry = pending.get(id);
+    if (entry === undefined || fault) return;
+    if (entry.probe) { stop(); return; }
+    if (Date.now() - entry.dispatchedAt >= invokeHardCapMs) {
+      // An op that outlives the hard cap while the child stays alive releases
+      // its caller as though the transport dropped it; the wire entry remains
+      // until the response so protocol matching still holds.
+      entry.stalled = false; entry.abandoned = true; clearTimeout(entry.timer);
+      entry.reject(new AutomationOperationError("transport-unavailable"));
+      return;
+    }
+    entry.stalled = true; kick();
+  }
   let normalChain: Promise<unknown> = Promise.resolve(), queued = 0;
   const invoke: GhostgetAutomationInvoker = (method, params, signal) => {
     if (["cancel", "revoke", "close"].includes(method)) return send(method, params, signal);
-    if (method === "poll" || method === "pollSet") {
-      // The owner serializes enrollment-scoped work per enrollment, so polls
-      // across contacts proceed concurrently through this lane. The waiter
-      // bound exceeds the 50-contact active limit plus owner-side polls; the
-      // wire reservation above keeps this lane from starving priority work.
-      if (pollWaiters.length >= 64) return Promise.reject(new AutomationOperationError("queue-capacity"));
+    const mutation = ["prepare", "grant", "submit"].includes(method);
+    if (mutation || ["poll", "pollSet", "events", "history", "enrollments", "status", "run", "run.by-intent", "grant.get", "grant.by-intent"].includes(method)) {
+      // Everything the child scopes per enrollment rides one bounded lane, so
+      // a slow send can never starve a poll, drain, read or an independent
+      // conversation's dispatch. The waiter bound exceeds the 50-contact
+      // active limit plus owner-side traffic.
+      const waiters = mutation ? mutationWaiters : readWaiters;
+      if (waiters.length >= 64) return Promise.reject(new AutomationOperationError("queue-capacity"));
       return (async () => {
-        while (!pollReady()) await new Promise<void>(resolve => pollWaiters.push(resolve));
-        pollInFlight++;
+        while (!laneReady(mutation)) {
+          await new Promise<void>(resolve => waiters.push(resolve));
+          signal?.throwIfAborted();
+        }
+        laneInFlight++;
         try { return await send(method, params, signal); }
-        finally { pollInFlight--; wakePoll(); }
+        finally { laneInFlight--; wakeLane(); }
       })();
     }
     if (queued >= 16) return Promise.reject(new AutomationOperationError("queue-capacity"));

@@ -30,6 +30,10 @@ export type ReplyDecision = Readonly<{
   eligibleAt?: number;
 }>;
 
+/** An inbound stays live well past the transport's own worst-case drain lag:
+ * slow delivery is the lane's fault, not the message's. Revision and
+ * supersession checks still stop genuine replays of old context. */
+const LIVE_EVENT_WINDOW_MS = 15 * 60_000;
 export function keywordPresent(text: string, keyword: string): boolean {
   const haystack = text.normalize("NFKC").toLocaleLowerCase("en-US");
   const needle = keyword.normalize("NFKC").toLocaleLowerCase("en-US");
@@ -49,7 +53,7 @@ export function decideReply(settings: Settings, contact: ContactSettings, event:
   if (event.contactId !== contact.id || event.routeId !== contact.routeId) return { outcome: "ignore", reason: "route-mismatch" };
   const invoked = event.author === "owner" && keywordPresent(event.text, contact.keyword);
   if (event.historical || event.group || event.kind !== "message" || (event.author !== "contact" && !invoked)) return { outcome: "ignore", reason: "not-live-direct-inbound" };
-  if (![now, event.occurredAt, event.observedAt, state.synchronizedAt].every(Number.isSafeInteger) || event.occurredAt > now + 30_000 || event.observedAt > now || event.occurredAt < (admittedAt ?? now) - 120_000) return { outcome: "ignore", reason: "stale-event" };
+  if (![now, event.occurredAt, event.observedAt, state.synchronizedAt].every(Number.isSafeInteger) || event.occurredAt > now + 30_000 || event.observedAt > now || event.occurredAt < (admittedAt ?? now) - LIVE_EVENT_WINDOW_MS) return { outcome: "ignore", reason: "stale-event" };
   if (event.revision !== state.latestRevision) return { outcome: "ignore", reason: "superseded" };
   if (state.synchronizedAt > now || state.synchronizedAt < now - 15_000) return { outcome: "defer", reason: "refresh-required" };
   if (state.ownerTyping === true) return { outcome: "ignore", reason: "owner-typing" };

@@ -26,10 +26,12 @@ process.stdin.on("data", (chunk: string) => {
   let at: number;
   while ((at = buffer.indexOf("\n")) !== -1) {
     const request = JSON.parse(buffer.slice(0, at)); buffer = buffer.slice(at + 1);
+    // A wedged child swallows every frame: even a priority probe goes
+    // unanswered, so only process death is evidence of the stall.
+    if (mode === "frozen-child") continue;
     if (request.method === "initialize" && mode === "slow-initialize") {
-      // A same-group helper burns CPU while initialize answers late, mirroring
-      // a loaded host whose startup progress must extend the request watchdog.
-      spawn(process.execPath, ["-e", "const s=Date.now();while(Date.now()-s<600);"], { detached: false, stdio: "ignore" }).unref();
+      // Initialize answers late while every other frame answers at once:
+      // liveness probes keep succeeding, so the invoke survives its watchdog.
       setTimeout(() => reply(request, { initialized: true }), 700);
     }
     else if (request.method === "initialize" && mode === "deaf-initialize") { /* A frozen child never answers. */ }
@@ -46,12 +48,14 @@ process.stdin.on("data", (chunk: string) => {
       process.stdout.write(JSON.stringify({ protocol: AUTOMATION_PROTOCOL, id: request.id, ok: false,
         error: { code: ["unavailable"], message: "ghostget.discovery.v1:native-chats:failed" } }) + "\n");
     }
+    else if (request.method === "conversations" && mode === "hold-conversations") { /* Occupies the ordinary chain forever. */ }
     else if (request.method === "conversations") reply(request, { privateBody: "Must never be published" });
     else if ((request.method === "poll" || request.method === "pollSet") && mode === "poll-lane") {
       // Held polls prove wire overlap: a serialized client could never reach
       // more than one held frame, and the lane cap bounds the burst.
       heldPolls.push(request); totalPolls++; maxHeld = Math.max(maxHeld, heldPolls.length);
     }
+    else if (request.method === "poll" && mode === "slow-op") setTimeout(() => reply(request, fixtureEnrollment(String(request.params?.enrollmentId ?? "enrollment:fixture"))), 700);
     else if (request.method === "poll") reply(request, fixtureEnrollment(String(request.params?.enrollmentId ?? "enrollment:fixture")))
     else if (request.method === "pollSet") reply(request, pollSetResult(request));
     else if (request.method === "lane-stats") reply(request, { held: heldPolls.length, maxHeld, totalPolls });
