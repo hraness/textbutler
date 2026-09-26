@@ -51,3 +51,11 @@ describe("iMessage app setup notices", () => {
     expect(state.stderr).toBe("");
   });
 });
+
+test("the committed app icon is a bounded .icns rendered from the canonical mark", async () => {
+  const icon = Buffer.from(await Bun.file(new URL("../native/AppIcon.icns", import.meta.url)).arrayBuffer());
+  expect(icon.subarray(0, 4).toString("latin1")).toBe("icns");
+  expect(icon.readUInt32BE(4)).toBe(icon.length);
+  expect(icon.length).toBeLessThan(1024 * 1024);
+  expect(await Bun.file(new URL("../native/app-icon.svg", import.meta.url)).text()).toStartWith("<svg ");
+});

@@ -45,3 +45,18 @@ test("app verification rejects added code, linked receipts and shared writable a
   await expect(readMacosAppReceipt(f.receipt)).rejects.toThrow(); await rm(f.receipt); await writeFile(f.receipt, contents, { mode: 0o644 });
   await expect(readMacosAppReceipt(f.receipt)).rejects.toThrow();
 });
+test("an app built with the icon binds its Resources folder; older apps without one still verify", async () => {
+  const f = await fixture();
+  await verifyMacosApp(f.identity);
+  const resources = join(f.identity.appPath, "Contents", "Resources"), icon = join(resources, "AppIcon.icns");
+  // Without iconSha256 in the receipt, an added Resources folder is unadmitted code.
+  await mkdir(resources, { mode: 0o700 }); await writeFile(icon, "icns synthetic", { mode: 0o600 });
+  await expect(verifyMacosApp(f.identity)).rejects.toThrow("identity");
+  const withIcon = parseMacosAppIdentity({ ...f.identity, iconSha256: await appFileDigest(icon) });
+  await verifyMacosApp(withIcon);
+  await writeFile(join(resources, "Extra.icns"), "extra", { mode: 0o600 });
+  await expect(verifyMacosApp(withIcon)).rejects.toThrow("identity");
+  await rm(join(resources, "Extra.icns")); await writeFile(icon, "icns changed", { mode: 0o600 });
+  await expect(verifyMacosApp(withIcon)).rejects.toThrow("identity");
+  expect(() => parseMacosAppIdentity({ ...f.identity, iconSha256: "not-a-digest" })).toThrow();
+});
