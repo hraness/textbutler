@@ -25,6 +25,7 @@ async function fixture(fast = false) {
   const enrolled = () => ({ id: "enrollment:fixture", identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision, ready: true, reason: null });
   const binding = automationBinding(enrolled()), events: AutomationEvent[] = [], messages: AutomationMessage[] = [], sent: readonly unknown[][] = [], acks: readonly unknown[][] = [];
   const mutableSent = sent as unknown[][], mutableAcks = acks as unknown[][], plans = new Map<string, AutomationPlan>(), statuses: { state: string; detail: string }[] = [];
+  const intentRuns = new Map<string, unknown>();
   let failEvents = 0, eventsCalls = 0;
   let beforeSubmit: (() => Promise<void>) | undefined;
   const allowed: [string, string][] = [], notices: string[] = [], synced: [string, string][] = [];
@@ -40,6 +41,7 @@ async function fixture(fast = false) {
     if (method === "status") return { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"].map(kind => [kind, { available: true, reason: null }])) };
     if (method === "prepare") { const body = { ...params, bindingDigest: binding.bindingDigest, expiresAt: new Date(time + 120000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` } as AutomationPlan; plans.set(plan.id, plan); return plan; }
     if (method === "submit") { const plan = plans.get(String(params.planId))!; if (!plan.intentId.endsWith(":ack")) await beforeSubmit?.(); (plan.intentId.endsWith(":ack") ? mutableAcks : mutableSent).push([...plan.actions]); return { id: `run:${sent.length + acks.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length + acks.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
+    if (method === "run.by-intent") return { run: intentRuns.get(String(params.intentId)) ?? null };
     throw new Error(`Unexpected fixture operation ${method}`);
   }, () => time);
   let compositions = 0, classifications = 0, agent: ButlerAgent = {
@@ -63,6 +65,7 @@ async function fixture(fast = false) {
   } });
   cleanup.push(async () => { await loop.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
   return { loop, journal, sent, acks, statuses, coordinate: conversation.coordinate, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },
+    intentRuns,
     change(next: Settings) { settings = next; for (const listener of listeners) listener(next); }, settings: () => settings,
     habitatChanged(id: string) { for (const listener of habitatListeners) listener(id); }, habitatListenerCount: () => habitatListeners.size,
     beforeSubmit(callback: () => Promise<void>) { beforeSubmit = callback; },
@@ -293,4 +296,51 @@ test("a self-chat allow command approves the repo request end to end", async () 
   expect(f.journal.repoRequests("pending")).toHaveLength(0);
   expect(f.sent).toHaveLength(1);
   expect(JSON.stringify(f.sent[0])).toContain("Approved");
+});
+test("a wedged send reconciles from terminal provider evidence without owner review", async () => {
+  const f = await fixture(); await f.loop.tick();
+  const upstream = (intentId: string, state: string, accepted: { messageId: string | null; providerReceiptId: string | null }[] = []) =>
+    ({ id: "run:upstream", planId: "plan:x", intentId, enrollmentId: bindingEnrollment, state, accepted, totalActions: 1, reason: state === "accepted" ? null : "Provider outcome", retryable: false });
+  const bindingEnrollment = "enrollment:fixture";
+
+  // A terminal accepted row is a receipt: the wedged run settles as submitted,
+  // its message ids attribute to the butler, and the contact unblocks.
+  f.journal.claim("run:settled", "contact-1", "message:old", 0);
+  f.journal.transition("run:settled", "running", "indeterminate", "dispatch-result-unknown", 0);
+  f.intentRuns.set("run:settled", upstream("run:settled", "accepted", [{ messageId: "sent:upstream", providerReceiptId: null }]));
+  await f.loop.tick(); await f.loop.idle();
+  expect(f.journal.hasUncertainSend("contact-1")).toBe(false);
+  expect(f.journal.recent("contact-1")[0]).toMatchObject({ id: "run:settled", state: "submitted", reason: "reconciled: provider recorded delivery" });
+  expect(f.journal.knownSentMessage("sent:upstream")).toBe(true);
+
+  // An ack-wedged run whose ack settled while its reply row is absent proves
+  // the reply never dispatched: it reconciles failed, not submitted.
+  f.journal.claim("run:ack-wedged", "contact-1", "message:older", 0);
+  f.journal.transition("run:ack-wedged", "running", "indeterminate", "ack-dispatch-unknown", 0);
+  f.intentRuns.set("run:ack-wedged:ack", upstream("run:ack-wedged:ack", "accepted", [{ messageId: "sent:ack", providerReceiptId: null }]));
+  await f.loop.tick(); await f.loop.idle();
+  expect(f.journal.hasUncertainSend("contact-1")).toBe(false);
+  const byId = new Map(f.journal.recent("contact-1").map(run => [run.id, run]));
+  expect(byId.get("run:ack-wedged")).toMatchObject({ state: "failed", reason: "reconciled: ack delivered; reply never dispatched" });
+  expect(f.journal.knownSentMessage("sent:ack")).toBe(true);
+
+  // A started row may still settle upstream: it stays blocked rather than
+  // risk a second send, until the next tick's evidence turns terminal.
+  f.journal.claim("run:active", "contact-1", "message:active", 0);
+  f.journal.transition("run:active", "running", "indeterminate", "dispatch-result-unknown", 0);
+  f.intentRuns.set("run:active", upstream("run:active", "started"));
+  await f.loop.tick(); await f.loop.idle();
+  expect(f.journal.hasUncertainSend("contact-1")).toBe(true);
+  f.intentRuns.set("run:active", upstream("run:active", "failed"));
+  await f.loop.tick(); await f.loop.idle();
+  expect(f.journal.hasUncertainSend("contact-1")).toBe(false);
+  expect(f.journal.recent("contact-1").find(run => run.id === "run:active")?.state).toBe("failed");
+
+  // And absence alone still proves nothing: a reply intent with no row could
+  // still be in flight, so the run stays blocked for owner reconciliation.
+  f.journal.claim("run:absent", "contact-1", "message:absent", 0);
+  f.journal.transition("run:absent", "running", "indeterminate", "dispatch-result-unknown", 0);
+  await f.loop.tick(); await f.loop.idle();
+  expect(f.journal.hasUncertainSend("contact-1")).toBe(true);
+  expect(f.journal.recent("contact-1").find(run => run.id === "run:absent")?.state).toBe("indeterminate");
 });

@@ -3,7 +3,7 @@ export const TRANSPORT_PROTOCOL = "textbutler.transport/1" as const;
 export type Capability = "history" | "contacts" | "events" | "text" | "attachment" | "reaction" | "sticker" | "link" | "poll" | "app-clip" | "experience" | "autonomous-send";
 export interface CapabilityStatus { readonly capability: Capability; readonly available: boolean; readonly reason: string | null }
 export interface TransportCapabilities { readonly protocol: typeof TRANSPORT_PROTOCOL; readonly provider: string; readonly capabilities: readonly CapabilityStatus[] }
-export type TransportErrorCode = "unsupported" | "invalid-input" | "contract-mismatch" | "unavailable" | "stale-context" | "authorization-required" | "indeterminate";
+export type TransportErrorCode = "unsupported" | "invalid-input" | "contract-mismatch" | "unavailable" | "stale-context" | "authorization-required" | "indeterminate" | "dispatch-failed";
 export type TransportResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: { readonly code: TransportErrorCode; readonly message: string; readonly capability?: Capability; readonly retryable: false } };
 export interface Conversation { readonly id: string; readonly title: string | null; readonly kind: "single" | "group" | "unknown"; readonly participantCount: number; readonly expiresAt: string }
 export interface Contact { readonly id: string; readonly name: string; readonly handles: readonly string[] }

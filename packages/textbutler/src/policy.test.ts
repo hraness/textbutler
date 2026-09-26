@@ -77,7 +77,9 @@ describe("reply admission", () => {
     expect(decideReply({ ...settings, paused: true }, contact, event, state, now).reason).toBe("paused");
   });
   test("event age is measured from admission, not the post-composition recheck", () => {
-    const aged = { ...event, occurredAt: now - 150_000, observedAt: now - 150_000 };
+    // Sixteen minutes old at recheck is past the live window, yet an admission
+    // 100 seconds ago saw it inside the window and keeps the event.
+    const aged = { ...event, occurredAt: now - 16 * 60_000, observedAt: now - 16 * 60_000 };
     expect(decideReply(settings, contact, aged, { ...state, synchronizedAt: now }, now).reason).toBe("stale-event");
     expect(decideReply(settings, contact, aged, { ...state, synchronizedAt: now }, now, now - 100_000).outcome).toBe("reply");
     expect(decideReply(settings, contact, aged, { ...state, lastOwnerAt: now - 20_000 }, now, now - 100_000).reason).toBe("owner-active");

@@ -169,6 +169,33 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
     service.notePending(contact.id, cluster === null ? null : { count: cluster.count, lastAt: cluster.latestAt, preview: cluster.preview, ready: page.enrollment.ready, observedAt: now() });
     return { contextId: automationContextId(page.enrollment), messageIds: page.messages.filter(message => message.kind === "message").map(message => message.id), state: { latestRevision: String(page.enrollment.revision), lastOwnerAt: state.lastOwnerAt, ownerTyping: "unknown", synchronizedAt: page.enrollment.ready ? now() : 0, repliesInLastHour: service.runJournal().repliesSince(contact.id, now() - 3600000) } };
   }
+  /** Settles a wedged send only from positive provider evidence. A terminal
+   * upstream row is a receipt; no reply row beside a settled ack row proves
+   * the reply intent never dispatched (the runtime awaits the ack before
+   * preparing the reply). Absence alone, unreachable transport, and
+   * non-terminal rows all leave the run blocked. */
+  async function reconcileFromEvidence(contact: ContactSettings, state: ContactLoop): Promise<void> {
+    const journal = service.runJournal();
+    const byIntent = (intentId: string) => Promise.resolve().then(() => client.runByIntent(intentId, AbortSignal.timeout(10_000))).catch(() => undefined);
+    for (const run of journal.uncertainRuns(contact.id)) {
+      const reply = await byIntent(run.id);
+      if (reply !== undefined && reply !== null && reply.enrollmentId === state.binding.enrollmentId) {
+        if (reply.state === "accepted") {
+          journal.recordSentMessages(contact.id, run.id, reply.accepted.map(part => part.messageId), now());
+          journal.reconcile(run.id, "submitted", "reconciled: provider recorded delivery", now());
+          continue;
+        }
+        if (reply.state === "failed") { journal.reconcile(run.id, "failed", "reconciled: provider recorded the send failed", now()); continue; }
+      }
+      if (run.reason !== "ack-dispatch-unknown") continue;
+      const ack = await byIntent(`${run.id}:ack`);
+      if (ack === undefined || ack === null || ack.enrollmentId !== state.binding.enrollmentId) continue;
+      if (ack.state === "accepted") {
+        journal.recordSentMessages(contact.id, `${run.id}:ack`, ack.accepted.map(part => part.messageId), now());
+        journal.reconcile(run.id, "failed", "reconciled: ack delivered; reply never dispatched", now());
+      } else if (ack.state === "failed") journal.reconcile(run.id, "failed", "reconciled: provider recorded the send failed", now());
+    }
+  }
   function contactLoop(contact: ContactSettings, binding: AutomationBinding): ContactLoop {
     const previous = contacts.get(contact.id);
     if (previous && previous.binding.bindingDigest === binding.bindingDigest && previous.binding.enrollmentId === binding.enrollmentId && previous.settingsRevision === contact.revision) return previous;
@@ -271,8 +298,11 @@ export async function createDaemonReplyLoop(options: ReplyLoopOptions) {
       if (healthy && caughtUp && !drainFailed) state.syncFailures = 0; else state.syncFailures++;
       if (!healthy) continue;
       if (!state.initialized) { state.initialized = true; await snapshot(contact, state, fresh.get(contact.id)); continue; }
-      if (service.runJournal().hasUncertainSend(contact.id)) state.blocked = RECONCILE_DETAIL;
-      else if (state.blocked === RECONCILE_DETAIL) delete state.blocked;
+      if (service.runJournal().hasUncertainSend(contact.id)) {
+        await reconcileFromEvidence(contact, state);
+        if (service.runJournal().hasUncertainSend(contact.id)) state.blocked = RECONCILE_DETAIL;
+        else delete state.blocked;
+      } else if (state.blocked === RECONCILE_DETAIL) delete state.blocked;
       const event = state.pending;
       if (!event && !state.running && !state.blocked) habitat?.schedule(contact);
       if (!event || state.running || !active(contact.id, contact.revision) || now() < event.observedAt + contact.debounceMs) continue;

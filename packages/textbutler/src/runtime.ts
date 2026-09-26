@@ -30,6 +30,14 @@ export type RuntimePorts = Readonly<{
   onSubmitted?: (reply: SubmittedReply) => void;
 }>;
 export type ProcessOutcome = Readonly<{ status: "ignored" | "deferred" | "blocked" | "duplicate-or-busy" | RunState; reason: string; runId?: string }>;
+/** One run covers intake refresh, qualification, ack, compose and dispatch:
+ * the serialized transport lane can queue each invoke for minutes on a loaded
+ * host, so the budget bounds the whole run, not any single call. */
+const RUN_BUDGET_MS = 600_000;
+/** Intake outcomes that indicate pipeline trouble and therefore journal an
+ * ignored run as evidence. Ordinary silence (keyword-absent, owner activity,
+ * rate limits, cooldowns) stays unjournaled. */
+const AUDITED_INTAKE_DROPS = new Set(["stale-event", "superseded", "invalid-event-or-state", "route-mismatch"]);
 
 function composeResult(value: unknown, contact: ContactSettings): readonly ActionIntent[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid response");
@@ -69,7 +77,16 @@ export class ButlerRuntime {
     const snapshot = await this.refresh(contact, event);
     const admittedAt = this.clock();
     const decision = decideReply(settings, contact, event, snapshot.state, admittedAt);
-    if (decision.outcome === "ignore") return { status: "ignored", reason: decision.reason };
+    if (decision.outcome === "ignore") {
+      // Drops that indicate pipeline trouble are evidence, not noise: journal
+      // them under a namespaced event id so the outcome stays visible without
+      // colliding with the event's real claim or replaying on re-drain.
+      if (AUDITED_INTAKE_DROPS.has(decision.reason)) {
+        const dropId = randomUUID();
+        if (this.ports.journal.claim(dropId, contact.id, `drop:${event.id}`, this.clock())) this.ports.journal.transition(dropId, "running", "ignored", `intake:${decision.reason}`, this.clock());
+      }
+      return { status: "ignored", reason: decision.reason };
+    }
     if (decision.outcome === "defer") return { status: "deferred", reason: decision.reason };
     // The capability and qualification gates are independent reads; fetching
     // them together keeps a transport status session off the serial run path.
@@ -87,7 +104,7 @@ export class ButlerRuntime {
     if (!this.ports.journal.claim(runId, contact.id, event.id, this.clock())) return { status: "duplicate-or-busy", reason: "event-or-contact-already-claimed" };
     const controller = new AbortController();
     this.active.set(contact.id, controller);
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const timeout = setTimeout(() => controller.abort(), RUN_BUDGET_MS);
     const hook: HookContext = { contactId: contact.id, runId, eventId: event.id, signal: controller.signal };
     const request: AgentRequest = { runId, contact, event, signal: controller.signal, capabilities: capabilities.value.capabilities.filter(value => value.available).map(value => value.capability) };
     let state: RunState = "running";
@@ -117,8 +134,10 @@ export class ButlerRuntime {
         this.dispatching.add(contact.id);
         const ackReceipt = await this.ports.transport.submit(ack.value, { mode: "delegated", grantId: grant }, controller.signal).catch(() => null);
         this.dispatching.delete(contact.id);
-        if (ackReceipt === null || !ackReceipt.ok || ackReceipt.value.state === "indeterminate" || ackReceipt.value.state === "partial") return finish("indeterminate", "ack-dispatch-unknown");
-        if (ackReceipt.value.state === "submitted" && ackReceipt.value.acceptedMessageIds) {
+        // An ack that provably never dispatched is skipped, not wedged: the
+        // reply itself still proceeds. Only unknown ack outcomes block.
+        if (ackReceipt === null || (!ackReceipt.ok && ackReceipt.error.code !== "dispatch-failed") || (ackReceipt.ok && (ackReceipt.value.state === "indeterminate" || ackReceipt.value.state === "partial"))) return finish("indeterminate", "ack-dispatch-unknown");
+        if (ackReceipt.ok && ackReceipt.value.state === "submitted" && ackReceipt.value.acceptedMessageIds) {
           this.ports.journal.recordSentMessages(contact.id, `${runId}:ack`, ackReceipt.value.acceptedMessageIds, this.clock());
           for (const id of ackReceipt.value.acceptedMessageIds) if (id !== null) ackIds.add(id);
         }
@@ -169,7 +188,9 @@ export class ButlerRuntime {
       state = "dispatching";
       this.dispatching.add(contact.id);
       const receipt = await this.ports.transport.submit(plan.value, { mode: "delegated", grantId: grant }, controller.signal);
-      if (!receipt.ok) return finish("indeterminate", "dispatch-result-unknown");
+      // A proven non-send fails the run cleanly instead of blocking the
+      // contact; only an outcome the provider cannot arbitrate stays uncertain.
+      if (!receipt.ok) return finish(receipt.error.code === "dispatch-failed" ? "failed" : "indeterminate", receipt.error.code === "dispatch-failed" ? "dispatch-failed" : "dispatch-result-unknown");
       if (receipt.value.acceptedMessageIds) this.ports.journal.recordSentMessages(contact.id, receipt.value.runId, receipt.value.acceptedMessageIds, this.clock());
       const result = finish(receipt.value.state, receipt.value.state);
       if (receipt.value.state === "submitted") {

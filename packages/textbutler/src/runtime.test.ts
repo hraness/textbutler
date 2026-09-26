@@ -110,10 +110,44 @@ test("an admitted event does not go stale while a slow reply is drafted", async 
   expect((await fixture.runtime.process(aged)).status).toBe("submitted");
   expect(fixture.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
 });
-test("an event that surfaces already stale is still ignored", async () => {
+test("an event delayed past the old drain window still replies, while a truly stale one is ignored and journaled", async () => {
   const fixture = setup();
-  expect((await fixture.runtime.process({ ...event, occurredAt: now - 130_000, observedAt: now - 130_000 })).reason).toBe("stale-event");
-  expect(fixture.submitted).toEqual([]);
+  // Five-minute delivery lag used to read as staleness; it is ordinary
+  // congestion now. The revision check, not the clock, rejects real replays.
+  expect((await fixture.runtime.process({ ...event, occurredAt: now - 300_000, observedAt: now - 60_000 })).status).toBe("submitted");
+  expect(fixture.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
+
+  expect((await fixture.runtime.process({ ...event, id: "m2", occurredAt: now - 16 * 60_000, observedAt: now - 60_000 })).reason).toBe("stale-event");
+  // Pipeline-trouble drops leave evidence under a namespaced event id that can
+  // never collide with the event's real claim.
+  expect(fixture.journal.recent("c1").map(run => [run.eventId, run.state, run.reason]))
+    .toContainEqual(["drop:m2", "ignored", "intake:stale-event"]);
+});
+test("a proven non-send fails the run cleanly and never blocks the contact", async () => {
+  const fixture = setup();
+  const defaultSubmit = fixture.transport.submit;
+  let refused = false;
+  fixture.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack") || refused) return defaultSubmit(plan, options, signal);
+    refused = true;
+    return { ok: false as const, error: { code: "dispatch-failed" as const, message: "Provider proved the send never started.", retryable: false as const } };
+  };
+  expect((await fixture.runtime.process(event)).status).toBe("failed");
+  expect(fixture.journal.hasUncertainSend("c1")).toBe(false);
+  expect(fixture.journal.recent("c1")[0]?.reason).toBe("dispatch-failed");
+  // A proven failure leaves the contact free: the next event sends normally.
+  expect((await fixture.runtime.process({ ...event, id: "m2" })).status).toBe("submitted");
+});
+test("a provably unsent ack is skipped while the reply still dispatches", async () => {
+  const fixture = setup();
+  const defaultSubmit = fixture.transport.submit;
+  fixture.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack")) return { ok: false as const, error: { code: "dispatch-failed" as const, message: "Provider proved the send never started.", retryable: false as const } };
+    return defaultSubmit(plan, options, signal);
+  };
+  expect((await fixture.runtime.process(event)).status).toBe("submitted");
+  expect(fixture.acks).toEqual([]);
+  expect(fixture.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
 });
 test("owner takeover while composing cancels the send", async () => {
   const fixture = setup();
