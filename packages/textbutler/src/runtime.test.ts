@@ -16,14 +16,14 @@ function setup(overrides: Partial<RuntimePorts> = {}) {
   const contact = { ...newContact("c1", "Example", "r1"), enabled: true, mode: "smart" as const };
   let settings: Settings = parseSettings({ schemaVersion: 1, paused: false, maxActiveContacts: 5, contacts: [contact] });
   let snapshot: ConversationSnapshot = { contextId: "ctx1", messageIds: ["m1"], state: { latestRevision: "v1", lastOwnerAt: null, ownerTyping: false, synchronizedAt: now, repliesInLastHour: 0 } };
-  const submitted: ActionIntent[][] = [];
+  const submitted: ActionIntent[][] = [], acks: ActionIntent[][] = [];
   const transport: TextbutlerTransport = {
     capabilities: async () => ({ ok: true, value: { protocol: TRANSPORT_PROTOCOL, provider: "synthetic", capabilities: ["text", "attachment", "reaction", "sticker", "link", "autonomous-send"].map(capability => ({ capability: capability as "text", available: true, reason: null })) } }),
     conversations: async () => ({ ok: true, value: [] }), contacts: async () => ({ ok: true, value: [] }),
     history: async () => { throw new Error("not used"); }, events: async () => { throw new Error("not used"); },
     prepare: async (request: PrepareRequest) => ({ ok: true, value: { protocol: TRANSPORT_PROTOCOL, id: "p1", intentId: request.intentId, conversationId: request.conversationId, contextId: request.contextId, digest: "a".repeat(64), expiresAt: new Date(now + 1000).toISOString(), actions: request.actions } }),
     submit: async plan => {
-      submitted.push([...plan.actions]);
+      (plan.intentId.endsWith(":ack") ? acks : submitted).push([...plan.actions]);
       return { ok: true, value: { planId: plan.id, runId: "receipt1", state: "submitted", submittedCount: plan.actions.length, totalCount: plan.actions.length, acceptedMessageIds: plan.actions.map((_action, index) => `accepted:${plan.id}:${index}`), recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
     },
   };
@@ -33,7 +33,7 @@ function setup(overrides: Partial<RuntimePorts> = {}) {
     delegatedGrant: async () => "contact-bound-grant", validateFile: async () => {}, clock: () => now, ...overrides,
   };
   const runtime = new ButlerRuntime(ports);
-  return { runtime, ports, transport, submitted, journal, setSettings: (next: Settings) => { settings = next; }, getSettings: () => settings, setSnapshot: (next: ConversationSnapshot) => { snapshot = next; }, getSnapshot: () => snapshot };
+  return { runtime, ports, transport, submitted, acks, journal, setSettings: (next: Settings) => { settings = next; }, getSettings: () => settings, setSnapshot: (next: ConversationSnapshot) => { snapshot = next; }, getSnapshot: () => snapshot };
 }
 test("wraps every text response and never replays one event", async () => {
   const fixture = setup();
@@ -41,6 +41,56 @@ test("wraps every text response and never replays one event", async () => {
   expect(fixture.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
   expect((await fixture.runtime.process(event)).status).toBe("duplicate-or-busy");
   expect(fixture.submitted.length).toBe(1);
+});
+test("a disclosed ack lands first while the reply composes", async () => {
+  const fixture = setup();
+  expect((await fixture.runtime.process(event)).status).toBe("submitted");
+  expect(fixture.acks).toEqual([[{ kind: "text", text: "🤖{ … }" }]]);
+  expect(fixture.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
+  // The journaled ack send attributes its own history echo to the butler.
+  expect(fixture.journal.knownSentMessage("accepted:p1:0")).toBe(true);
+  fixture.setSettings({ ...fixture.getSettings(), contacts: fixture.getSettings().contacts.map(c => ({ ...c, disclosure: { character: "", begin: "", end: "" } })) });
+  fixture.setSnapshot({ ...fixture.getSnapshot(), messageIds: ["m1", "m2"] });
+  expect((await fixture.runtime.process({ ...event, id: "m2", text: "butler again" })).status).toBe("submitted");
+  expect(fixture.acks[1]).toEqual([{ kind: "text", text: "…" }]);
+});
+test("an unproven ack wedges the run; a proven failure only skips it", async () => {
+  const fixture = setup();
+  const defaultSubmit = fixture.transport.submit;
+  fixture.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack")) throw new Error("dispatch lost");
+    return defaultSubmit(plan, options, signal);
+  };
+  // A thrown submit is an unknown dispatch result: the run goes indeterminate
+  // instead of replying into unproven conversation state.
+  expect((await fixture.runtime.process(event)).status).toBe("indeterminate");
+  expect(fixture.submitted).toEqual([]);
+  const recovered = setup();
+  const recoveredSubmit = recovered.transport.submit;
+  recovered.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack")) return { ok: true, value: { planId: plan.id, runId: "receipt-failed", state: "failed" as const, submittedCount: 0, totalCount: plan.actions.length, acceptedMessageIds: null, recordedAt: new Date(now).toISOString(), delivery: "unknown" as const, retryable: false as const } };
+    return recoveredSubmit(plan, options, signal);
+  };
+  expect((await recovered.runtime.process(event)).status).toBe("submitted");
+  expect(recovered.submitted).toEqual([[{ kind: "text", text: "🤖{ Hello there. }" }]]);
+});
+test("the ack's own history echo does not cancel the reply it precedes", async () => {
+  const fixture = setup();
+  // The ack send bumps the enrollment revision before the post-compose
+  // recheck. Only the echo's journaled id may explain the drift; a foreign id
+  // still cancels as conversation-changed.
+  fixture.ports.agent.compose = async () => {
+    fixture.setSnapshot({ contextId: "ctx2", messageIds: ["m1", "accepted:p1:0"], state: { latestRevision: "v2", lastOwnerAt: null, ownerTyping: false, synchronizedAt: now, repliesInLastHour: 0 } });
+    return { summary: "I can help.", actions: [{ kind: "text", text: "Hello there." }] };
+  };
+  expect((await fixture.runtime.process(event)).status).toBe("submitted");
+  const raced = setup();
+  raced.ports.agent.compose = async () => {
+    raced.setSnapshot({ contextId: "ctx2", messageIds: ["m1", "m9"], state: { latestRevision: "v2", lastOwnerAt: null, ownerTyping: false, synchronizedAt: now, repliesInLastHour: 0 } });
+    return { summary: "I can help.", actions: [{ kind: "text", text: "Hello there." }] };
+  };
+  expect((await raced.runtime.process(event)).status).toBe("cancelled");
+  expect(raced.submitted).toEqual([]);
 });
 test("nontext intent gets a disclosed companion before the action", async () => {
   const fixture = setup();
@@ -94,7 +144,11 @@ test("disabling contact during composition prevents sending", async () => {
 });
 test("uncertain effect is journaled and blocks subsequent replies", async () => {
   const fixture = setup();
-  fixture.transport.submit = async () => { throw new Error("connection lost after send"); };
+  const defaultSubmit = fixture.transport.submit;
+  fixture.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack")) return defaultSubmit(plan, options, signal);
+    throw new Error("connection lost after send");
+  };
   expect((await fixture.runtime.process(event)).status).toBe("indeterminate");
   expect((await fixture.runtime.process({ ...event, id: "m2" })).reason).toBe("reconcile-previous-send");
   expect(fixture.journal.recent("c1")[0]?.planDigest).toBe("a".repeat(64));
@@ -115,7 +169,9 @@ test.each(["partial", "indeterminate"] as const)("a concurrent event cannot clai
     composeCalls++;
     return { summary: "Synthetic response", actions: Array.from({ length: state === "partial" ? 2 : 1 }, (_, index) => ({ kind: "text", text: `Synthetic response ${index + 1}` })) };
   };
-  fixture.transport.submit = async plan => {
+  const defaultSubmit = fixture.transport.submit;
+  fixture.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack")) return defaultSubmit(plan, options, signal);
     sendCalls++; sendEntered.resolve(); await settleSend.promise;
     return { ok: true, value: { planId: plan.id, runId: "synthetic-uncertain", state, submittedCount: state === "partial" ? 1 : 0, totalCount: plan.actions.length, acceptedMessageIds: null, recordedAt: new Date(now).toISOString(), delivery: "unknown", retryable: false } };
   };
@@ -213,7 +269,9 @@ test("accepted message ids attribute disclosure-free sends to the butler", async
 test("a late cancel cannot abort a send already in dispatch", async () => {
   const fixture = setup();
   const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
-  fixture.transport.submit = async (plan, _options, signal) => {
+  const defaultSubmit = fixture.transport.submit;
+  fixture.transport.submit = async (plan, options, signal) => {
+    if (plan.intentId.endsWith(":ack")) return defaultSubmit(plan, options, signal);
     entered.resolve(); await release.promise;
     // A real transport races this signal and would report the send as unknown;
     // the dispatch guard must keep it from firing after the intent is journaled.

@@ -1,0 +1,33 @@
+{
+  "kind": "independent-ai-source-review",
+  "scope": "Fast acknowledgement for admitted replies in ButlerRuntime.process (packages/textbutler/src/runtime.ts): a disclosure-wrapped text ack sent after admission and before agent composition, plus the relaxed post-compose supersession check that tolerates the ack's own history echo.",
+  "rounds": [
+    {
+      "round": 1,
+      "design": "Fire-and-forget Tapback reaction on the triggering message (disclosure emoji or 👀 fallback), unawaited before reply.compose.",
+      "verdict": "blockers",
+      "blockers": [
+        "iMessage admits only the six standard Tapback emoji (heart, thumbs-up, thumbs-down, laugh, emphasize, question) and rejects everything else at dispatch — a 🤖 or 👀 ack could never land on the primary provider.",
+        "Outgoing reaction echoes cannot be journaled (iMessage returns null messageId for reactions) and therefore attribute to the owner: they bump lastOwnerAt and latestRevision, which would cancel the very reply being acknowledged and suppress the contact for the whole human cooldown.",
+        "An indeterminate reaction dispatch leaves an unresolved upstream run that wedges every subsequent dispatch, invisible to `replies reconcile` because the ack was never journaled."
+      ]
+    },
+    {
+      "round": 2,
+      "design": "Redesigned as an awaited disclosure-wrapped text ack (`🤖{ … }`): text works on every provider, the echo attributes to the butler via disclosure wrap and journaled acceptedMessageIds, indeterminate dispatch wedges the run honestly, and the post-compose recheck relaxes to a foreign-new-message-id check for acked runs only.",
+      "verdict": "blockers-fixed",
+      "blockers": [
+        "Ack submit ran outside the contact's dispatching guard, so cancelContact/pause could abort it mid-dispatch and manufacture an indeterminate where the reply path yields a clean cancelled. Fixed by holding this.dispatching across the ack submit, mirroring the reply send.",
+        "The foreign-id exemption used the global sent_messages journal, so an owner manual `replies send` landing mid-compose would be excused too — a double-send the old scalar revision check reliably cancelled. Fixed by exempting only this run's acceptedMessageIds via a local Set."
+      ],
+      "acceptedNits": [
+        "Beeper may resolve the accepted pendingMessageId alias to a different final provider id; on divergence the ack echo counts as foreign and the run cancels — fail-safe direction.",
+        "For acked runs, contact reactions/edits/deletes mid-compose no longer cancel (they add no message id); owner activity still cancels via lastOwnerAt across all kinds.",
+        "Hook vetoes now run after the ack is on the wire — the ack means 'seen', semantically defensible.",
+        "The ack consumes one grant action and is 1:1 with admitted inbound events."
+      ],
+      "verification": "iMessage accepted id round-trips to the history row id (guid); WhatsApp ledger is consistent by construction; journal provenance covers cleared-disclosure contacts."
+    }
+  ],
+  "result": "Ship. The text ack lands while composition runs, precedes the reply through the serialized lane, journals provenance like any other send, surfaces dispatch uncertainty as a reconcilable indeterminate instead of an invisible upstream wedge, and preserves supersession cancels for any foreign new message."
+}
