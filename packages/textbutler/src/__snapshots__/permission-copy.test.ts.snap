@@ -1,0 +1,126 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`permission copy follows the shared templates pre-prompt notices: fda interactive 1`] = `
+"🔐 Textbutler needs Full Disk Access to read your Messages.
+   macOS doesn't ask for this. Turn on Textbutler in System Settings › Privacy & Security › Full Disk Access. Only the chats you pick are read.
+   Press Enter to open Settings · s to skip
+"
+`;
+
+exports[`permission copy follows the shared templates pre-prompt notices: fda non-interactive 1`] = `
+"🔐 Textbutler needs Full Disk Access to read your Messages.
+   macOS doesn't ask for this. Turn on Textbutler in System Settings › Privacy & Security › Full Disk Access. Only the chats you pick are read.
+"
+`;
+
+exports[`permission copy follows the shared templates pre-prompt notices: automation interactive 1`] = `
+"🔐 macOS will ask to let Textbutler control Messages.
+   Textbutler only sends replies in chats you turn on. Change this any time in System Settings › Privacy & Security › Automation.
+   Press Enter to continue · s to skip
+"
+`;
+
+exports[`permission copy follows the shared templates pre-prompt notices: automation ascii 1`] = `
+"NOTE macOS will ask to let Textbutler control Messages.
+   Textbutler only sends replies in chats you turn on. Change this any time in System Settings › Privacy & Security › Automation.
+"
+`;
+
+exports[`permission copy follows the shared templates recovery after a denial or an unconfirmed result: full-disk-access denied interactive 1`] = `
+"✗ Textbutler can't read your Messages: macOS access is off for Textbutler.
+  Turn on Textbutler in System Settings › Privacy & Security › Full Disk Access.
+→ textbutler doctor · press o to open Settings
+"
+`;
+
+exports[`permission copy follows the shared templates recovery after a denial or an unconfirmed result: full-disk-access denied ascii 1`] = `
+"FAIL Textbutler can't read your Messages: macOS access is off for Textbutler.
+  Turn on Textbutler in System Settings › Privacy & Security › Full Disk Access.
+-> textbutler doctor
+"
+`;
+
+exports[`permission copy follows the shared templates recovery after a denial or an unconfirmed result: full-disk-access unknown 1`] = `
+"✗ Textbutler couldn't read your Messages. macOS may be blocking Textbutler.
+  Check System Settings › Privacy & Security › Full Disk Access.
+→ textbutler doctor
+"
+`;
+
+exports[`permission copy follows the shared templates recovery after a denial or an unconfirmed result: automation denied interactive 1`] = `
+"✗ Textbutler can't control Messages: macOS access is off for Textbutler.
+  Turn on Textbutler in System Settings › Privacy & Security › Automation.
+→ textbutler doctor · press o to open Settings
+"
+`;
+
+exports[`permission copy follows the shared templates recovery after a denial or an unconfirmed result: automation denied ascii 1`] = `
+"FAIL Textbutler can't control Messages: macOS access is off for Textbutler.
+  Turn on Textbutler in System Settings › Privacy & Security › Automation.
+-> textbutler doctor
+"
+`;
+
+exports[`permission copy follows the shared templates recovery after a denial or an unconfirmed result: automation unknown 1`] = `
+"✗ Textbutler couldn't control Messages. macOS may be blocking Textbutler.
+  Check System Settings › Privacy & Security › Automation.
+→ textbutler doctor
+"
+`;
+
+exports[`pre-prompt and recovery by audience recovery offers o to open the pane only after a denial at a terminal: automation denied recovery 1`] = `
+"✗ Textbutler can't control Messages: macOS access is off for Textbutler.
+  Turn on Textbutler in System Settings › Privacy & Security › Automation.
+→ textbutler doctor · press o to open Settings
+"
+`;
+
+exports[`doctor's macOS access step walks from installing the app to a finished setup: access steps 1`] = `
+[
+  {
+    "command": "textbutler help permissions",
+    "detail": "iMessage works through the Textbutler app on this Mac. Install it, then turn on Textbutler in System Settings › Privacy & Security › Full Disk Access.",
+    "id": "macos-access",
+    "settingsUrl": "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+    "status": "action-needed",
+    "title": "macOS access for iMessage",
+  },
+  {
+    "command": "bun run textbutler:app imessage-setup --data-dir <data-dir>",
+    "detail": "Turn on Textbutler in System Settings › Privacy & Security › Full Disk Access, then run app setup. macOS will ask to let Textbutler control Messages.",
+    "id": "macos-access",
+    "settingsUrl": "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+    "status": "action-needed",
+    "title": "macOS access for iMessage",
+  },
+  {
+    "command": "bun run textbutler:app imessage-setup --data-dir <data-dir>",
+    "detail": "Textbutler can't control Messages: macOS access is off for Textbutler. Turn on Textbutler in System Settings › Privacy & Security › Automation. macOS won't ask again, so run app setup again after you turn it on.",
+    "id": "macos-access",
+    "settingsUrl": "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+    "status": "blocked",
+    "title": "macOS access for iMessage",
+  },
+  {
+    "command": "bun run textbutler:app imessage-setup --data-dir <data-dir>",
+    "detail": "Textbutler couldn't control Messages. macOS may be blocking Textbutler. Check System Settings › Privacy & Security › Automation. Then run app setup again.",
+    "id": "macos-access",
+    "settingsUrl": "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+    "status": "blocked",
+    "title": "macOS access for iMessage",
+  },
+  {
+    "command": "bun run textbutler:app imessage-setup --data-dir <data-dir>",
+    "detail": "App setup stopped before it finished. Run it again.",
+    "id": "macos-access",
+    "status": "action-needed",
+    "title": "macOS access for iMessage",
+  },
+  {
+    "detail": "Textbutler can control Messages. If iMessage chats stop loading, turn on Textbutler in System Settings › Privacy & Security › Full Disk Access.",
+    "id": "macos-access",
+    "status": "done",
+    "title": "macOS access for iMessage",
+  },
+]
+`;

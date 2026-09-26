@@ -98,7 +98,7 @@ describe("Textbutler CLI style contract", () => {
     expect(text.text.split("\n").slice(0, 9).join("\n")).toBe([
       "Textbutler readiness", "",
       "⚠ Private settings", "  Create your private settings. Automatic replies start paused.",
-      "⚠ Messaging apps", "  Connect iMessage, WhatsApp, or Beeper (for Signal, Telegram and more). Sign-in and permissions for each app happen in Ghostget.",
+      "⚠ Messaging apps", "  Connect iMessage, WhatsApp, or Beeper (for Signal, Telegram and more). Sign in to each app with Ghostget. iMessage also needs macOS access for Textbutler.",
       "⚠ Background service", "  Start the background service. It keeps running after you close the terminal or menu.",
       "⚠ Choose conversations",
     ].join("\n"));

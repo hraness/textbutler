@@ -12,9 +12,10 @@ import { requestDaemon } from "./daemon.ts";
 import { loadHostConfig, parseHostConfig, type HostConfig } from "./host-config.ts";
 import { nativeSubscriptionAccount } from "./native-subscription.ts";
 import { CliUsageError, symbolsFor, type Symbols } from "./cli-style.ts";
+import { macosAccessStep } from "./permission-readiness.ts";
 
 /** "skipped" marks a step that doesn't apply or that the owner left off on purpose. */
-export interface SetupStep { id: string; title: string; status: "done" | "action-needed" | "blocked" | "skipped"; detail: string; command?: string }
+export interface SetupStep { id: string; title: string; status: "done" | "action-needed" | "blocked" | "skipped"; detail: string; command?: string; settingsUrl?: string }
 export interface Readiness {
   ok: boolean; platform: string; dataDir: string; initialized: boolean; daemonConnected: boolean;
   automaticReplies: "running" | "paused" | "unavailable";
@@ -48,8 +49,10 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
     detail: connected.length > 0 ? `Connected: ${connected.map(appName).join(", ")}. Next, choose the chats Textbutler may answer.`
       : configured.length > 0 && !snapshot ? `Set up: ${configured.map(account => appName(account.provider)).join(", ")}. The background service connects them when it starts.`
       : configured.length > 0 ? "Your messaging apps are set up but not loaded. Restart the background service to load them."
-      : "Connect iMessage, WhatsApp, or Beeper (for Signal, Telegram and more). Sign-in and permissions for each app happen in Ghostget.",
+      : "Connect iMessage, WhatsApp, or Beeper (for Signal, Telegram and more). Sign in to each app with Ghostget. iMessage also needs macOS access for Textbutler.",
     command: connected.length > 0 ? "textbutler messaging list" : configured.length > 0 ? "textbutler daemon install" : "textbutler tui" });
+  const access = await macosAccessStep({ dataDir, imessageConfigured: configured.some(account => account.provider === "imessage") || connected.includes("imessage") });
+  if (access) steps.push(access);
   steps.push({ id: "daemon", title: "Background service", status: snapshot ? "done" : "action-needed",
     detail: snapshot ? "Running." : "Start the background service. It keeps running after you close the terminal or menu.",
     ...(!snapshot ? { command: "textbutler daemon install" } : {}) });
