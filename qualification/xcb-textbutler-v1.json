@@ -23,10 +23,10 @@
     "packages/textbutler/src/native-task.ts": "122ba7b346ba9cbaca3d1c71270c32e6d6dda37e4c59c8a34c4051c8241859f4",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
     "packages/textbutler/src/control-service.ts": "185874912a60352805e346234fa9b4eb8d60e510702cdbb2a1313b2f561d7d86",
-    "packages/textbutler/src/contact-habitat.ts": "bea4ecdba1f74ee7591e6a06799e3c9d01cb41d5d287bc78802f0f81255c45fe",
+    "packages/textbutler/src/contact-habitat.ts": "4df0c1e1ab17c3337311beda044127cf59e54b317931b5c250dcdff0ba4fc71f",
     "packages/textbutler/src/contact-repos.ts": "6b51b022526f98e4ea360e5cd730ce6053f0447d5204f1eef08fe04301fa6783",
-    "packages/textbutler/src/habitat-agent.ts": "51ba8d39757d5e5822b2d519b950063cb73628884691b502fcd427928a0caef3",
-    "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
+    "packages/textbutler/src/habitat-agent.ts": "f0a9b384436882115fccaa9615de1e5933bf714c83a0182bb53334573f3f77b0",
+    "packages/textbutler/src/habitat-program.ts": "20562a8c2d01ae2ef98268633aaeda8eef09222bc36f6eea554276ffe6757275",
     "packages/textbutler/src/javascript-tool.ts": "6ae01458d0eb16c44c5a5c06e7d4790245ed592cb0885d81c4f6a8d082a66ad7",
     "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
     "packages/textbutler/src/memory-search.ts": "39036b33a3e573d1bb5f4f26d7b4520013224ee20f0a6004de09b2199867abcd",
@@ -59,6 +59,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "a32207faa781aed2a876caf4166734a3ae95a5ae291539f3c37fd74fc3f808a8"
+    "receiptSha256": "e9b81e1d2188b86f951cacfa1ad28ad2bc2466e86651364301d7f1bf671d5afb"
   }
 }

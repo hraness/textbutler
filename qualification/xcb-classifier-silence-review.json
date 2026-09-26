@@ -1,0 +1,59 @@
+{
+ "version": 1,
+ "reviewer": {
+  "kind": "independent-ai-source-review",
+  "agent": "devin-cli-subagent/explore-review",
+  "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and diff read-only against the pinned base digests and produced only this review record. Source digests it could not hash itself were verified by the integrating agent with shasum and are re-derived fail-closed by validateXcbIntegrationAdmission."
+ },
+ "sourceState": {
+  "branch": "devin/classifier-share-silence",
+  "baseCommit": "96f5c63",
+  "headCommit": "devin/classifier-share-silence tip",
+  "identity": "Source digests identify the reviewed bytes; commits alone do not."
+ },
+ "scope": "The smart-mode explicit-ask fix: a bare shared link scored respond=true at 0.95 confidence in production (run bb48d8c4, docs.google.com share with no question), sending an unwanted reply. The four decision-language surfaces are tightened so only an explicit question, task request, or direct address can clear the 0.85 reply gate: the respond-phase instruction (habitat-program.ts), the rules contract embedded in the model context (habitat-agent.ts), the non-habitat CLASSIFIER_INSTRUCTIONS (decision.ts), and the DEFAULT_HABITAT_PLAN.guidance seed (contact-habitat.ts), plus regression pins in habitat-program.test.ts, habitat-agent.test.ts, policy.test.ts and contact-habitat.test.ts covering all four surfaces.",
+ "method": "Read-only inspection of the diff and the surrounding decide/compose flow (decision.ts classify path, runtime.ts:103 threshold enforcement, habitat-agent.ts rules/context assembly and the 0.85 clamps, habitat-program.ts manifest prompt interpolation, contact-habitat.ts plan seeding, routed-agent.ts CLASSIFIER_INSTRUCTIONS usage), plus a repo-wide search for other silent/confidence decision surfaces. Verification of the three bundled-source receipt digests was performed by the integrating agent (shasum -a 256) since the reviewer has no shell; the admission validator re-derives every digest fail-closed at build and check time.",
+ "result": "Ship. Enforcement is code, not prose: runtime.ts:103 ignores respond=true below 0.85, habitat-agent.ts forces respond=false and strips actions/tool under threshold, compose throws NoReplyNeeded, classify runs with allowedTools=[], and the 0.85 gate cannot be reached by a bare share under the new wording. The new rules live in non-evolvable host instruction text, so self-evolution cannot promote them away; plan.guidance remains untrusted style data under host authority. Output schema, reason enum, identity/disclosure/commitment sentences, keyword bypass and all decideReply gates are unchanged. Every one of the four surfaces now carries a regression pin that fails on revert.",
+ "findings": [
+  {
+   "severity": "note",
+   "status": "resolved",
+   "file": "packages/textbutler/src/habitat-program.test.ts, packages/textbutler/src/habitat-agent.test.ts, packages/textbutler/src/policy.test.ts, packages/textbutler/src/contact-habitat.test.ts",
+   "finding": "The initial regression test pinned only the respond-phase instruction; a revert of the rules contract, CLASSIFIER_INSTRUCTIONS or default plan guidance would have passed the suite.",
+   "recommendation": "Pin each surface.",
+   "resolution": "Fixed: added a driver-body pin for the rules contract, a CLASSIFIER_INSTRUCTIONS pin in policy.test.ts and a DEFAULT_HABITAT_PLAN.guidance pin in contact-habitat.test.ts."
+  },
+  {
+   "severity": "note",
+   "status": "resolved",
+   "file": "packages/textbutler/src/decision.ts:68",
+   "finding": "The instructions said \"confidence above 0.85\" while the code admits at >= 0.85.",
+   "recommendation": "Use exact threshold wording.",
+   "resolution": "Fixed: \"confidence at or above 0.85 requires an explicit request\"."
+  },
+  {
+   "severity": "note",
+   "status": "accepted",
+   "file": "packages/textbutler/src/habitat-agent.ts:192, packages/textbutler/src/habitat-program.ts:6",
+   "finding": "Surfaces diverge slightly on shares combined with a direct address: the rules string silences a share without an explicit question or request while the program instruction permits reply on a direct address alone. Silence-favoring and safe; a share captioned with a request still qualifies as a request under both.",
+   "recommendation": "Accept; tightening further would narrow the intentionally allowed direct-address case.",
+   "resolution": "Accepted."
+  },
+  {
+   "severity": "note",
+   "status": "accepted",
+   "file": "packages/textbutler/src/habitat-program.ts:6",
+   "finding": "Minor phrasing redundancy (\"stay silent. So stay silent\") in the respond instruction.",
+   "recommendation": "Optional cosmetic cleanup in a future prompt change.",
+   "resolution": "Accepted; not worth invalidating validated digests for prose polish."
+  },
+  {
+   "severity": "note",
+   "status": "pre-existing",
+   "file": "packages/textbutler/src/decision.ts:64-67",
+   "finding": "classificationAllowsReply has no callers; runtime.ts:103 duplicates the threshold inline.",
+   "recommendation": "Unchanged by this diff; track separately.",
+   "resolution": "Out of scope."
+  }
+ ]
+}

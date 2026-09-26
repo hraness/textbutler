@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { configureContact, DEFAULT_ACTIVE_LIMIT, disclose, disclosedText, disclosureMarkers, newContact, parseDisclosure, parseSettings } from "./config.ts";
-import { decideReply, keywordPresent, type ConversationState, type MessageEvent } from "./decision.ts";
+import { CLASSIFIER_INSTRUCTIONS, decideReply, keywordPresent, type ConversationState, type MessageEvent } from "./decision.ts";
 
 const now = 1_800_000_000_000;
 const contact = { ...newContact("c1", "Example", "r1"), enabled: true };
@@ -75,5 +75,12 @@ describe("reply admission", () => {
     expect(decideReply(settings, contact, aged, { ...state, synchronizedAt: now }, now).reason).toBe("stale-event");
     expect(decideReply(settings, contact, aged, { ...state, synchronizedAt: now }, now, now - 100_000).outcome).toBe("reply");
     expect(decideReply(settings, contact, aged, { ...state, lastOwnerAt: now - 20_000 }, now, now - 100_000).reason).toBe("owner-active");
+  });
+  test("the smart classifier requires an explicit ask and keeps shares silent", () => {
+    expect(CLASSIFIER_INSTRUCTIONS).toContain("explicitly asks for help");
+    expect(CLASSIFIER_INSTRUCTIONS).toContain("a question, a task, or a direct address");
+    expect(CLASSIFIER_INSTRUCTIONS).toContain("A shared link, document, or media item without an explicit ask is context, not a request");
+    expect(CLASSIFIER_INSTRUCTIONS).toContain("confidence at or above 0.85 requires an explicit request");
+    expect(CLASSIFIER_INSTRUCTIONS).toContain("You have no tools");
   });
 });

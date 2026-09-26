@@ -16,7 +16,7 @@ const planSchema = planInputSchema.transform((value): HabitatPlan => {
   const { personality, javascript, memorySearch, soulCore, repoAccess, ...plan } = value;
   return { ...plan, ...(personality === undefined ? {} : { personality }), ...(javascript === undefined ? {} : { javascript }), ...(memorySearch === undefined ? {} : { memorySearch }), ...(soulCore === undefined ? {} : { soulCore }), ...(repoAccess === undefined ? {} : { repoAccess }) };
 });
-export const DEFAULT_HABITAT_PLAN: HabitatPlan = Object.freeze({ version: 1, guidance: "Be useful, concise, and honest. Match explicit preferences; do not manufacture familiarity. Stay silent when help is not wanted.", contextMessages: 12, maxReplyCharacters: 640, humor: "match", webSearch: false, memeSearch: true, javascript: false, memorySearch: true });
+export const DEFAULT_HABITAT_PLAN: HabitatPlan = Object.freeze({ version: 1, guidance: "Be useful, concise, and honest. Match explicit preferences; do not manufacture familiarity. Reply only to explicit asks; shared content and ambiguous messages stay silent.", contextMessages: 12, maxReplyCharacters: 640, humor: "match", webSearch: false, memeSearch: true, javascript: false, memorySearch: true });
 export const parseHabitatPlan = (value: unknown): HabitatPlan => Object.freeze(planSchema.parse(value));
 export const habitatDigest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const observationSchema = z.strictObject({ id, at: timestamp, author: z.enum(["owner", "contact"]), kind: z.enum(["message", "reaction"]), text: text(2048), relatedMessageId: id.nullable(), sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u).optional(), truncated: z.boolean().optional() });

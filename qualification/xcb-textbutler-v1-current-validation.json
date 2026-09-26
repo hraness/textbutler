@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the owner-approved repository-access change: contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface, and the fast gateway driver now tolerates a stray proposed action beside a tool request and salvages a schema-valid tool nested inside the actions array (bare tool object or {tool:{...}} wrapper), while malformed tool-shaped entries remain actions and fail closed; the two-step tool budget still fails closed. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone package isolation, both package test suites, and all chained typechecks.",
+  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the owner-approved repository-access change and the smart-mode explicit-ask classifier fix: the respond-phase instruction, the model-context rules contract, the standalone CLASSIFIER_INSTRUCTIONS and the default plan guidance now require an explicit question, task request or direct address before any reply, treat bare shared links, documents, media and forwarded content without an explicit ask as context that wants no reply, keep share-inferred intent below the 0.85 reply threshold, and carry regression pins on all four decision surfaces. contact-repos.ts joins the reviewed sources as a bounded per-contact git shelf (locked-env clone/fetch, staged sweep, remote-identity check, bounded read/search/list), journal.ts gains durable repo approval requests, the self-chat conversation resolves owner allow/deny deterministically outside the model, live contact allowlists gate every shelf operation, habitat plans opt in through owner-controlled repoAccess pinned against self-evolution, and control settings round-trip repos on every surface, and the fast gateway driver now tolerates a stray proposed action beside a tool request and salvages a schema-valid tool nested inside the actions array (bare tool object or {tool:{...}} wrapper), while malformed tool-shaped entries remain actions and fail closed; the two-step tool budget still fails closed. This does not establish live provider qualification, runtime confinement, macOS permissions, live messaging delivery or owner activation. Full root check includes repository tests, static policy checks, standalone isolation/build and chained TypeScript checks.",
   "toolchain": "Bun 1.3.14",
   "command": "bun run check",
   "result": {
     "exitCode": 0,
-    "passed": 1119,
+    "passed": 1123,
     "failed": 0,
-    "assertions": 13558,
+    "assertions": 13574,
     "files": 106
   },
   "invocations": [
@@ -26,9 +26,9 @@
         "command": "bun test packages",
         "result": {
           "exitCode": 0,
-          "passed": 638,
+          "passed": 642,
           "failed": 0,
-          "assertions": 5524,
+          "assertions": 5540,
           "files": 52
         }
       },
@@ -36,7 +36,7 @@
     }
   ],
   "sourceInventoryCount": 43,
-  "sourceDigest": "6bcc5095d3a020bb6e7f0b09a91b2320f3c2d62fc5f5799e84bef0d8a37cccc7",
+  "sourceDigest": "e935a075cd39dabdef5feecc58d2e4688b25dd87e92b44ddcccc357480a4f761",
   "sourceSha256": {
     "packages/control/src/index.ts": "fc1b72eb57f26137a1cc7387e7b5a879aa0682c8acb6c916ce3f4598dd5d010d",
     "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
@@ -48,10 +48,10 @@
     "packages/textbutler/src/native-task.ts": "122ba7b346ba9cbaca3d1c71270c32e6d6dda37e4c59c8a34c4051c8241859f4",
     "packages/textbutler/src/contact-capabilities.ts": "6f10a826057a49fc234d791c504ef466dd5cffa3ccafd8527fd97a29e0f0d014",
     "packages/textbutler/src/control-service.ts": "185874912a60352805e346234fa9b4eb8d60e510702cdbb2a1313b2f561d7d86",
-    "packages/textbutler/src/contact-habitat.ts": "bea4ecdba1f74ee7591e6a06799e3c9d01cb41d5d287bc78802f0f81255c45fe",
+    "packages/textbutler/src/contact-habitat.ts": "4df0c1e1ab17c3337311beda044127cf59e54b317931b5c250dcdff0ba4fc71f",
     "packages/textbutler/src/contact-repos.ts": "6b51b022526f98e4ea360e5cd730ce6053f0447d5204f1eef08fe04301fa6783",
-    "packages/textbutler/src/habitat-agent.ts": "61ed52739f8863a4d9904b045a87826588e4c60360f601ba0b5594509f0af02c",
-    "packages/textbutler/src/habitat-program.ts": "b327d205c0eebfb1746980df27f17fb646ef5da538f330209ffd7123ddfcaa1e",
+    "packages/textbutler/src/habitat-agent.ts": "f0a9b384436882115fccaa9615de1e5933bf714c83a0182bb53334573f3f77b0",
+    "packages/textbutler/src/habitat-program.ts": "20562a8c2d01ae2ef98268633aaeda8eef09222bc36f6eea554276ffe6757275",
     "packages/textbutler/src/javascript-tool.ts": "6ae01458d0eb16c44c5a5c06e7d4790245ed592cb0885d81c4f6a8d082a66ad7",
     "packages/textbutler/src/javascript-worker-entry.ts": "26112477da6fda01af8c2d5257d191d08a7a061617ad7dcc540c60f2dc521e7d",
     "packages/textbutler/src/memory-search.ts": "39036b33a3e573d1bb5f4f26d7b4520013224ee20f0a6004de09b2199867abcd",
@@ -83,16 +83,16 @@
     "bun.lock": "d7275c271129b75f91181da97a3af8450127f7b1d1e0d1c8000b1e829f0be216"
   },
   "review": {
-    "artifact": "qualification/xcb-contact-repos-review.json",
-    "sha256": "c16e2efa0726d8966d5e1c496141ddc0a95842b31d4baca947a74a771d8f08a6",
+    "artifact": "qualification/xcb-classifier-silence-review.json",
+    "sha256": "265dbf080e82d45f77fd77f581dca55b9d3597decc72e871a8cb6ff1e6d44153",
     "kind": "independent-ai-source-review",
-    "result": "Ship after five blocking fixes: reachable self-chat owner approvals proven end to end, allowlist enforcement on every shelf operation, allow-before-resolve ordering, typed client repos parsing, and public-host-only URL admission; lows fixed or accepted."
+    "result": "Ship. Threshold enforcement is code, not prose: respond=true below 0.85 is ignored and stripped of actions/tool, classify runs tool-less, and the explicit-ask rules live in non-evolvable host text. All four decision surfaces carry regression pins; no schema, identity, routing or permission text changed. Notes: rules-vs-program share wording divergence accepted (silence-favoring), threshold wording corrected to 'at or above 0.85', pre-existing dead export tracked separately."
   },
   "log": {
     "path": "qualification/xcb-textbutler-v1-current-check.log",
-    "bytes": 134818,
-    "sha256": "d077c4eb2a870ab8e967ee636c98999f90c233ae54f933cb1a9b1aa4bcaa8510",
-    "note": "Complete successful bun run check output for the owner-approved repository-access branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
+    "bytes": 135542,
+    "sha256": "c48b736b72ed8f5c747fbf25cc31497eddc2d538bc36bf492730b25a6fdcea34",
+    "note": "Complete successful bun run check output for the smart-mode explicit-ask classifier branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",

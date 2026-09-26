@@ -28,6 +28,17 @@ test("cancellation before dispatch starts no model and over-bound inputs fail cl
   expect(calls).toBe(0);
 });
 
+test("the respond instructions require an explicit ask and treat shares without one as context", async () => {
+  const result = await executeHabitatProgram({ phase: "respond", plan: DEFAULT_HABITAT_PLAN, context: {}, signal: new AbortController().signal,
+    executor: { id: "synthetic-silence", async execute(request) {
+      expect(request.prompt).toContain("explicitly asks a question, requests a task, or directly addresses");
+      expect(request.prompt).toContain("bare link, document, media item, or forwarded material");
+      expect(request.prompt).toContain("keeps confidence below 0.85");
+      return { respond: false, confidence: 0.2, reason: "not_needed", actions: [] };
+    } } });
+  expect(result.output).toMatchObject({ respond: false });
+});
+
 test("structured personality remains style data and is bound into the replayable manifest", async () => {
   const personality = { tone: "warm" as const, formality: "casual" as const };
   const result = await executeHabitatProgram({ phase: "respond", plan: { ...DEFAULT_HABITAT_PLAN, personality }, context: {}, signal: new AbortController().signal,
