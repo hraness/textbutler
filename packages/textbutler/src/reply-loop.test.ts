@@ -23,8 +23,8 @@ async function fixture(fast = false) {
   const identity = { provider: "imessage" as const, authId: "fixture", accountIdentity: "1".repeat(64), accountSubject: "synthetic-account", implementationIdentity: "2".repeat(64), sourceGeneration: "synthetic-db" };
   const conversation = { coordinate: { provider: "imessage" as const, chatGuid: "iMessage;-;fixture@example.test", service: "iMessage" as const, observedChatRowId: 1 }, title: "Synthetic", kind: "single" as const, participants: ["fixture@example.test"] };
   const enrolled = () => ({ id: "enrollment:fixture", identity, conversation, bindingDigest: automationBindingDigest(identity, conversation), revision, ready: true, reason: null });
-  const binding = automationBinding(enrolled()), events: AutomationEvent[] = [], messages: AutomationMessage[] = [], sent: readonly unknown[][] = [];
-  const mutableSent = sent as unknown[][], plans = new Map<string, AutomationPlan>(), statuses: { state: string; detail: string }[] = [];
+  const binding = automationBinding(enrolled()), events: AutomationEvent[] = [], messages: AutomationMessage[] = [], sent: readonly unknown[][] = [], acks: readonly unknown[][] = [];
+  const mutableSent = sent as unknown[][], mutableAcks = acks as unknown[][], plans = new Map<string, AutomationPlan>(), statuses: { state: string; detail: string }[] = [];
   let failEvents = 0, eventsCalls = 0;
   let beforeSubmit: (() => Promise<void>) | undefined;
   const allowed: [string, string][] = [], notices: string[] = [], synced: [string, string][] = [];
@@ -39,7 +39,7 @@ async function fixture(fast = false) {
       return { events: events.slice(Number(params.cursor ?? 0)), nextCursor: String(events.length), caughtUp: true }; }
     if (method === "status") return { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"].map(kind => [kind, { available: true, reason: null }])) };
     if (method === "prepare") { const body = { ...params, bindingDigest: binding.bindingDigest, expiresAt: new Date(time + 120000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` } as AutomationPlan; plans.set(plan.id, plan); return plan; }
-    if (method === "submit") { await beforeSubmit?.(); const plan = plans.get(String(params.planId))!; mutableSent.push([...plan.actions]); return { id: `run:${sent.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
+    if (method === "submit") { const plan = plans.get(String(params.planId))!; if (!plan.intentId.endsWith(":ack")) await beforeSubmit?.(); (plan.intentId.endsWith(":ack") ? mutableAcks : mutableSent).push([...plan.actions]); return { id: `run:${sent.length + acks.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: binding.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length + acks.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
     throw new Error(`Unexpected fixture operation ${method}`);
   }, () => time);
   let compositions = 0, classifications = 0, agent: ButlerAgent = {
@@ -62,7 +62,7 @@ async function fixture(fast = false) {
     async notifySelfChat(text: string) { notices.push(text); },
   } });
   cleanup.push(async () => { await loop.close(); journal.close(); await rm(root, { recursive: true, force: true }); });
-  return { loop, journal, sent, statuses, coordinate: conversation.coordinate, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },
+  return { loop, journal, sent, acks, statuses, coordinate: conversation.coordinate, stats: () => ({ compositions, classifications }), advance(ms: number) { time += ms; }, replaceAgent(next: ButlerAgent) { agent = next; },
     change(next: Settings) { settings = next; for (const listener of listeners) listener(next); }, settings: () => settings,
     habitatChanged(id: string) { for (const listener of habitatListeners) listener(id); }, habitatListenerCount: () => habitatListeners.size,
     beforeSubmit(callback: () => Promise<void>) { beforeSubmit = callback; },
@@ -207,8 +207,8 @@ test("one batched pollSet covers the set and a failed entry only fails its conta
   const enrolled = (id: string, conv: ReturnType<typeof conversation>) => ({ id, identity, conversation: conv, bindingDigest: automationBindingDigest(identity, conv), revision, ready: true, reason: null });
   const enrollmentA = enrolled("enrollment:a", conversation(1)), enrollmentB = enrolled("enrollment:b", conversation(2));
   const bindingA = automationBinding(enrollmentA), bindingB = automationBinding(enrollmentB);
-  const events: AutomationEvent[] = [], messages: AutomationMessage[] = [], sent: readonly unknown[][] = [];
-  const mutableSent = sent as unknown[][], plans = new Map<string, AutomationPlan>();
+  const events: AutomationEvent[] = [], messages: AutomationMessage[] = [], sent: readonly unknown[][] = [], acks: readonly unknown[][] = [];
+  const mutableSent = sent as unknown[][], mutableAcks = acks as unknown[][], plans = new Map<string, AutomationPlan>();
   const setArgs: string[][] = [];
   let failA = false, singlePolls = 0;
   const client = createGhostgetAutomationClient(async (method, params) => {
@@ -224,7 +224,7 @@ test("one batched pollSet covers the set and a failed entry only fails its conta
     if (method === "events") return { events: events.slice(Number(params.cursor ?? 0)), nextCursor: String(events.length), caughtUp: true };
     if (method === "status") return { identity, connected: true, events: { available: true, reason: null }, actions: Object.fromEntries(["text", "attachment", "reaction", "sticker", "link", "poll", "app-clip", "experience"].map(kind => [kind, { available: true, reason: null }])) };
     if (method === "prepare") { const body = { ...params, bindingDigest: bindingB.bindingDigest, expiresAt: new Date(time + 120000).toISOString() }, digest = automationHash(body), plan = { ...body, digest, id: `plan:${digest}` } as AutomationPlan; plans.set(plan.id, plan); return plan; }
-    if (method === "submit") { const plan = plans.get(String(params.planId))!; mutableSent.push([...plan.actions]); return { id: `run:${sent.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: plan.enrollmentId ?? bindingB.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
+    if (method === "submit") { const plan = plans.get(String(params.planId))!; (plan.intentId.endsWith(":ack") ? mutableAcks : mutableSent).push([...plan.actions]); return { id: `run:${sent.length + acks.length}`, planId: plan.id, intentId: plan.intentId, enrollmentId: plan.enrollmentId ?? bindingB.enrollmentId, state: "accepted", accepted: plan.actions.map((_action, index) => ({ messageId: `sent:${sent.length + acks.length}:${index}`, providerReceiptId: null })), totalActions: plan.actions.length, reason: null, retryable: false }; }
     throw new Error(`Unexpected fixture operation ${method}`);
   }, () => time);
   const loop = await createDaemonReplyLoop({ client, automatic: false, now: () => time, hooks: new Hooks(),

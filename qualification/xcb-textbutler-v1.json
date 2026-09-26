@@ -46,7 +46,7 @@
     "packages/textbutler/src/daemon.ts": "158a15c0404de06c4b318a338ed7ba7e1727617b49f9301d095cf6406e1aa95c",
     "packages/textbutler/src/host-config.ts": "c0a59527d9427aaa3ca26ca469ce73e7edb1153607d1ac5d9c50e84dd825ccd0",
     "packages/textbutler/src/workspace.ts": "70b2fbec3a14c835f9ec2a4fcc1c2535e1fd2e5fde4907486cef6d6a8fc599b4",
-    "packages/textbutler/src/runtime.ts": "527aa7c8b71d9e566171ade6bf6713b7d85e63bfc62e23e1613eba383b46cc3c",
+    "packages/textbutler/src/runtime.ts": "d8ec7fa463fff0fdeea330855376960103eac3613a155dee8e3cd148448662dd",
     "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
     "packages/textbutler/src/cli.ts": "1847462b11d007925b0096733fb393fbc6dcd4667b4f895cd0e07fd30ed20d1c",
     "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
@@ -59,6 +59,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "873fe811d6f65dfe5b5063d00176a5cb794f27cf9d9d5c2893e4e4e7c3c8c1aa"
+    "receiptSha256": "4e69cac790264f46067610bd482b25eb3fdec51fe834f189f52cebbf242321b4"
   }
 }

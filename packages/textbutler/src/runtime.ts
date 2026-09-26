@@ -103,6 +103,27 @@ export class ButlerRuntime {
         if (!classification.respond || classification.confidence < 0.85) return finish("ignored", "classifier-silent");
       }
       if (controller.signal.aborted) return finish("cancelled", "cancelled");
+      // A disclosure-wrapped ack is the fastest possible read receipt: it lands
+      // while composition still runs and its echo attributes to the butler, not
+      // the owner. It is awaited so it precedes the reply in the serialized
+      // lane and holds the dispatching guard like the reply does — aborting it
+      // mid-dispatch would only manufacture an indeterminate. A dispatch whose
+      // outcome is unknown wedges the run honestly instead of leaving an
+      // unresolved upstream run for the next reply to trip on.
+      const ackIds = new Set<string>();
+      const ack = await this.ports.transport.prepare({ intentId: `${runId}:ack`, conversationId: contact.routeId, contextId: snapshot.contextId,
+        actions: [{ kind: "text", text: disclose("…", contact.disclosure) }] });
+      if (ack.ok) {
+        this.dispatching.add(contact.id);
+        const ackReceipt = await this.ports.transport.submit(ack.value, { mode: "delegated", grantId: grant }, controller.signal).catch(() => null);
+        this.dispatching.delete(contact.id);
+        if (ackReceipt === null || !ackReceipt.ok || ackReceipt.value.state === "indeterminate" || ackReceipt.value.state === "partial") return finish("indeterminate", "ack-dispatch-unknown");
+        if (ackReceipt.value.state === "submitted" && ackReceipt.value.acceptedMessageIds) {
+          this.ports.journal.recordSentMessages(contact.id, `${runId}:ack`, ackReceipt.value.acceptedMessageIds, this.clock());
+          for (const id of ackReceipt.value.acceptedMessageIds) if (id !== null) ackIds.add(id);
+        }
+      }
+      const acked = ackIds.size > 0;
       if ((await this.ports.hooks.emit("reply.compose", hook)).veto) return finish("ignored", "extension-veto");
       const actions = composeResult(await this.ports.agent.compose(request), contact);
       for (const action of actions) {
@@ -115,13 +136,25 @@ export class ButlerRuntime {
       const currentContact = current.contacts.find(c => c.id === contact.id);
       if (!currentContact || currentContact.revision !== contact.revision || currentContact.routeId !== contact.routeId) return finish("cancelled", "settings-changed");
       const refreshed = await this.refresh(currentContact, event);
-      const lastDecision = decideReply(current, currentContact, event, refreshed.state, this.clock(), admittedAt);
+      // An acked run moved the revision itself, so supersession is judged from
+      // the refreshed baseline — genuinely new messages are caught below by
+      // comparing message ids instead.
+      const lastDecision = decideReply(current, currentContact, acked ? { ...event, revision: refreshed.state.latestRevision } : event, refreshed.state, this.clock(), admittedAt);
       // A pinned run already absorbed a continuous stream to its cap: newer
       // contact messages queue behind it instead of restarting it forever.
       // Pause, settings, owner activity and stale context still cancel it.
       const stillReply = ["reply", "classify"].includes(lastDecision.outcome) || (event.pinned === true && lastDecision.reason === "superseded");
-      if (controller.signal.aborted || !stillReply
-        || (event.pinned !== true && (refreshed.state.latestRevision !== snapshot.state.latestRevision || refreshed.contextId !== snapshot.contextId))) return finish("cancelled", "conversation-changed");
+      // Once an ack is journaled, revision drift is expected — our own echo
+      // bumps it. The cancel condition then relaxes to "a new message id
+      // arrived that isn't this run's ack", which still catches contact or
+      // owner messages — including owner sends journaled separately — while
+      // ignoring the ack's own echo (and any reaction or edit, which adds no
+      // message id). Without an ack, drift remains the strict scalar
+      // revision/context comparison.
+      const changed = event.pinned !== true && (acked
+        ? refreshed.messageIds.some(id => !snapshot.messageIds.includes(id) && !ackIds.has(id))
+        : refreshed.state.latestRevision !== snapshot.state.latestRevision || refreshed.contextId !== snapshot.contextId);
+      if (controller.signal.aborted || !stillReply || changed) return finish("cancelled", "conversation-changed");
       const plan = await this.ports.transport.prepare({ intentId: runId, conversationId: contact.routeId, contextId: refreshed.contextId, actions });
       if (!plan.ok) return finish("failed", plan.error.code);
       if (controller.signal.aborted) return finish("cancelled", "cancelled");
