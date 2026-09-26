@@ -11,8 +11,10 @@ import { initializeOwnerState } from "./control-service.ts";
 import { requestDaemon } from "./daemon.ts";
 import { loadHostConfig, parseHostConfig, type HostConfig } from "./host-config.ts";
 import { nativeSubscriptionAccount } from "./native-subscription.ts";
+import { CliUsageError, symbolsFor, type Symbols } from "./cli-style.ts";
 
-export interface SetupStep { id: string; title: string; status: "done" | "action-needed" | "blocked"; detail: string; command?: string }
+/** "skipped" marks a step that doesn't apply or that the owner left off on purpose. */
+export interface SetupStep { id: string; title: string; status: "done" | "action-needed" | "blocked" | "skipped"; detail: string; command?: string }
 export interface Readiness {
   ok: boolean; platform: string; dataDir: string; initialized: boolean; daemonConnected: boolean;
   automaticReplies: "running" | "paused" | "unavailable";
@@ -33,26 +35,28 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
   } catch (error) {
     const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
     steps.push({ id: "configuration", title: "Private settings", status: missing ? "action-needed" : "blocked",
-      detail: missing ? "Create your private settings. Automatic replies start paused." : "Private settings need attention. Preserve existing files; check their ownership, permissions and configuration.",
+      detail: missing ? "Create your private settings. Automatic replies start paused." : "Your private settings can't be read. Keep the files, and check that you own them and only you can read them.",
       ...(missing ? { command: "textbutler setup" } : {}) });
   }
   if (config) steps.push({ id: "configuration", title: "Private settings", status: "done", detail: "Private settings are present. Existing contacts and pause settings are preserved." });
   const response = await requestDaemon({ dataDir, request: { protocol: CONTROL_PROTOCOL, command: "snapshot" } }).catch(() => null);
   const snapshot = response?.ok && response.kind === "snapshot" ? response.snapshot : null;
-  steps.push({ id: "daemon", title: "Background service", status: snapshot ? "done" : "action-needed",
-    detail: snapshot ? "The owner control service is connected." : "Start the background service. It continues after you close the terminal or menu.",
-    ...(!snapshot ? { command: "textbutler daemon install" } : {}) });
   const configured = config?.ghostget?.automationAccounts ?? [];
   const connected = snapshot?.messagingProviders ?? [];
-  steps.push({ id: "messaging", title: "Messaging apps", status: connected.length > 0 ? "done" : "action-needed",
-    detail: connected.length > 0 ? `Configured connections: ${connected.join(", ")}. Connect each app, then choose an exact conversation.`
-      : configured.length > 0 ? "Messaging accounts are configured. Restart the daemon to load them; inspect connection status if it remains unavailable."
-      : "Choose native iMessage, native WhatsApp, or Beeper for linked messaging apps. Account sign-in and permissions belong to Ghostget.",
-    command: connected.length > 0 ? "textbutler messaging list" : "textbutler setup" });
+  const appName = (provider: string): string => provider === "imessage" ? "iMessage" : provider === "whatsapp" ? "WhatsApp" : provider === "beeper" ? "Beeper" : provider;
+  steps.push({ id: "messaging", title: "Messaging apps", status: connected.length > 0 || configured.length > 0 && !snapshot ? "done" : "action-needed",
+    detail: connected.length > 0 ? `Connected: ${connected.map(appName).join(", ")}. Next, choose the chats Textbutler may answer.`
+      : configured.length > 0 && !snapshot ? `Set up: ${configured.map(account => appName(account.provider)).join(", ")}. The background service connects them when it starts.`
+      : configured.length > 0 ? "Your messaging apps are set up but not loaded. Restart the background service to load them."
+      : "Connect iMessage, WhatsApp, or Beeper (for Signal, Telegram and more). Sign-in and permissions for each app happen in Ghostget.",
+    command: connected.length > 0 ? "textbutler messaging list" : configured.length > 0 ? "textbutler daemon install" : "textbutler tui" });
+  steps.push({ id: "daemon", title: "Background service", status: snapshot ? "done" : "action-needed",
+    detail: snapshot ? "Running." : "Start the background service. It keeps running after you close the terminal or menu.",
+    ...(!snapshot ? { command: "textbutler daemon install" } : {}) });
   const contacts = snapshot?.contacts ?? [];
   steps.push({ id: "contacts", title: "Choose conversations", status: contacts.length > 0 ? "done" : "action-needed",
-    detail: contacts.length > 0 ? `${contacts.length} selected conversation${contacts.length === 1 ? "" : "s"}. You can review your inbox with automatic replies off.`
-      : "Add one conversation first. New contacts stay disabled; importing history is optional and never sends a reply.",
+    detail: contacts.length > 0 ? `${contacts.length} chat${contacts.length === 1 ? "" : "s"} added. You can review your inbox with automatic replies off.`
+      : "Add one chat first. It starts with automatic replies off. Importing history is optional and never sends a reply.",
     command: "textbutler tui" });
   const accounts = snapshot?.providerAccounts ?? [];
   const ready = accounts.filter(account => account.status === "ready");
@@ -60,32 +64,46 @@ export async function readReadiness(dataDir: string): Promise<Readiness> {
   const xcbAccounts = config?.xcb?.accounts ?? [];
   const nextAccount = ready[0]?.id ?? (xcbAccounts[0] ? nativeSubscriptionAccount(xcbAccounts[0].provider) : "native-codex");
   steps.push({ id: "agent", title: "Reply suggestions", status: selected ? "done" : ready.length ? "action-needed" : "blocked",
-    detail: selected ? "A ready agent account is selected for at least one contact. Suggestions still require an explicit send."
-      : ready.length ? "Choose a ready agent account for the contact you want help with."
-      : xcbAccounts.length ? "xcb subscription accounts are configured. Start or restart the daemon, then check the selected account. Sign-in, model access and contact-scoped qualification must all pass before suggestions are available."
-      : "Connect your Claude, Codex, or Devin subscription through xcb using an explicit account and full model key. Sign in using xcb first; Textbutler keeps only references. Inbox review and explicit typed replies do not need an AI account.",
-    command: ready.length ? `textbutler contacts account CONTACT ${nextAccount}`
+    detail: selected ? "A ready AI account is chosen for at least one chat. Nothing is sent until you send it or turn on automatic replies."
+      : ready.length ? "Choose a ready AI account for the chat you want help with."
+      : xcbAccounts.length ? "Your xcb accounts are set up. Start the background service, then check an account. It must be signed in with model access before Textbutler can suggest replies."
+      : "Connect your Claude, Codex, or Devin subscription through xcb. Sign in with xcb first; Textbutler keeps only references. You can review your inbox and send your own replies without one.",
+    command: ready.length ? `textbutler contacts account <contact> ${nextAccount}`
       : xcbAccounts.length ? `textbutler providers check ${nextAccount}`
-      : "textbutler setup --xcb /absolute/xcb --xcb-state /absolute/xcb-state --xcb-account codex:ACCOUNT --xcb-model codex/MODEL" });
+      : "textbutler help setup" });
   const automaticReplies = snapshot?.automation?.state ?? "unavailable";
-  steps.push({ id: "automation", title: "Automatic replies", status: automaticReplies === "running" ? "done" : "action-needed",
-    detail: automaticReplies === "running" ? "Automatic replies are running for enabled contacts. Pause remains available."
-      : snapshot?.settings.paused ? "Paused. Keep this off while you try inbox review; enabling automation is a separate choice."
-      : "Automatic replies need an enabled contact, a current messaging grant and a qualified agent.", command: "textbutler pause" });
+  const paused = automaticReplies !== "running" && snapshot?.settings.paused === true;
+  steps.push({ id: "automation", title: "Automatic replies", status: automaticReplies === "running" ? "done" : paused ? "skipped" : "action-needed",
+    detail: automaticReplies === "running" ? "Running for the chats you turned on. You can pause them any time."
+      : paused ? "Paused. Leave them off while you try the inbox; turning them on is a separate choice."
+      : "Automatic replies need a chat that's turned on, access to send in it, and a ready AI account.",
+    command: automaticReplies === "running" ? "textbutler pause" : paused ? "textbutler resume" : "textbutler help contacts" });
   return { ok: config !== null && snapshot !== null && process.platform === "darwin", platform: process.platform, dataDir, initialized,
     daemonConnected: snapshot !== null, automaticReplies, canReviewInbox: snapshot?.replies !== undefined && contacts.length > 0,
     canGenerateReplies: selected, steps, snapshot };
 }
 
-export function readinessText(value: Readiness): string {
-  return ["Textbutler setup and readiness", "", ...value.steps.map(step => `${step.status === "done" ? "✓" : step.status === "blocked" ? "!" : "○"} ${step.title}\n  ${step.detail}${step.command && step.status !== "done" ? `\n  Next: ${step.command}` : ""}`),
-    "", "Your Mac must be awake and signed in. Quitting the menu does not stop the daemon.",
-    "Pause stops automatic replies; owner-confirmed replies are a separate action.", ""].join("\n");
+/** Human readiness report (SPEC § D7): one symbol per step, detail only where
+ * something is left to do, a one-line count and at most one next command. */
+export function readinessText(value: Readiness, options: { symbols?: Symbols; next?: boolean } = {}): string {
+  const symbols = options.symbols ?? symbolsFor();
+  const mark = (status: SetupStep["status"]): string => status === "done" ? symbols.ok : status === "blocked" ? symbols.fail : status === "skipped" ? symbols.skip : symbols.warn;
+  const lines = ["Textbutler readiness", ""];
+  for (const step of value.steps) {
+    lines.push(`${mark(step.status)} ${step.title}`);
+    if (step.status !== "done") lines.push(`  ${step.detail}`);
+  }
+  const open = value.steps.filter(step => step.status === "action-needed" || step.status === "blocked");
+  const next = open.find(step => step.command !== undefined)?.command;
+  lines.push("", "Replies need your Mac awake and signed in. Quitting the menu doesn't stop them.", "",
+    open.length === 0 ? "Everything is ready." : `${open.length} step${open.length === 1 ? "" : "s"} left.`);
+  if (next !== undefined && options.next !== false) lines.push(`${symbols.next} ${next}`);
+  return `${lines.join("\n")}\n`;
 }
 
-export async function runDoctor(dataDir: string, output: { write(text: string): unknown }): Promise<number> {
+export async function runDoctor(dataDir: string, output: { write(text: string): unknown }, options: { json?: boolean; symbols?: Symbols } = {}): Promise<number> {
   const value = await readReadiness(dataDir);
-  output.write(`${JSON.stringify(value)}\n`);
+  output.write(options.json ? `${JSON.stringify(value)}\n` : readinessText(value, options.symbols === undefined ? {} : { symbols: options.symbols }));
   return value.ok ? 0 : 1;
 }
 
@@ -118,30 +136,30 @@ async function xcbExecutableDigest(path: string): Promise<string> {
 
 /** Setup is additive under the daemon owner lock. It cannot replace an account,
  * executable, model, or agent settings, nor can it start synchronization. */
-export async function runSetup(args: readonly string[], dataDir: string, output: { write(text: string): unknown }): Promise<number> {
+export async function runSetup(args: readonly string[], dataDir: string, output: { write(text: string): unknown }, options: { next?: boolean; symbols?: Symbols } = {}): Promise<number> {
   let config: HostConfig | undefined;
   if (args.length > 0) {
     const values = new Map<string, string>(); const accounts: { provider: string; authId: string }[] = [];
     const xcbAccounts: { provider: string; accountId: string }[] = [], xcbModels = new Map<string, string>();
     for (let i = 0; i < args.length; i += 2) {
       const key = args[i]!, value = args[i + 1];
-      if (!value || !["--ghostget", "--runtime", "--state-home", "--account", "--xcb", "--xcb-state", "--xcb-account", "--xcb-model"].includes(key)) throw new OwnerCliError(SETUP_USAGE);
+      if (!value || !["--ghostget", "--runtime", "--state-home", "--account", "--xcb", "--xcb-state", "--xcb-account", "--xcb-model"].includes(key)) throw new CliUsageError("Setup needs different options.", "textbutler help setup");
       if (key === "--account" || key === "--xcb-account") {
         const parts = value.split(":");
-        if (parts.length !== 2) throw new OwnerCliError(SETUP_USAGE);
+        if (parts.length !== 2) throw new CliUsageError("Setup needs different options.", "textbutler help setup");
         if (key === "--account") accounts.push({ provider: parts[0]!, authId: parts[1]! });
         else xcbAccounts.push({ provider: parts[0]!, accountId: parts[1]! });
       } else if (key === "--xcb-model") {
         const provider = value.split("/")[0]!;
-        if (xcbModels.has(provider)) throw new OwnerCliError(SETUP_USAGE);
+        if (xcbModels.has(provider)) throw new CliUsageError("Setup needs different options.", "textbutler help setup");
         xcbModels.set(provider, value);
-      } else { if (values.has(key)) throw new OwnerCliError(SETUP_USAGE); values.set(key, value); }
+      } else { if (values.has(key)) throw new CliUsageError("Setup needs different options.", "textbutler help setup"); values.set(key, value); }
     }
     const ghostgetRequested = ["--ghostget", "--runtime", "--state-home"].some(key => values.has(key)) || accounts.length > 0;
     const xcbRequested = values.has("--xcb") || values.has("--xcb-state") || xcbAccounts.length > 0 || xcbModels.size > 0;
     if (ghostgetRequested && (!values.has("--ghostget") || accounts.length === 0)
       || xcbRequested && (!values.has("--xcb") || !values.has("--xcb-state") || xcbAccounts.length === 0
-        || xcbModels.size !== xcbAccounts.length || xcbAccounts.some(account => !xcbModels.has(account.provider)))) throw new OwnerCliError(SETUP_USAGE);
+        || xcbModels.size !== xcbAccounts.length || xcbAccounts.some(account => !xcbModels.has(account.provider)))) throw new CliUsageError("Setup needs different options.", "textbutler help setup");
     config = parseHostConfig({ schemaVersion: 1, ...(ghostgetRequested ? { ghostget: { executable: values.get("--ghostget"), authId: accounts[0]!.authId,
       automationAccounts: accounts, ...(values.has("--runtime") ? { runtimeExecutable: values.get("--runtime") } : {}),
       ...(values.has("--state-home") ? { stateHome: values.get("--state-home") } : {}) } } : {}),
@@ -213,9 +231,8 @@ export async function runSetup(args: readonly string[], dataDir: string, output:
         }
       } finally { lock.close(); }
     }
-    output.write("Connection configuration saved. Existing accounts and agent settings are preserved. No credentials were copied and no messages were read or sent. Start the daemon to load new connections, then run providers check for your chosen AI account.\n\n");
+    output.write(`${(options.symbols ?? symbolsFor()).ok} Connection saved. Existing accounts and settings were kept. No credentials were copied and no messages were read or sent.\n\n`);
   }
-  output.write(readinessText(await readReadiness(dataDir)));
-  if (!config) output.write("For guided connection and contact selection, run: textbutler tui\n");
+  output.write(readinessText(await readReadiness(dataDir), { ...(options.symbols === undefined ? {} : { symbols: options.symbols }), ...(options.next === undefined ? {} : { next: options.next }) }));
   return 0;
 }

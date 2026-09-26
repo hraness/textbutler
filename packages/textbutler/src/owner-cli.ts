@@ -1,38 +1,11 @@
 import { CONTROL_PROTOCOL, validateContactSettings, type Contact, type ControlRequest, type ControlResponse, type DesktopSnapshot } from "../../control/src/index.ts";
 import { parseHabitatPlan } from "./contact-habitat.ts";
+import { CliUsageError } from "./cli-style.ts";
 
 export type OwnerControlClient = (request: ControlRequest) => Promise<ControlResponse>;
 
 /** Only explicit, bounded diagnostics may be displayed by the CLI entrypoint. */
 export class OwnerCliError extends Error {}
-
-export const OWNER_COMMAND_HELP = `Owner controls:
-  status                              Show the daemon's current state
-  pause | resume                      Pause or resume automatic replies
-  messaging list                      Show configured messaging connections
-  messaging start PROVIDER            Connect imessage, whatsapp, or beeper
-  conversations list                  List recent direct conversations
-  contacts list                       Show contacts and their settings
-  contacts add CANDIDATE [--history]   Add the exact candidate, disabled
-  contacts account CONTACT ACCOUNT   Select an explicit agent account
-  contacts enable CONTACT            Enable replies for this contact
-  contacts disable CONTACT           Disable replies and revoke its grant
-  contacts mode CONTACT smart|keyword [--keyword WORD]
-  contacts self CONTACT on|off        Mark a conversation as your own address
-  jobs show JOB_ID                    Read a pending operation's result
-  habitats show CONTACT              Inspect personality, memory, learning and budget
-  habitats configure CONTACT REVISION JSON
-                                     Set the full plan while automatic replies are paused
-  habitats rollback CONTACT REVISION Roll back while automatic replies are paused
-  habitats memory-clear CONTACT REVISION
-                                     Clear learned excerpts while replies are paused
-
-Use an exact contact ID or a unique contact name. Adding a contact keeps
-automatic replies off. History is imported only with --history.
-Account selection never enables a contact; resume never enables contacts.
-Mark a conversation self when its only participant is your own address:
-iMessage delivers each of your texts to it inbound and echoes it outbound,
-so the echo must not count as the owner's answer.`;
 
 const ownerFamilies = new Set(["status", "pause", "resume", "messaging", "conversations", "contacts", "jobs", "habitats"]);
 const identity = (value: string | undefined): value is string => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(value);
@@ -102,7 +75,7 @@ export async function handleOwnerCommand(args: readonly string[], options: {
   const habitat = family === "habitats" && (verb === "show" && args.length === 3
     || (verb === "rollback" || verb === "memory-clear") && args.length === 4 && habitatRevision || verb === "configure" && args.length === 5 && habitatRevision);
   if (!(status || pause || messagingList || messagingStart || conversations || contactsList || add || account || activation || mode || self || job || habitat)) {
-    throw new OwnerCliError(`Unrecognized owner command.\n\n${OWNER_COMMAND_HELP}`);
+    throw new CliUsageError(`Missing or invalid arguments for "${[family, verb].filter(word => word !== undefined && /^[a-z-]{1,24}$/u.test(word)).join(" ")}".`, `textbutler help ${family}`);
   }
   let habitatPlan: ReturnType<typeof parseHabitatPlan> | undefined;
   if (habitat && verb === "configure") {
