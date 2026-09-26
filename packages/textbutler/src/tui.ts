@@ -67,8 +67,8 @@ async function pick<T>(io: TerminalSession, title: string, values: readonly T[],
     } else filtered = values.filter(item => label(item).toLowerCase().includes(value.trim().toLowerCase()));
   }
 }
-function printResponse(io: TerminalSession, response: ControlResponse, done = "Settings updated."): void {
-  io.write(`${terminalText(describeControlResult(response, symbolsFor(), done))}\n`);
+function printResponse(io: TerminalSession, response: ControlResponse, dataDir: string, done = "Settings updated."): void {
+  io.write(`${terminalText(describeControlResult(response, symbolsFor(), done, { dataDir }))}\n`);
 }
 
 /** A thin owner client, following XCB's separation between interaction and
@@ -82,7 +82,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
     return response?.ok && response.kind === "snapshot" ? response.snapshot : null;
   };
   const owner = async (args: readonly string[], done: string): Promise<void> => {
-    await handleOwnerCommand(args, { request: client, print: value => io.write(`${terminalText(describeControlResult(value, symbolsFor(), done))}\n`) });
+    await handleOwnerCommand(args, { request: client, print: value => io.write(`${terminalText(describeControlResult(value, symbolsFor(), done, { dataDir }))}\n`) });
   };
   while (true) {
     const snapshot = await current();
@@ -123,10 +123,11 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
           io.write("Connections saved. Choose Setup & readiness (1) to start the background service.\n");
           continue;
         }
-        if (provider) printResponse(io, await job({ protocol: CONTROL_PROTOCOL, command: "messaging.start", provider }));
+        if (provider) printResponse(io, await job({ protocol: CONTROL_PROTOCOL, command: "messaging.start", provider }), dataDir,
+          `${provider === "imessage" ? "iMessage" : provider === "whatsapp" ? "WhatsApp" : "Beeper"} connection started. Check it under Setup & readiness.`);
       } else if (choice.trim() === "3") {
         const response = await job({ protocol: CONTROL_PROTOCOL, command: "conversations.list" });
-        if (!response.ok || response.kind !== "conversations") { printResponse(io, response); continue; }
+        if (!response.ok || response.kind !== "conversations") { printResponse(io, response, dataDir); continue; }
         io.write(`${terminalText(response.detail)}\n`);
         const candidate = await pick(io, "Select the exact conversation", response.candidates, value => `${value.name} · ${value.subtitle}${value.eligible ? "" : ` (unavailable: ${value.reason})`}`);
         if (!candidate) continue;
@@ -138,20 +139,20 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
         await owner(["contacts", "add", candidate.id, ...(history.trim().toLowerCase() === "y" ? ["--history"] : [])], `Added ${terminalLabel(candidate.name)}. Automatic replies are off.`);
       } else if (choice.trim() === "4") {
         const response = await job({ protocol: CONTROL_PROTOCOL, command: "replies.scan" });
-        if (!response.ok || response.kind !== "replies") { printResponse(io, response); continue; }
+        if (!response.ok || response.kind !== "replies") { printResponse(io, response, dataDir); continue; }
         io.write(`Checked ${response.checked} conversations; ${response.unreadable} unavailable.\n`);
         const item = await pick(io, "Waiting for your reply", response.pending, value => `${value.name} · ${value.pendingCount} messages\n     ${value.preview ?? ""}${value.reason ? `\n     ${value.reason}` : ""}`);
         if (!item) continue;
         const action = await io.ask("[t] Type a reply  [s] Suggest a reply  [Enter] Back: ");
         if (action?.trim() === "s") {
           const suggested = await job({ protocol: CONTROL_PROTOCOL, command: "replies.suggest", contactId: item.contactId });
-          if (!suggested.ok || suggested.kind !== "reply-suggestion" || !suggested.draft) { printResponse(io, suggested); continue; }
+          if (!suggested.ok || suggested.kind !== "reply-suggestion" || !suggested.draft) { printResponse(io, suggested, dataDir); continue; }
           const review = await client({ protocol: CONTROL_PROTOCOL, command: "replies.draft.read", draftId: suggested.draft.id });
-          if (!review.ok || review.kind !== "reply-draft") { printResponse(io, review); continue; }
+          if (!review.ok || review.kind !== "reply-draft") { printResponse(io, review, dataDir); continue; }
           io.write(`\nReview every outgoing action for ${terminalLabel(review.draft.name)} (${review.draft.provider}).\n`);
           io.write(terminalDraft(review.draft));
           if ((await io.ask("Type send to send these exact actions, or Enter to cancel: ")) === "send") {
-            printResponse(io, await job({ protocol: CONTROL_PROTOCOL, command: "replies.send", draftId: review.draft.id, expectedDigest: review.draft.digest }));
+            printResponse(io, await job({ protocol: CONTROL_PROTOCOL, command: "replies.send", draftId: review.draft.id, expectedDigest: review.draft.digest }), dataDir);
           }
         } else if (action?.trim() === "t") {
           const text = await io.ask("Your reply (Enter to cancel): ");
@@ -162,7 +163,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
           const disclosed = disclose(text, contact.settings.disclosure);
           io.write(`\nTo: ${terminalLabel(item.name)}\n${terminalText(disclosed)}\n\n`);
           if ((await io.ask("Type send to send this reply, or Enter to cancel: ")) === "send") {
-            printResponse(io, await job({ protocol: CONTROL_PROTOCOL, command: "replies.send", contactId: item.contactId, text, expectedRevision: snapshot!.revision }));
+            printResponse(io, await job({ protocol: CONTROL_PROTOCOL, command: "replies.send", contactId: item.contactId, text, expectedRevision: snapshot!.revision }), dataDir);
           }
         }
       } else if (choice.trim() === "5") {

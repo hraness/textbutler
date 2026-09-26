@@ -4,13 +4,17 @@ exports[`control results read as one plain line, never JSON 1`] = `
 {
   "enrolled": "✓ Added Alex spoof. Automatic replies are off. Imported 42 recent messages as context (3 skipped).",
   "enrolled without history": "✓ Added the contact. Automatic replies are off.",
+  "no suggestion": "– No reply suggested for Sam. Nothing new since your last reply.",
   "pending": "↻ Still waiting for a result. Check it with textbutler jobs show job-1. Don't repeat this action: it may already have taken effect.",
   "pending (owner output)": "↻ Still waiting for a result. Check it with textbutler jobs show job-2. Don't repeat this action: it may already have taken effect.",
   "refused": "✗ Settings changed. Review them and try again.",
-  "reply failed": "✗ Messages rejected the reply.",
-  "reply sent": "✓ Sent to Alex.",
-  "reply uncertain": "⚠ Messages didn't confirm the send. Don't send it again; check the chat first.",
+  "reply cancelled by code": "– The reply wasn't sent: it was stopped before sending.",
+  "reply failed": "✗ The reply wasn't sent. The provider rejected this reply.",
+  "reply partial": "⚠ Only part of the reply was sent. Don't send it again. Check the chat, then run textbutler replies reconcile <contact> with --sent or --failed.",
+  "reply sent": "✓ Reply sent.",
+  "reply uncertain": "⚠ It isn't known whether the reply was sent. Don't send it again. Check the chat, then run textbutler replies reconcile <contact> with --sent or --failed.",
   "settings changed": "✓ Automatic replies are paused.",
+  "shortened history": "✓ Added Alex spoof. Automatic replies are off. Imported 10 recent messages as context (2 shortened).",
 }
 `;
 
@@ -25,6 +29,11 @@ exports[`service and menu bar results 1`] = `
   "login": "✓ The Textbutler menu will start when you log in.",
   "not started": 
 "✗ The Textbutler menu didn't start.
+→ textbutler doctor"
+,
+  "not started with reason": 
+"✗ The Textbutler menu didn't start.
+  This Mac's processor isn't supported. Use an Apple silicon Mac.
 → textbutler doctor"
 ,
   "started": "✓ The Textbutler menu is running.",
