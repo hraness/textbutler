@@ -5,6 +5,7 @@ import { basename, join, resolve } from "node:path";
 
 import {
   assertReleaseAssetBytes,
+  type ReleasePageSource,
   publicRepository,
   releaseDistribution,
   releasePackageForName,
@@ -58,9 +59,12 @@ if (basename(tarball) !== distribution.releaseArchiveName(manifest.version) || b
 const tarballBytes = readFileSync(tarball);
 const checksumBytes = readFileSync(checksum);
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
-const expectedTitle = `${releasePackage.title} ${tagArgument}`;
-const expectedBody =
-  `Automated public release of ${releasePackage.name}@${manifest.version} from ${tagArgument}.`;
+const expectedTitle = distribution.releaseTitle(releaseVersion);
+// The page body is rendered from CHANGELOG.md at the verified commit before
+// any release object exists, so a missing, empty, or Unreleased section fails
+// before creation. Assigned once, after the tag is proven to target the commit.
+let pageSource: ReleasePageSource | undefined;
+let expectedBody = "";
 // GitHub's release list lags `gh release create` by a few seconds (v0.8.1,
 // v0.8.2, and v0.8.3 each missed the draft on the first read). Bound the
 // read-after-write wait; ambiguity and shape checks in findDraft still fail closed.
@@ -195,6 +199,19 @@ async function verifyRemoteAnnotatedTag(): Promise<void> {
   }
 }
 
+async function readReleaseChangelog(): Promise<string> {
+  const changelog = await run([
+    "gh", "api",
+    "-H", "Accept: application/vnd.github.raw+json",
+    `/repos/${publicRepository}/contents/CHANGELOG.md?ref=${verifiedSha}`,
+  ]);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(changelog.stdout);
+  } catch {
+    throw new Error(`CHANGELOG.md at ${verifiedSha} is not UTF-8.`);
+  }
+}
+
 async function readRelease(): Promise<unknown> {
   return JSON.parse((await run([
     "gh", "api", `/repos/${publicRepository}/releases/tags/${tagArgument}`,
@@ -302,7 +319,7 @@ async function verifyPublishedRelease(): Promise<void> {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     try {
-      const coordinate = distribution.parseGitHubRelease(await readRelease(), releaseVersion);
+      const coordinate = distribution.parseGitHubRelease(await readRelease(), releaseVersion, pageSource);
       assertReleaseAssetBytes(coordinate, tarballBytes, checksumBytes, sha256);
       const directory = mkdtempSync(join(tmpdir(), "message-like-me-release-assets-"));
       try {
@@ -332,6 +349,8 @@ async function verifyPublishedRelease(): Promise<void> {
 }
 
 await verifyRemoteAnnotatedTag();
+pageSource = Object.freeze({ changelog: await readReleaseChangelog(), commit: verifiedSha });
+expectedBody = distribution.releaseBody(releaseVersion, pageSource);
 
 const existing = await run([
   "gh", "api", "--include", `/repos/${publicRepository}/releases/tags/${tagArgument}`,

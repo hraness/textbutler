@@ -328,12 +328,12 @@ describe('supported source presentation', () => {
     for (const copy of [readme, changelog, whatsappContract, llms, messagingSkill]) {
       expect(copy).toMatch(/unobservable|observability limit/u);
     }
-    expect(changelog).toContain('## 0.8.5 (2026-09-06)');
-    expect(changelog).toContain('## 0.8.3 (2026-09-06)');
+    expect(changelog).toContain('## 0.8.5 - 2026-09-06');
+    expect(changelog).toContain('## 0.8.3 - 2026-09-06');
     expect(changelog).not.toContain('## Unreleased');
-    expect(changelog.indexOf('## 0.8.5 (')).toBeLessThan(changelog.indexOf('## 0.8.3 ('));
+    expect(changelog.indexOf('## 0.8.5 - ')).toBeLessThan(changelog.indexOf('## 0.8.3 - '));
     const currentChangelog = changelog.slice(
-      changelog.indexOf('## 0.8.3 ('),
+      changelog.indexOf('## 0.8.3 - '),
       changelog.indexOf('## 0.8.2\n'),
     );
     expect(currentChangelog).toContain('`@hraness/wrench@0.16.7`');

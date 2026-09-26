@@ -8,9 +8,14 @@ const OIDC_CONFIG_ID = /^oidc:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 const SCOPED_PACKAGE = /^@[a-z0-9][a-z0-9._-]{0,127}\/[a-z0-9][a-z0-9._-]{0,127}$/u;
 
 /** One publishable package coordinate. tagPrefix namespaces its immutable
- * release tags; title prefixes the GitHub Release name. Every field is a
- * closed constant — no caller input may extend this set. */
+ * release tags; title is the registry product name that prefixes the GitHub
+ * Release name. Releases up to lastLegacyPageVersion were published with
+ * legacyTitle and the bare identity sentence as their whole body; later
+ * releases carry the standard page. Every field is a closed constant — no
+ * caller input may extend this set. */
 export type ReleasePackage = Readonly<{
+  lastLegacyPageVersion: string;
+  legacyTitle: string;
   name: string;
   repository: string;
   tagPrefix: string;
@@ -21,10 +26,12 @@ export type ReleasePackage = Readonly<{
 export const publicPackageName = "@hraness/message-like-me";
 export const publicRepository = "hraness/textbutler";
 export const rootReleasePackage: ReleasePackage = Object.freeze({
+  lastLegacyPageVersion: "0.8.21",
+  legacyTitle: "Message Like Me",
   name: publicPackageName,
   repository: publicRepository,
   tagPrefix: "v",
-  title: "Message Like Me",
+  title: "Textbutler",
   workflowPath: ".github/workflows/release.yml",
 });
 const releasePackages: ReadonlyMap<string, ReleasePackage> = new Map([
@@ -82,6 +89,97 @@ export type GitHubReleaseCoordinate = Readonly<{
   tarball: GitHubReleaseAsset;
 }>;
 
+
+const MAXIMUM_CHANGELOG_BYTES = 1_024 * 1_024;
+const MAXIMUM_SECTION_BYTES = 32 * 1_024;
+const IDENTITY_OPEN = "<!-- ";
+const IDENTITY_CLOSE = " -->";
+
+export type ChangelogSection = Readonly<{
+  changes: string;
+  summary: string;
+}>;
+
+function compareSemver(left: string, right: string): number {
+  const a = text(left, SEMVER, "release version").split(".").map(Number);
+  const b = text(right, SEMVER, "release version").split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (a[index] ?? 0) - (b[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+/** Select the one CHANGELOG.md section for version. Its heading is
+ * `## X.Y.Z` or `## vX.Y.Z` with an optional ` - YYYY-MM-DD`; its body is a
+ * summary paragraph followed by a bulleted list. A missing, duplicated,
+ * empty, malformed, or Unreleased section fails closed so the release page
+ * is never written without reviewed notes. */
+export function changelogSection(changelog: string, version: string): ChangelogSection {
+  text(version, SEMVER, "changelog version");
+  if (typeof changelog !== "string" || Buffer.byteLength(changelog, "utf8") > MAXIMUM_CHANGELOG_BYTES) {
+    throw new Error("CHANGELOG.md is missing or exceeds its byte bound.");
+  }
+  const lines = changelog.replaceAll("\r\n", "\n").split("\n");
+  const escaped = version.replaceAll(".", "\\.");
+  const heading = new RegExp(`^## v?${escaped}(?![0-9A-Za-z.-])(.*)$`, "u");
+  const starts = lines.flatMap((line, index) => heading.test(line) ? [index] : []);
+  if (starts.length === 0) throw new Error(`CHANGELOG.md has no section for ${version}.`);
+  if (starts.length > 1) throw new Error(`CHANGELOG.md has more than one section for ${version}.`);
+  const start = starts[0] as number;
+  const suffix = heading.exec(lines[start] as string)?.[1] ?? "";
+  if (/unreleased/iu.test(suffix)) throw new Error(`CHANGELOG.md section ${version} still says Unreleased.`);
+  if (suffix !== "" && !/^ - [0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(suffix)) {
+    throw new Error(`CHANGELOG.md heading for ${version} must be "## ${version}" with an optional " - YYYY-MM-DD".`);
+  }
+  let end = start + 1;
+  while (end < lines.length && !/^#{1,2} /u.test(lines[end] as string)) end += 1;
+  const body = lines.slice(start + 1, end).join("\n").trim();
+  if (body.length === 0) throw new Error(`CHANGELOG.md section ${version} is empty.`);
+  if (Buffer.byteLength(body, "utf8") > MAXIMUM_SECTION_BYTES) {
+    throw new Error(`CHANGELOG.md section ${version} exceeds its byte bound.`);
+  }
+  if (/unreleased/iu.test(body)) throw new Error(`CHANGELOG.md section ${version} still says Unreleased.`);
+  if (body.includes("<!--") || body.includes("-->") || /^#/mu.test(body)) {
+    throw new Error(`CHANGELOG.md section ${version} must hold only a summary and bullets.`);
+  }
+  const firstBullet = body.search(/^- /mu);
+  if (firstBullet <= 0) {
+    throw new Error(`CHANGELOG.md section ${version} needs a summary paragraph followed by bullets.`);
+  }
+  const summary = body.slice(0, firstBullet).trim();
+  const changes = body.slice(firstBullet).trim();
+  if (summary.length === 0 || summary.split("\n").some((line) => line.startsWith("- "))) {
+    throw new Error(`CHANGELOG.md section ${version} needs a summary paragraph followed by bullets.`);
+  }
+  return Object.freeze({ changes, summary });
+}
+
+/** Split a release body into the visible notes and the identity record: the
+ * text inside the last `<!-- ` marker, which must close the body with `-->`. */
+export function splitReleaseBody(body: unknown): Readonly<{ identity: string; notes: string }> {
+  if (typeof body !== "string" || !body.endsWith(IDENTITY_CLOSE)) {
+    throw new Error("GitHub Release body does not end with its identity record.");
+  }
+  const marker = body.lastIndexOf(IDENTITY_OPEN);
+  if (marker < 0) throw new Error("GitHub Release body has no identity record.");
+  const identity = body.slice(marker + IDENTITY_OPEN.length, body.length - IDENTITY_CLOSE.length);
+  if (identity.length === 0 || identity.includes("\n") || identity.includes("-->")) {
+    throw new Error("GitHub Release identity record is malformed.");
+  }
+  if (marker < 2 || body.slice(marker - 2, marker) !== "\n\n") {
+    throw new Error("GitHub Release identity record must follow the notes after one blank line.");
+  }
+  return Object.freeze({ identity, notes: body.slice(0, marker - 2) });
+}
+
+/** The source a release page is rendered from: the CHANGELOG.md bytes of the
+ * release commit and that full commit SHA. */
+export type ReleasePageSource = Readonly<{
+  changelog: string;
+  commit: string;
+}>;
+
 export function releaseDistribution(releasePackage: ReleasePackage) {
   if (!SCOPED_PACKAGE.test(releasePackage.name)) throw new Error("Release package name is not one exact scoped coordinate.");
   if (!/^[a-z][a-z0-9-]{0,31}$/u.test(releasePackage.tagPrefix)) {
@@ -104,6 +202,80 @@ export function releaseDistribution(releasePackage: ReleasePackage) {
   function releaseArchiveName(version: string): string {
     text(version, SEMVER, "release version");
     return `${scopeOwner}-${unscoped}-${version}.tgz`;
+  }
+
+
+  function releaseIdentity(version: string): string {
+    text(version, SEMVER, "release identity version");
+    return `Automated public release of ${releasePackage.name}@${version} from ${releasePackage.tagPrefix}${version}.`;
+  }
+
+  function releaseTitle(version: string): string {
+    text(version, SEMVER, "release title version");
+    return `${releasePackage.title} ${releasePackage.tagPrefix}${version}`;
+  }
+
+  function releaseNotes(version: string, source: ReleasePageSource): string {
+    text(source.commit, SHA1, "release source commit");
+    const section = changelogSection(source.changelog, version);
+    const tag = `${releasePackage.tagPrefix}${version}`;
+    const archive = releaseArchiveName(version);
+    const base = `https://github.com/${releasePackage.repository}`;
+    return [
+      section.summary,
+      "",
+      "## Changes",
+      "",
+      section.changes,
+      "",
+      "## Install",
+      "",
+      "Install this version from the GitHub Release file:",
+      "",
+      "```sh",
+      `bun add --global ${base}/releases/download/${tag}/${archive}`,
+      "```",
+      "",
+      "The same bytes from npm:",
+      "",
+      "```sh",
+      `bun add --global ${releasePackage.name}@${version}`,
+      "```",
+      "",
+      "## Verify",
+      "",
+      `\`SHA256SUMS\` on this release lists the SHA-256 digest of \`${archive}\`. Download both files and run \`shasum -a 256 -c SHA256SUMS\`.`,
+      "",
+      `Built from commit [\`${source.commit}\`](${base}/commit/${source.commit}). The npm copy carries trusted-publisher provenance from this repository's release workflow. The [publishing guide](${base}/blob/${tag}/docs/publishing.md#legacy-package-publication) describes how the files are built and checked.`,
+    ].join("\n");
+  }
+
+  /** The complete standard release body: changelog summary and changes,
+   * generated Install and Verify, then the identity record as the final bytes. */
+  function releaseBody(version: string, source: ReleasePageSource): string {
+    return `${releaseNotes(version, source)}\n\n${IDENTITY_OPEN}${releaseIdentity(version)}${IDENTITY_CLOSE}`;
+  }
+
+  function assertReleasePage(release: JsonRecord, version: string, source: ReleasePageSource | undefined): void {
+    const legacyEra = compareSemver(version, releasePackage.lastLegacyPageVersion) <= 0;
+    if (
+      legacyEra
+      && release.name === `${releasePackage.legacyTitle} ${releasePackage.tagPrefix}${version}`
+      && release.body === releaseIdentity(version)
+    ) return;
+    if (release.name !== releaseTitle(version)) {
+      throw new Error(`GitHub Release ${releasePackage.tagPrefix}${version} has the wrong title.`);
+    }
+    const page = splitReleaseBody(release.body);
+    if (page.identity !== releaseIdentity(version)) {
+      throw new Error(`GitHub Release ${releasePackage.tagPrefix}${version} has the wrong identity record.`);
+    }
+    if (source === undefined) {
+      throw new Error(`GitHub Release ${releasePackage.tagPrefix}${version} notes need their changelog source.`);
+    }
+    if (page.notes !== releaseNotes(version, source)) {
+      throw new Error(`GitHub Release ${releasePackage.tagPrefix}${version} notes differ from the rendered changelog.`);
+    }
   }
 
   function parseNpmRelease(
@@ -161,14 +333,17 @@ export function releaseDistribution(releasePackage: ReleasePackage) {
     });
   }
 
-  function parseGitHubRelease(value: unknown, version: string): GitHubReleaseCoordinate {
+  function parseGitHubRelease(
+    value: unknown,
+    version: string,
+    source?: ReleasePageSource,
+  ): GitHubReleaseCoordinate {
     text(version, SEMVER, "GitHub release version");
     const tag = `${releasePackage.tagPrefix}${version}`;
     const release = record(value, "GitHub Release");
+    assertReleasePage(release, version, source);
     if (
       release.tag_name !== tag
-      || release.name !== `${releasePackage.title} ${tag}`
-      || release.body !== `Automated public release of ${releasePackage.name}@${version} from ${tag}.`
       || release.draft !== false
       || release.prerelease !== false
       || release.immutable !== true
@@ -195,6 +370,10 @@ export function releaseDistribution(releasePackage: ReleasePackage) {
     releaseArchiveName,
     parseNpmRelease,
     parseGitHubRelease,
+    releaseBody,
+    releaseIdentity,
+    releaseNotes,
+    releaseTitle,
     stableTag,
     unscoped,
   });
@@ -224,8 +403,17 @@ export function parseNpmRelease(
 export function parseGitHubRelease(
   value: unknown,
   version: string,
+  source?: ReleasePageSource,
 ): GitHubReleaseCoordinate {
-  return root.parseGitHubRelease(value, version);
+  return root.parseGitHubRelease(value, version, source);
+}
+
+export function releaseBody(version: string, source: ReleasePageSource): string {
+  return root.releaseBody(version, source);
+}
+
+export function releaseTitle(version: string): string {
+  return root.releaseTitle(version);
 }
 
 export function assertReleaseAssetBytes(
