@@ -187,7 +187,6 @@ body {
   border-inline-start: 1px solid var(--line);
   background: var(--paper-deep);
 }
-.draft-notes h2 { margin: 0; font-size: 1.15rem; line-height: 1.35; }
 .draft-notes dl { display: grid; gap: 1rem; margin-block: 1.25rem; }
 .draft-notes dt { font-weight: 600; }
 .draft-notes dd { margin: 0.2rem 0 0; color: var(--muted); }
@@ -271,8 +270,9 @@ body {
 }
 .source-card h3 {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-family: var(--hraness-type-h3-font);
+  font-size: var(--hraness-type-h3-size);
+  font-weight: var(--hraness-type-h3-weight);
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -329,13 +329,6 @@ body {
   color: var(--muted);
   font-size: 0.875rem;
   font-weight: 500;
-}
-.mlm-contrast__heading {
-  margin: 0;
-  font-size: clamp(1.35rem, 2vw, 1.75rem);
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  line-height: 1.15;
 }
 .mlm-contrast p:not(.mlm-contrast__label) {
   margin: 0;
@@ -470,24 +463,27 @@ nav.message-like-me-ask-ai + footer {
 .not-found h1 {
   margin: 0;
   max-width: 22ch;
-  font-size: clamp(2.25rem, 4.5vw, 3.75rem);
-  font-weight: 500;
+  font-family: var(--hraness-type-h1-font);
+  font-size: var(--hraness-type-h1-size);
+  font-weight: var(--hraness-type-h1-weight);
   letter-spacing: -0.022em;
   line-height: 1.05;
   text-wrap: balance;
 }
 .document-page h2 {
   margin: 0;
-  font-size: clamp(1.75rem, 3vw, 2.5rem);
-  font-weight: 500;
+  font-family: var(--hraness-type-h2-font);
+  font-size: var(--hraness-type-h2-size);
+  font-weight: var(--hraness-type-h2-weight);
   letter-spacing: -0.012em;
   line-height: 1.15;
   text-wrap: balance;
 }
 .document-page h3 {
   margin: 0;
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-family: var(--hraness-type-h3-font);
+  font-size: var(--hraness-type-h3-size);
+  font-weight: var(--hraness-type-h3-weight);
   letter-spacing: -0.01em;
   line-height: 1.25;
 }
@@ -525,8 +521,9 @@ nav.message-like-me-ask-ai + footer {
 .readme-prose { font-size: 1rem; line-height: 1.65; min-width: 0; }
 .readme-prose h1 {
   margin: 0 0 1.5rem;
-  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
-  font-weight: 500;
+  font-family: var(--hraness-type-h1-font);
+  font-size: var(--hraness-type-h1-size);
+  font-weight: var(--hraness-type-h1-weight);
   letter-spacing: -0.022em;
   line-height: 1.05;
 }
@@ -534,12 +531,18 @@ nav.message-like-me-ask-ai + footer {
   margin: 3rem 0 1rem;
   padding-top: 1.75rem;
   border-top: 1px solid var(--line);
-  font-size: 1.5rem;
-  font-weight: 500;
+  font-family: var(--hraness-type-h2-font);
+  font-size: var(--hraness-type-h2-size);
+  font-weight: var(--hraness-type-h2-weight);
   letter-spacing: -0.012em;
   line-height: 1.2;
 }
-.readme-prose h3 { margin: 2rem 0 0.75rem; font-size: 1.1rem; font-weight: 600; }
+.readme-prose h3 {
+  margin: 2rem 0 0.75rem;
+  font-family: var(--hraness-type-h3-font);
+  font-size: var(--hraness-type-h3-size);
+  font-weight: var(--hraness-type-h3-weight);
+}
 .readme-prose p { color: var(--ink); }
 .readme-prose img { height: auto; max-width: 100%; }
 .readme-prose pre {
@@ -588,10 +591,7 @@ nav.message-like-me-ask-ai + footer {
   padding-left: 2rem;
   border-left: 1px solid var(--line);
 }
-.about-grid h2 {
-  margin-top: 1.5rem;
-  font-size: 1.5rem;
-}
+.about-grid h2 { margin-top: 1.5rem; }
 .about-grid article > p:not(.section-number) {
   margin: 1rem 0 0;
   color: var(--muted);
@@ -652,7 +652,7 @@ nav.message-like-me-ask-ai + footer {
   font-size: 0.78rem;
   font-weight: 500;
 }
-.workflow-steps h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+.workflow-steps h3 { margin: 0; font-family: var(--hraness-type-h3-font); font-size: var(--hraness-type-h3-size); font-weight: var(--hraness-type-h3-weight); }
 .workflow-steps p { margin: 0.6rem 0 0; max-width: 46rem; line-height: 1.55; }
 .workflow-steps p code {
   color: var(--accent-on-inverse);
@@ -730,8 +730,9 @@ nav.message-like-me-ask-ai + footer {
 }
 .hero h1 {
   margin: 0;
+  font-family: var(--hraness-type-h1-font);
   font-size: clamp(2.25rem, 4.5vw, 3.5rem);
-  font-weight: 500;
+  font-weight: var(--hraness-type-h1-weight);
   letter-spacing: -0.022em;
   line-height: 1.05;
   text-wrap: balance;
@@ -806,21 +807,6 @@ nav.message-like-me-ask-ai + footer {
   html { scroll-behavior: auto; }
 }
 
-/* Pinned v0.4 marketing recipes predate configurable heading sizes. Keep this
- * small adapter local so the component runtime can upgrade independently. */
-[data-hraness-theme="paper"] :where(.hraness-marketing-hero__heading, .hraness-marketing-cta__heading):not(.textbutler-marketing *) {
-  font-size: var(--hraness-paper-heading-size);
-  line-height: var(--hraness-paper-heading-leading);
-  letter-spacing: var(--hraness-paper-heading-tracking);
-}
-[data-hraness-theme="paper"] :where(.hraness-marketing-section__heading, .hraness-marketing-install__heading, .hraness-marketing-primitives__heading, .hraness-marketing-interfaces__heading, .hraness-marketing-trust__heading, .hraness-marketing-quotes__heading, .hraness-marketing-pricing__heading, .hraness-marketing-questions__heading, .hraness-marketing-maker__heading):not(.textbutler-marketing *) {
-  font-size: var(--hraness-paper-section-heading-size);
-  line-height: var(--hraness-paper-heading-leading);
-}
-[data-hraness-theme="paper"] .hraness-marketing-hero__summary:not(.textbutler-marketing *) {
-  font-size: var(--hraness-paper-summary-size);
-}
-
 /* Textbutler pairs the shared palette with a contact workspace. */
 .textbutler-page .hraness-marketing-hero__eyebrow:empty,
 .textbutler-page .hraness-marketing-section__label:empty,
@@ -846,7 +832,7 @@ nav.message-like-me-ask-ai + footer {
 .architecture-rows dd { margin: 0; color: var(--muted); max-width: 66ch; }
 .development-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1.5rem, 4vw, 4rem); }
 .development-status > div { border-block-start: 1px solid var(--line); padding-block-start: 1.5rem; }
-.development-status h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+.development-status h3 { margin: 0; font-family: var(--hraness-type-h3-font); font-size: var(--hraness-type-h3-size); font-weight: var(--hraness-type-h3-weight); }
 .development-status p { margin-block: 0.75rem 1rem; color: var(--muted); max-width: 55ch; }
 .provider-marks { display: flex; flex-wrap: wrap; gap: 0.45rem 1rem; align-items: center; }
 .development-status .provider-marks, .about-grid .provider-marks { margin: 0.4rem 0 0; color: inherit; }

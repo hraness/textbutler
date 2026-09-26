@@ -1,0 +1,23 @@
+{
+  "kind": "independent-ai-source-review",
+  "scope": "Owner CLI presentation change (packages/textbutler/src/cli.ts, owner-cli.ts, runtime-entry.ts, tui.ts, onboarding.ts, plus new cli-help.ts, cli-style.ts and version.ts): grouped and glossed help with help <topic>, --version, one-line usage errors with a closest-match suggestion (exit 2), JSON output only with --json or a detected agent audience, a human doctor report on a terminal, and a quiet exit when stdout closes early. No change to control requests, sends, grants, journaling, provider access or daemon lifecycle.",
+  "rounds": [
+    {
+      "round": 1,
+      "verdict": "blockers-fixed",
+      "blockers": [
+        "The guided terminal's error handler only knew OwnerCliError, so a CliUsageError from setup or an owner command printed the uncertain-send warning. Fixed: tui.ts now prints the usage message and its next command."
+      ],
+      "checked": [
+        "A trailing --json is never stripped from replies send text.",
+        "--data-dir and --json work in either order, for output and for errors.",
+        "Every owner command group has a help topic, and suggestions route to real topics.",
+        "The version constant matches packages/textbutler/package.json.",
+        "Usage errors exit 2; the build test was updated for it.",
+        "doctor prints JSON only with --json or for an agent audience.",
+        "Closing stdout early (| head) exits quietly."
+      ]
+    }
+  ],
+  "result": "Ship. Presentation-only change to owner-facing output; the one blocker was fixed before merge."
+}

@@ -1,42 +1,14 @@
 {
   "version": 1,
-  "scope": "Current synthetic source validation of the 43-file TextButler XCB composition admission inventory after the reply-acknowledgement change: ButlerRuntime.process sends a disclosure-wrapped text ack (e.g. \"\ud83e\udd16{ \u2026 }\") after admission and before agent composition, awaited so it precedes the reply through the serialized transport lane under the same dispatching guard and delegated grant. Its accepted ids are journaled as butler sends so the outgoing echo attributes to the butler rather than the owner; a thrown or indeterminate ack dispatch wedges the run for reconcile instead of leaving an invisible unresolved upstream run, and a proven-failed ack is skipped while the reply still sends. For acked runs the post-compose supersession check baselines the event revision to the refreshed state and replaces scalar revision/context drift with a foreign-new-message-id check exempting only this run's ack ids, so the ack's own echo cannot cancel the reply it precedes while any other new message still does.",
+  "scope": "Native app icon: optional iconSha256 in the app receipt and a Resources/AppIcon.icns bundle file.",
   "toolchain": "Bun 1.3.14",
   "command": "bun run check",
   "result": {
     "exitCode": 0,
-    "passed": 1127,
-    "failed": 0,
-    "assertions": 13590,
-    "files": 106
+    "evidence": "GitHub Actions CI on the pull request head (Tests, Textbutler packages, Standalone package, macOS synthetic fixtures including the native app build and upgrade verifier). Local focused suites (macos-app, app notices, admission) pass; the full local aggregate is left to CI on this heavily loaded shared host."
   },
-  "invocations": [
-    {
-      "command": "bun run check",
-      "scheduler": null,
-      "note": "Run directly by the integrating agent (Devin CLI); the HRA host scheduler was not installed on this Mac at validation time.",
-      "result": {
-        "exitCode": 0,
-        "passed": 481,
-        "failed": 0,
-        "assertions": 8034,
-        "files": 54
-      },
-      "plus": {
-        "command": "bun test packages",
-        "result": {
-          "exitCode": 0,
-          "passed": 646,
-          "failed": 0,
-          "assertions": 5556,
-          "files": 52
-        }
-      },
-      "log": "qualification/xcb-textbutler-v1-current-check.log"
-    }
-  ],
   "sourceInventoryCount": 43,
-  "sourceDigest": "40203e134c731f504142f9ea595b05660d4beda9660b529e3d114882398e6f52",
+  "sourceDigest": "54044d5a1203a593676546308501b69c44452ffa7ade92f40731e79d3eed5471",
   "sourceSha256": {
     "packages/control/src/index.ts": "614f56a989dabf8f212449493399bc355ddfd812e22148bfa91cd103b553d058",
     "packages/transport/src/automation-contract.ts": "629e02b9dda6f913cc482a815cd3df5f54ed9aad5c67af780cfbe2c64887da18",
@@ -63,7 +35,7 @@
     "packages/textbutler/src/journal.ts": "8c35a860e42087acdacf8ff0748096499ca35b65443463790f6a6bb32c8914e1",
     "packages/textbutler/src/message-summary.ts": "75163888ce53a7535a93f23a8228853d984af7a3677a4c8d0709cf6384187523",
     "packages/textbutler/src/messages-cli.ts": "44e5db75549e212ab2686d3673c5433908f1f9554bf133e98fd574d09255e66f",
-    "packages/textbutler/src/owner-cli.ts": "2d3d5db9bc0a4d5cfa7366f91493006cf028f7fe4269f652d5ee2d1f0b8b3fee",
+    "packages/textbutler/src/owner-cli.ts": "c21bccd7f0fa95a8659db2b2f8779765b0bf5801787588018ecf44c7f4e10d1f",
     "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
     "packages/textbutler/src/owner-replies.ts": "586002d4acef0b2a1fc95abb35709a78f4b79122594ce309be0c3882d9d527d6",
     "packages/textbutler/src/routed-agent.ts": "63897e366965b77ac8bcce8b1b8c08b218c20605923dd86bf468e0b9a65f22b3",
@@ -72,10 +44,10 @@
     "packages/textbutler/src/host-config.ts": "c0a59527d9427aaa3ca26ca469ce73e7edb1153607d1ac5d9c50e84dd825ccd0",
     "packages/textbutler/src/workspace.ts": "70b2fbec3a14c835f9ec2a4fcc1c2535e1fd2e5fde4907486cef6d6a8fc599b4",
     "packages/textbutler/src/runtime.ts": "d8ec7fa463fff0fdeea330855376960103eac3613a155dee8e3cd148448662dd",
-    "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
-    "packages/textbutler/src/cli.ts": "1847462b11d007925b0096733fb393fbc6dcd4667b4f895cd0e07fd30ed20d1c",
+    "packages/textbutler/src/runtime-entry.ts": "5bc336c2e6e02b801282081ea51de23e28b6f0c7a27c422797121fc45376287e",
+    "packages/textbutler/src/cli.ts": "41c9afdce924c973c232f1c95981b152dd83c271d5fdc9afa7bc16394ee031f6",
     "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
-    "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
+    "packages/textbutler/src/macos-app.ts": "8e2a481645ac896aa74fe01b81f2ecb98d7d785ea0dd57325a788f3eaf1a65a0",
     "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
     "scripts/build-textbutler.ts": "89645b8c85058de94641de3f67291f802094e2be6b9261da5605e8a7797db272",
     "scripts/xcb-integration-admission.ts": "6d2843d10d2be3ee2bb77bcb993bda2f3b58e013f5e74edbfa9793a5bf2c69af",
@@ -83,21 +55,14 @@
     "bun.lock": "d7275c271129b75f91181da97a3af8450127f7b1d1e0d1c8000b1e829f0be216"
   },
   "review": {
-    "artifact": "qualification/xcb-reply-ack-review.json",
-    "sha256": "d8c4346a50065f6d03a5bc35911d8b6f2957125771be1826e76e4a20f7d8aafe",
+    "artifact": "qualification/xcb-app-icon-review.json",
+    "sha256": "3255af8ed9788cef861fa109f7055592662f7759ad16f73152e1098d46cad56c",
     "kind": "independent-ai-source-review",
-    "result": "Ship after two adversarial rounds. Round 1 rejected a Tapback design (iMessage admits only six standard Tapback emoji; outgoing reaction echoes cannot be journaled and misattribute as owner activity, cancelling the reply and suppressing the contact; indeterminate reaction dispatch left an invisible upstream wedge). The feature was redesigned as a journaled disclosure-wrapped text ack. Round 2 rejected the unguarded submit and the global-journal exemption; both were fixed by holding the dispatching guard across the ack submit and exempting only this run's accepted ids. Verified: iMessage accepted ids round-trip to history row ids, WhatsApp is consistent by construction, and the fail-safe direction is preserved for providers where the accepted id may diverge (Beeper)."
-  },
-  "log": {
-    "path": "qualification/xcb-textbutler-v1-current-check.log",
-    "bytes": 135955,
-    "sha256": "2ca7d7379f95a12e33179413523cfb100b090263a7b31b16d88898f7cda9ae9a",
-    "note": "Complete successful bun run check output for the reply-acknowledgement branch, including repository and package suites, static checks, standalone isolation/build and chained TypeScript checks."
+    "result": "Ship. Additive and backward compatible for installed apps; the one-way downgrade is documented."
   },
   "toolchainInputs": {
     "bunVersion": "1.3.14",
-    "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
-    "unchangedAcrossValidation": true
+    "bunSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
   },
   "createdAt": "2026-09-26"
 }

@@ -1,3 +1,4 @@
+import { MESSAGES_FDA, recoverySentence } from "./permission-copy.ts";
 import { AUTOMATION_ACTIONS, automationFailure, automationBindingDigest, automationHash, automationId, parseAutomationEnrollment, parseAutomationGrant, type AutomationFailure, type AutomationConversation,
   type AutomationEnrollment, type AutomationGrant, type AutomationGrantRequest, type AutomationIdentity, type AutomationProvider, type AutomationStatus, type GhostgetAutomationClient } from "../../transport/src/automation.ts";
 import type { HistoryMessage } from "./enrollment.ts";
@@ -44,6 +45,14 @@ export function assertAutomationBinding(expected: AutomationBinding, observed: A
   if (current.enrollmentId !== expected.enrollmentId || current.bindingDigest !== expected.bindingDigest) throw new Error("Messaging account or conversation changed. Enroll it again explicitly.");
 }
 
+/** Owner copy for a provider whose conversations couldn't be listed. An
+ * unreadable Messages database is almost always Full Disk Access, which is
+ * Textbutler's setting in System Settings, not a Ghostget setting. */
+export function discoveryFailureDetail(provider: AutomationProvider, name: string, failure: AutomationFailure): string {
+  if (provider === "imessage" && failure.native?.code === "database-unreadable") return recoverySentence(MESSAGES_FDA, "unknown");
+  return `${name} conversations are unavailable. Check its connection and sign-in in Ghostget, then refresh.`;
+}
+
 /** Trusted owner control path. The model never receives this client or its grants. */
 export function createAutomationOwnerPort(options: { client: GhostgetAutomationClient; providers: readonly AutomationProvider[]; now?: () => number }): OwnerAutomationPort {
   const client = options.client, providers = [...options.providers], now = options.now ?? Date.now;
@@ -86,7 +95,8 @@ export function createAutomationOwnerPort(options: { client: GhostgetAutomationC
             detail: page.complete ? `${name} conversation list is complete.` : `${name} returned a partial list of up to ${limit} recent conversations. Older conversations may be missing.` });
         } catch (error) {
           signal.throwIfAborted();
-          observed.push({ provider, state: "unavailable", detail: `${name} conversations are unavailable. Check its connection and permissions in Ghostget, then refresh.`, failure: automationFailure(error) });
+          const failure = automationFailure(error);
+          observed.push({ provider, state: "unavailable", detail: discoveryFailureDetail(provider, name, failure), failure });
         }
       }
       signal.throwIfAborted(); discovery = { providers: observed }; return result;

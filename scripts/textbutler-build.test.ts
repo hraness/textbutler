@@ -24,15 +24,19 @@ test("the real bundle runs from an isolated installation without node_modules or
       return { code, stdout, stderr };
     };
     const help = await run(["--help"]);
-    expect(help).toMatchObject({ code: 0, stderr: "" }); expect(help.stdout).toContain("Start here:");
-    expect(help.stdout).toContain("replies send DRAFT DIGEST");
+    expect(help).toMatchObject({ code: 0, stderr: "" }); expect(help.stdout).toContain("Start here");
+    expect(help.stdout).toContain("replies <command>");
+    const replies = await run(["replies", "--help"]);
+    expect(replies).toMatchObject({ code: 0, stderr: "" }); expect(replies.stdout).toContain("replies send <draft> <check>");
+    const version = await run(["--version"]);
+    expect(version).toMatchObject({ code: 0, stderr: "" }); expect(version.stdout).toMatch(/^textbutler \S+\n$/u);
     const invalid = await run(["contacts", "bogus"]);
-    expect(invalid.code).toBe(1); expect(invalid.stderr).toContain("Unrecognized owner command");
+    expect(invalid.code).toBe(2); expect(invalid.stderr).toContain('Missing or invalid arguments for "contacts bogus".');
     const data = join(root, "data");
     const setup = await run(["setup", "--data-dir", data]);
     expect(setup.code).toBe(0);
     expect(JSON.parse(await readFile(join(data, "state/settings.json"), "utf8")).settings).toMatchObject({ paused: true, contacts: [] });
-    const doctor = await run(["doctor", "--data-dir", data]);
+    const doctor = await run(["doctor", "--json", "--data-dir", data]);
     expect(doctor.stdout).not.toContain("UNSAFE-PRELOAD");
     expect(doctor.stderr).not.toContain("local installation");
     expect(JSON.parse(doctor.stdout)).toMatchObject({ canGenerateReplies: false, daemonConnected: false });
@@ -46,7 +50,7 @@ test("the real bundle runs from an isolated installation without node_modules or
     expect(notices).toContain("does not qualify a provider or prove live message delivery");
     expect(notices).toContain("Claude API remains unavailable");
     expect(notices).toContain("MIT-licensed reference application");
-    expect(help.stdout).toContain("--xcb");
+    expect((await run(["setup", "--help"])).stdout).toContain("--xcb");
     expect(await readdir(home, { recursive: true })).toEqual([".bunfig.toml"]);
   } finally { await writable(root); await rm(root, { recursive: true, force: true }); }
 }, 30_000);

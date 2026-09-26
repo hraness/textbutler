@@ -4,6 +4,7 @@ import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 export const MACOS_APP_BUNDLE_ID = "app.textbutler.desktop";
+export const MACOS_APP_ICON_MAXIMUM = 1024 * 1024;
 export interface MacosAppIdentity {
   schemaVersion: 1;
   bundleId: typeof MACOS_APP_BUNDLE_ID;
@@ -21,10 +22,13 @@ export interface MacosAppIdentity {
   infoPlistSha256: string;
   signatureSha256: string;
   sourceSha256: string;
+  /** Contents/Resources/AppIcon.icns. Apps built before the icon have none. */
+  iconSha256?: string;
 }
 const PATH_KEYS = ["appPath", "home", "dataDir", "runtime", "entrypoint"] as const;
 const HASH_KEYS = ["runtimeSha256", "entrypointSha256", "executableSha256", "infoPlistSha256", "signatureSha256", "sourceSha256"] as const;
-const KEYS = ["schemaVersion", "bundleId", "signing", "messagesBundleId", "automationConsent", ...PATH_KEYS, ...HASH_KEYS].sort().join(",");
+const BASE_KEYS = ["schemaVersion", "bundleId", "signing", "messagesBundleId", "automationConsent", ...PATH_KEYS, ...HASH_KEYS];
+const KEYS = [BASE_KEYS.sort().join(","), [...BASE_KEYS, "iconSha256"].sort().join(",")];
 function fail(): never { throw new Error("The TextButler app identity is missing, changed, or unsafe. Preserve it and reinstall the verified app before starting its service."); }
 export function macosAppPath(value: unknown): string {
   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== value || Buffer.byteLength(value) > 4096 || /[\u0000-\u001f\u007f{}"\\]/u.test(value)) fail();
@@ -33,9 +37,9 @@ export function macosAppPath(value: unknown): string {
 export function parseMacosAppIdentity(value: unknown): MacosAppIdentity {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail();
   const row = value as Record<string, unknown>;
-  if (Object.keys(row).sort().join(",") !== KEYS || row.schemaVersion !== 1 || row.bundleId !== MACOS_APP_BUNDLE_ID || !["ad-hoc", "certificate"].includes(String(row.signing)) || !["com.apple.MobileSMS", "com.apple.iChat"].includes(String(row.messagesBundleId)) || !["native-api", "synthetic"].includes(String(row.automationConsent))) fail();
+  if (!KEYS.includes(Object.keys(row).sort().join(",")) || row.schemaVersion !== 1 || row.bundleId !== MACOS_APP_BUNDLE_ID || !["ad-hoc", "certificate"].includes(String(row.signing)) || !["com.apple.MobileSMS", "com.apple.iChat"].includes(String(row.messagesBundleId)) || !["native-api", "synthetic"].includes(String(row.automationConsent))) fail();
   for (const key of PATH_KEYS) macosAppPath(row[key]);
-  for (const key of HASH_KEYS) if (typeof row[key] !== "string" || !/^[a-f0-9]{64}$/u.test(row[key])) fail();
+  for (const key of [...HASH_KEYS, ...("iconSha256" in row ? ["iconSha256"] : [])]) if (typeof row[key] !== "string" || !/^[a-f0-9]{64}$/u.test(row[key] as string)) fail();
   if (row.appPath !== join(String(row.home), "Applications", "TextButler.app")) fail();
   return Object.freeze({ ...row }) as unknown as MacosAppIdentity;
 }
@@ -78,7 +82,9 @@ async function inventory(path: string, expected: readonly string[]): Promise<voi
 export async function verifyMacosApp(identity: MacosAppIdentity, physicalAppPath = identity.appPath): Promise<void> {
   parseMacosAppIdentity(identity);
   await inventory(physicalAppPath, ["Contents"]);
-  await inventory(join(physicalAppPath, "Contents"), ["Info.plist", "MacOS", "_CodeSignature"]);
+  const icon = identity.iconSha256;
+  await inventory(join(physicalAppPath, "Contents"), ["Info.plist", "MacOS", "_CodeSignature", ...(icon === undefined ? [] : ["Resources"])]);
+  if (icon !== undefined) await inventory(join(physicalAppPath, "Contents", "Resources"), ["AppIcon.icns"]);
   await inventory(join(physicalAppPath, "Contents", "MacOS"), ["TextButler"]);
   await inventory(join(physicalAppPath, "Contents", "_CodeSignature"), ["CodeResources"]);
   const files = [
@@ -89,6 +95,7 @@ export async function verifyMacosApp(identity: MacosAppIdentity, physicalAppPath
     [join(physicalAppPath, "Contents", "_CodeSignature", "CodeResources"), identity.signatureSha256, false],
   ] as const;
   for (const [file, expected, executable] of files) if (await appFileDigest(file, { executable }) !== expected) fail();
+  if (icon !== undefined && await appFileDigest(join(physicalAppPath, "Contents", "Resources", "AppIcon.icns"), { maximum: MACOS_APP_ICON_MAXIMUM }) !== icon) fail();
 }
 export async function readMacosAppReceipt(path: string): Promise<MacosAppIdentity> {
   macosAppPath(path); await appPhysicalDirectory(dirname(path), true);

@@ -137,7 +137,7 @@ test('binds Design Kit v0.15.0 to the portable Paper palette', async () => {
   };
 
   expect(manifest.dependencies?.['@hraness/design-kit'])
-    .toBe('github:hraness/design-kit#v0.18.2');
+    .toBe('github:hraness/design-kit#v0.19.0');
   expect(manifest.dependencies?.['@hraness/ui'])
     .toBe('github:hraness/ui#v0.5.19');
   expect(css).toContain("@import '@hraness/design-kit/styles.css';");
@@ -157,8 +157,8 @@ test('binds Design Kit v0.15.0 to the portable Paper palette', async () => {
 
 test('admits the released finite marketing snapshot and scopes it to the landing', async () => {
   const snapshot = await checkMarketingSnapshot();
-  expect(snapshot.source.commit).toBe('d38d13c07d7956d02ddfbca8d32aa2066d88fbd3');
-  expect(snapshot.files['product-marketing-preset.css'].sha256).toBe('ab78b17a454385c190e36172ea660aa396cd08e7ef371e249b91342ec411044d');
+  expect(snapshot.source.commit).toBe('8937fceab35ae5bf591202bde3d641d48cec7f46');
+  expect(snapshot.files['product-marketing-preset.css'].sha256).toBe('279d8878f8e233e355202c9e0a19797a32ea7999486e711dae7836497879a1e6');
   const html = renderToStaticMarkup(<Home />);
   // React hoists the product icon's preload ahead of the document root.
   expect(html.replace(/^(?:<link\b[^>]*>\s*)+/u, ''))

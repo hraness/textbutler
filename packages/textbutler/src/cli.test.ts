@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { newContact } from "./config.ts";
-import { runTextbutlerCli, CLI_USAGE } from "./cli.ts";
+import { runTextbutlerCli } from "./cli.ts";
+import { CliUsageError } from "./cli-style.ts";
 import { startDaemon, type RunningDaemon } from "./daemon.ts";
 
 const roots: string[] = [], daemons: RunningDaemon[] = [];
@@ -17,7 +18,7 @@ describe("owner reply CLI", () => {
       ["replies", "discard"], ["replies", "send", "draft:x", "extra"],
       ["replies", "send", "draft:x"], ["replies", "show"], ["replies", "show", "contact-1"],
       ["inbox", "extra"],
-    ]) await expect(runTextbutlerCli(argv, { write: () => {} })).rejects.toThrow(CLI_USAGE);
+    ]) await expect(runTextbutlerCli(argv, { write: () => {} })).rejects.toThrow(CliUsageError);
   });
   test("reply commands fail closed when no daemon is reachable", async () => {
     const dataDir = await root();
@@ -60,13 +61,16 @@ describe("owner CLI entrypoint", () => {
   test("help gives a readable first task and distinguishes draft review from sending", async () => {
     const help = await run(["--help"]);
     expect(help.code).toBe(0);
-    expect(help.lines.join("")).toContain("Start here:");
-    expect(help.lines.join("")).toContain("replies show DRAFT");
-    expect(help.lines.join("")).toContain("replies send DRAFT DIGEST");
-    expect(help.lines.join("")).toContain("contacts add CANDIDATE [--history]");
-    expect(help.lines.join("")).toContain("--xcb-account PROVIDER:ACCOUNT");
-    expect(help.lines.join("")).toContain("--xcb-model PROVIDER/MODEL[/EFFORT]");
-    expect(help.lines.join("")).toContain("providers check native-codex");
+    expect(help.lines.join("")).toContain("Start here");
+    expect(help.lines.join("")).toContain("replies <command>");
+    const replies = await run(["help", "replies"]);
+    expect(replies.lines.join("")).toContain("replies show <draft>");
+    expect(replies.lines.join("")).toContain("replies send <draft> <check>");
+    expect((await run(["help", "contacts"])).lines.join("")).toContain("contacts add <candidate> [--history]");
+    const setup = (await run(["setup", "--help"])).lines.join("");
+    expect(setup).toContain("--xcb-account <ai>:<id>");
+    expect(setup).toContain("--xcb-model <ai>/<model>[/<effort>]");
+    expect((await run(["providers", "-h"])).lines.join("")).toContain("providers check native-codex");
   });
   test("contact controls and pause use the running owner daemon", async () => {
     const dataDir = await root();

@@ -7,83 +7,76 @@ import { createLaunchAgentLifecycle, defaultLaunchAgentHost, type LaunchAgentLif
 import { runMenuBarCommand } from "./menubar.ts";
 import type { ClaudeApiAdapterOptions } from "@hraness/agentmixer";
 import type { ControlRequest, ControlResponse } from "../../control/src/index.ts";
-import { awaitOwnerJob, handleOwnerCommand, OWNER_COMMAND_HELP, OwnerCliError, pendingJobOutput, resolveOwnerContact } from "./owner-cli.ts";
+import { awaitOwnerJob, handleOwnerCommand, OwnerCliError, pendingJobOutput, resolveOwnerContact } from "./owner-cli.ts";
 import { runDoctor, runSetup } from "./onboarding.ts";
 import { runTextbutlerTui } from "./tui.ts";
 import { runIMessageSetup } from "./imessage-setup.ts";
-import { handleMessagesCommand, MESSAGES_COMMAND_HELP } from "./messages-cli.ts";
+import { handleMessagesCommand } from "./messages-cli.ts";
+import { BARE_INTRO, COMMANDS, HELP_TOPICS, ROOT_HELP, topicHelp } from "./cli-help.ts";
+import { CliUsageError, closest, detectAudience, jsonError, quoteInput, renderError, symbolsFor, type Audience } from "./cli-style.ts";
+import { TEXTBUTLER_VERSION } from "./version.ts";
 
-export const CLI_USAGE = `Textbutler — your local messaging assistant
+type CliOptions = { launchAgent?: LaunchAgentLifecycle; entrypoint?: string; providerArtifact?: ClaudeApiAdapterOptions["runtimeArtifact"];
+  supportEnv?: Readonly<Record<string, string | undefined>>; audience?: Audience; env?: Readonly<Record<string, string | undefined>> };
 
-Start here:
-  textbutler setup                    Initialize private settings and next steps
-  textbutler tui                      Open the guided terminal interface
-  textbutler doctor                   Check readiness and see what to do next
-  textbutler --help                   Show this guide
+/** A malformed form of a known command points at that command's help. */
+function usage(args: readonly string[]): CliUsageError {
+  const family = args[0] ?? "";
+  const shown = args.slice(0, family === "replies" || family === "daemon" || family === "providers" || family === "menubar" ? 2 : 1).filter(word => /^[a-z-]{1,24}$/u.test(word)).join(" ");
+  return new CliUsageError(`Missing or invalid arguments for "${shown || family}".`, `textbutler help ${topicHelp(family) ? family : ""}`.trim());
+}
 
-Setup options:
-  setup [--ghostget ABS] [--runtime ABS] [--state-home ABS]
-        [--account PROVIDER:AUTHID ...]
-        [--xcb ABS --xcb-state ABS --xcb-account PROVIDER:ACCOUNT
-         --xcb-model PROVIDER/MODEL[/EFFORT] ...]
-  XCB providers: claude, codex, devin. Sign in with XCB first; setup pins the executable.
-  Use one explicit account and full model key per provider. Restart after setup.
-  init                               Initialize private settings, paused
-
-${OWNER_COMMAND_HELP}
-
-${MESSAGES_COMMAND_HELP}
-
-Agents:
-  providers list                     Show configured agent accounts
-  providers check ACCOUNT            Verify one explicitly selected account
-  providers check native-codex       Check the configured XCB Codex subscription
-  providers check native-claude-code Check the configured XCB Claude subscription
-  providers check native-devin       Check the configured XCB Devin subscription
-
-Review and reply:
-  inbox                              Find enrolled conversations to answer
-  replies suggest CONTACT            Create a suggestion without sending it
-  replies show DRAFT                  Review every action and its digest
-  replies send DRAFT DIGEST           Send the exact reviewed suggestion
-  replies send CONTACT TEXT...       Send your literal reply
-  replies discard DRAFT              Discard a suggestion
-  replies reconcile CONTACT          Resolve an uncertain send after checking Messages
-                                      (--sent marks it delivered, --failed not delivered)
-
-Background service:
-  daemon run                         Run in this terminal
-  daemon install|uninstall|status     Manage login startup and service status
-  menubar [start|stop|status|doctor|install|uninstall]
-  app imessage-setup                 Link the configured iMessage account from TextButler.app
-
-Optional support:
-  support [protocol --json|offer --json|shown ID|release ID|dismiss|snooze|enable|status --json]
-
-Append --data-dir /absolute/private/path to use another data directory.
-Commands return JSON; help and the guided interface are for people.
-Start paused, add one contact, review a reply, then enable automation when ready.`;
-export async function runTextbutlerCli(argv: readonly string[], output: { write(text: string): unknown } = process.stdout, options: { launchAgent?: LaunchAgentLifecycle; entrypoint?: string;
-  providerArtifact?: ClaudeApiAdapterOptions["runtimeArtifact"]; supportEnv?: Readonly<Record<string, string | undefined>> } = {}): Promise<number> {
+export async function runTextbutlerCli(argv: readonly string[], output: { write(text: string): unknown } = process.stdout, options: CliOptions = {}): Promise<number> {
+  if (argv[0] === "support" && argv.length === 2 && (argv[1] === "--help" || argv[1] === "-h")) { output.write(`${topicHelp("support")}\n`); return 0; }
   if (argv[0] === "support") return await runProductSupportCommand(argv.slice(1), { stdout: text => output.write(text), stderr: text => process.stderr.write(text) }, { command: ["textbutler"], ...(options.supportEnv === undefined ? {} : { env: options.supportEnv }) });
-  const args = [...argv]; let dataDir = defaultDataDirectory();
+  const env = options.env ?? process.env, audience = options.audience ?? detectAudience({ env }), symbols = symbolsFor(env);
+  const args = [...argv]; let dataDir = defaultDataDirectory(), json = false;
+  // A trailing --json selects machine output. It is never taken from the text
+  // of a literal reply, so "replies send CONTACT ... --json" stays unchanged.
+  const takeJson = (): void => { if (args.at(-1) === "--json" && !(args[0] === "replies" && args[1] === "send")) { args.pop(); json = true; } };
+  takeJson();
   const option = args.indexOf("--data-dir");
   if (option !== -1) {
-    if (option !== args.length - 2 || args[option + 1] === undefined || !args[option + 1]!.startsWith("/")) throw new Error(CLI_USAGE);
+    if (option !== args.length - 2 || args[option + 1] === undefined || !args[option + 1]!.startsWith("/")) throw new CliUsageError("--data-dir needs an absolute folder path and must come last.", "textbutler --help");
     dataDir = args[option + 1]!; args.splice(option, 2);
   }
+  takeJson();
+  const machine = json || audience === "agent";
   if (args.length === 0) {
     if (process.stdin.isTTY && output === process.stdout) return await runTextbutlerTui(dataDir, output, { ...(options.entrypoint ? { entrypoint: options.entrypoint } : {}) });
-    output.write(`${CLI_USAGE}\n`); return 0;
+    output.write(`${BARE_INTRO}\n`); return 0;
   }
-  if (args.length === 1 && ["--help", "help", "-h"].includes(args[0]!)) { output.write(`${CLI_USAGE}\n`); return 0; }
+  if (args.length === 1 && ["--version", "-V", "version"].includes(args[0]!)) {
+    output.write(machine ? `${JSON.stringify({ name: "textbutler", version: TEXTBUTLER_VERSION })}\n` : `textbutler ${TEXTBUTLER_VERSION}\n`); return 0;
+  }
+  const helpFlag = args.length > 1 && ["--help", "-h"].includes(args.at(-1)!);
+  if (["--help", "-h", "help"].includes(args[0]!) || helpFlag) {
+    if (args.length === 1) { output.write(`${ROOT_HELP}\n`); return 0; }
+    // The agent messaging family keeps its JSON help for agents.
+    if (helpFlag && args[0] === "messages" && args.length === 2 && machine) return (await handleMessagesCommand(args, { request: () => Promise.reject(new Error("unused")), print: value => output.write(`${JSON.stringify(value)}\n`), dataDir }))!;
+    const topic = helpFlag ? args[0]! : args[1]!, text = topicHelp(topic);
+    if (text === undefined || args[0] === "help" && args.length !== 2) {
+      const guess = closest(topic, HELP_TOPICS);
+      throw new CliUsageError(`No help topic ${quoteInput(topic)}.${guess ? ` Did you mean "${guess}"?` : ""}`, "textbutler --help", "unknown-topic");
+    }
+    output.write(`${text}\n`); return 0;
+  }
+  if (!COMMANDS.includes(args[0]!) && args[0] !== "app") {
+    const guess = closest(args[0]!, COMMANDS);
+    throw new CliUsageError(`Unknown command ${quoteInput(args[0]!)}.${guess ? ` Did you mean "${guess}"?` : ""}`, "textbutler --help", "unknown-command");
+  }
   const command = args.join(" ");
   const print = (value: unknown): void => { output.write(`${JSON.stringify(value)}\n`); };
   const request = (request: ControlRequest): Promise<ControlResponse> => requestDaemon({ dataDir, request });
-  if (args[0] === "setup") return await runSetup(args.slice(1), dataDir, output);
-  if (command === "app imessage-setup") { if (option === -1) throw new Error(CLI_USAGE); const result = await runIMessageSetup(dataDir); print(result); return result.ok ? 0 : 1; }
+  if (args[0] === "setup") return await runSetup(args.slice(1), dataDir, output, { symbols });
+  // Hidden: TextButler.app runs this role itself (see the setup guide).
+  if (command === "app imessage-setup") {
+    if (option === -1) throw new CliUsageError("App setup runs inside TextButler.app, not from this command.", "bun run textbutler:app imessage-setup --data-dir <path>");
+    const result = await runIMessageSetup(dataDir); print(result); return result.ok ? 0 : 1;
+  }
+  if (args[0] === "app") throw new CliUsageError(`Unknown command ${quoteInput(args.join(" "))}.`, "textbutler --help", "unknown-command");
   if (command === "tui") return await runTextbutlerTui(dataDir, output, { ...(options.entrypoint ? { entrypoint: options.entrypoint } : {}) });
-  if (command === "doctor") return await runDoctor(dataDir, output);
+  if (command === "doctor") return await runDoctor(dataDir, output, { json: machine, symbols });
   if (args[0] === "messages") {
     try { return (await handleMessagesCommand(args, { request, print, dataDir }))!; }
     catch (error) {
@@ -95,7 +88,7 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
     const handled = await handleOwnerCommand(args, { request, print });
     if (handled !== undefined) return handled;
   } catch (error) {
-    if (error instanceof OwnerCliError) throw error;
+    if (error instanceof OwnerCliError || error instanceof CliUsageError) throw error;
     print({ ok: false, status: "disconnected", detail: "The control request could not be confirmed. Run textbutler doctor. Check status before repeating a change; it may already have taken effect." }); return 1;
   }
   const checkAccount = args.length === 3 && args[0] === "providers" && args[1] === "check" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(args[2]!) ? args[2] : undefined;
@@ -110,8 +103,8 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
   const repliesReconcile = args[0] === "replies" && args[1] === "reconcile" && (args.length === 3 || args.length === 4 && ["--sent", "--failed"].includes(args[3]!))
     ? { contact: args[2]!, resolution: args[3] === "--sent" ? "sent" as const : args[3] === "--failed" ? "failed" as const : undefined } : undefined;
   const replies = inbox || repliesSuggest !== undefined || repliesShow !== undefined || repliesSendDraft !== undefined || repliesSendText !== undefined || repliesDiscard !== undefined || repliesReconcile !== undefined;
-  if (args[0] === "replies" && !replies) throw new Error(CLI_USAGE);
-  if (!["init", "doctor", "providers list", "daemon run", "daemon install", "daemon uninstall", "daemon status"].includes(command) && !menuBar && !checkAccount && !replies) throw new Error(CLI_USAGE);
+  if (args[0] === "replies" && !replies) throw usage(args);
+  if (!["init", "doctor", "providers list", "daemon run", "daemon install", "daemon uninstall", "daemon status"].includes(command) && !menuBar && !checkAccount && !replies) throw usage(args);
   /** Job-backed control call: poll until the stored result arrives. */
   const job = (input: ControlRequest): Promise<ControlResponse> => awaitOwnerJob(input, request);
   const unresolved = (response: ControlResponse): void => { print(response.ok && response.kind === "job" ? pendingJobOutput(response) : response); };
@@ -124,7 +117,7 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
   if (replies) {
     try { return await repliesCommand(); }
     catch (error) {
-      if (error instanceof OwnerCliError || (error instanceof Error && error.message === CLI_USAGE)) throw error;
+      if (error instanceof OwnerCliError || error instanceof CliUsageError) throw error;
       print({ ok: false, status: "disconnected", detail: "The reply operation could not be confirmed. Run textbutler doctor and inspect status before repeating a send; it may already have been submitted." }); return 1;
     }
   }
@@ -207,8 +200,26 @@ export async function runTextbutlerCli(argv: readonly string[], output: { write(
   await daemon.close();
   return 0;
 }
+/** Render a thrown error per SPEC § D5: one sentence and one next command on
+ * stderr, or the JSON error object on stdout for --json and agents. */
+export function describeCliError(error: unknown, argv: readonly string[], env: Readonly<Record<string, string | undefined>> = process.env, audience: Audience = detectAudience({ env })): { stdout: string; stderr: string; exitCode: number } {
+  const usage = error instanceof CliUsageError;
+  const message = usage || error instanceof OwnerCliError ? error.message : "Textbutler couldn't finish this command.";
+  const next = usage ? error.next : error instanceof OwnerCliError ? undefined : "textbutler doctor";
+  const code = usage ? error.code : error instanceof OwnerCliError ? "invalid-request" : "failed";
+  const exitCode = usage ? 2 : 1;
+  const literalReply = argv[0] === "replies" && argv[1] === "send";
+  const json = !literalReply && (argv.at(-1) === "--json" || argv.at(-3) === "--json" && argv.at(-2) === "--data-dir");
+  if (json || audience === "agent") return { stdout: jsonError(code, message, next), stderr: "", exitCode };
+  return { stdout: "", stderr: renderError(message, next, symbolsFor(env)), exitCode };
+}
+/** `textbutler --help | head -1` exits quietly instead of printing a trace. */
+export function quietOnClosedPipe(): void {
+  process.stdout.on("error", (error: NodeJS.ErrnoException) => { if (error.code === "EPIPE") process.exit(0); throw error; });
+}
 if (import.meta.main) {
-  const supportEnv = { ...process.env };
-  try { process.exitCode = await runTextbutlerCli(process.argv.slice(2), process.stdout, { supportEnv }); }
-  catch (error) { process.stderr.write(`${error instanceof OwnerCliError ? error.message : error instanceof Error && error.message === CLI_USAGE ? CLI_USAGE : "Textbutler could not complete this command. Run textbutler doctor for setup and readiness guidance. Check that the private data directory and installed runtime are available."}\n`); process.exitCode = 1; }
+  quietOnClosedPipe();
+  const supportEnv = { ...process.env }, argv = process.argv.slice(2);
+  try { process.exitCode = await runTextbutlerCli(argv, process.stdout, { supportEnv }); }
+  catch (error) { const shown = describeCliError(error, argv); process.stdout.write(shown.stdout); process.stderr.write(shown.stderr); process.exitCode = shown.exitCode; }
 }
