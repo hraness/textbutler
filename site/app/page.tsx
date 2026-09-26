@@ -10,6 +10,7 @@ import {
   ProductHero,
   ProviderMarkChip,
 } from '@hraness/design-kit/react/server';
+import { product, type PortfolioProductId } from '@hraness/design-kit/portfolio';
 import Link from 'next/link';
 
 import { ConversationField } from './_components/conversation-field';
@@ -41,6 +42,12 @@ export const metadata = pageMetadata({
   description: SITE_DESCRIPTION,
   path: '/',
 });
+
+// Related cards take each product's link, mark, and one-liner from the portfolio facts.
+const related = (id: PortfolioProductId, name: string) => {
+  const { canonicalUrl, mark, oneLiner } = product(id);
+  return { href: canonicalUrl, mark, name, role: oneLiner };
+};
 
 const HERO_FOOTNOTE = `${SITE_STATUS_LABEL} · macOS · iMessage, WhatsApp, and Beeper`;
 const HOME_QUESTIONS = [
@@ -193,51 +200,13 @@ export default function Home() {
             {
               heading: "The personal apps",
               headingId: "related-apps",
-              items: [
-                {
-                  name: "PeopleBlade",
-                  href: "https://peopleblade.com",
-                  role: "Local personal CRM for everyone you know, built for your agent",
-                  relationship: "PeopleBlade keeps the people. Textbutler’s legacy history tools write the same private message-bundle format, so an export made for one reads in the other.",
-                },
-                {
-                  name: "Soulscrape",
-                  href: "https://soulscrape.com",
-                  role: "Free agent skill that writes dated dossiers on people, sources cited",
-                  relationship: "Textbutler’s legacy history tools can export your messages with a person as evidence for a Soulscrape profile.",
-                },
-                {
-                  name: "Wordcell",
-                  href: "https://wordcell.io",
-                  role: "Markdown knowledge base that gives agents the decisions behind code",
-                  relationship: "The butler's memory lives in ordinary files; Wordcell is the same idea grown into a full queryable vault your agent can search.",
-                },
-              ],
+              items: [related('peopleblade', 'PeopleBlade'), related('soulscrape', 'Soulscrape'), related('kb', 'Wordcell')],
             },
             {
               heading: "The agent platform",
               headingId: "related-tools",
               summary: "The connections, subscription, and model comparisons around the butler.",
-              items: [
-                {
-                  name: "Ghostget",
-                  href: "https://ghostget.com",
-                  role: "Named web actions for AI agents: read pages, save media, use connected accounts",
-                  relationship: "Ghostget connects Textbutler to iMessage, WhatsApp, and Beeper.",
-                },
-                {
-                  name: "xcb",
-                  href: "https://xcb.sh",
-                  role: "Routes coding tasks across the Claude, Codex, and Devin plans you have",
-                  relationship: "xcb runs the butler’s replies on your Claude Code or Codex subscription and keeps that sign-in out of Textbutler.",
-                },
-                {
-                  name: "AI Charts",
-                  href: "https://aicharts.io",
-                  role: "Model benchmark scores plotted against cost and tokens per task",
-                  relationship: "Textbutler’s replies run on Claude or Codex models; AI Charts compares published benchmarks for them.",
-                },
-              ],
+              items: [related('wrench', 'Ghostget'), related('xcb', 'xcb'), related('aicharts', 'AI Charts')],
             },
           ]} />
           <MarketingCallToAction actions={[{ href: GETTING_STARTED_URL, label: 'Start guided setup' }, { href: '/docs', label: 'Read the docs' }]} className="mlm-marketing-cta" footnote={HERO_FOOTNOTE} heading="Try one conversation" headingId="closing-title" id="closing" summary="Connect an app, choose a conversation, and watch your agent work. Turn on automatic replies only after your account passes its check and you’ve tested with the person you chose." />

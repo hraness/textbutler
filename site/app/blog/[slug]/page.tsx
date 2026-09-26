@@ -96,8 +96,8 @@ export default async function BlogPostPage({ params }: Readonly<{ params: Promis
                   items={related.map((item) => ({
                     name: item.name,
                     href: item.href,
+                    mark: item.mark,
                     role: item.role,
-                    relationship: item.relationship,
                   }))}
                 />
               )}
