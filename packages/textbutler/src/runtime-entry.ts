@@ -1,14 +1,15 @@
-import { CLI_USAGE, runTextbutlerCli } from "./cli.ts";
-import { OwnerCliError } from "./owner-cli.ts";
+import { describeCliError, quietOnClosedPipe, runTextbutlerCli } from "./cli.ts";
 
 /** The verified launcher supplies its own physical entrypoint for restarts.
  * Local bundle integrity is not provider qualification: no runtimeArtifact is
  * created here, and account/contact activation remains an owner operation. */
 export async function runInstalledCli(args: readonly string[], entrypoint: string): Promise<number> {
+  quietOnClosedPipe();
   try { return await runTextbutlerCli(args, process.stdout, { entrypoint }); }
   catch (error) {
-    process.stderr.write(`${error instanceof OwnerCliError ? error.message : error instanceof Error && error.message === CLI_USAGE ? CLI_USAGE
-      : "Textbutler could not complete this command. Run textbutler doctor for setup and readiness guidance."}\n`);
-    return 1;
+    const shown = describeCliError(error, args);
+    process.stdout.write(shown.stdout); process.stderr.write(shown.stderr);
+    return shown.exitCode;
   }
 }
+

@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { CONTROL_PROTOCOL, type ControlRequest, type ControlResponse, type DesktopSnapshot } from "../../control/src/index.ts";
 import { awaitOwnerJob, handleOwnerCommand, OwnerCliError, pendingJobOutput, resolveOwnerContact } from "./owner-cli.ts";
+import { CliUsageError } from "./cli-style.ts";
+/** Usage errors point at help; other owner errors explain the refusal. Both are shown to the owner. */
+const ownerFacing = (error: unknown): boolean => error instanceof OwnerCliError || error instanceof CliUsageError;
+const rejectsOwnerFacing = async (pending: Promise<unknown>): Promise<void> => {
+  const error = await pending.then(() => undefined, (reason: unknown) => reason);
+  expect(ownerFacing(error)).toBe(true);
+};
 import { DEFAULT_HABITAT_PLAN } from "./contact-habitat.ts";
 
 function snapshot(): DesktopSnapshot {
@@ -32,7 +39,7 @@ describe("owner CLI commands", () => {
       ["pause", "all"], ["status", "extra"], ["messaging", "start", "telegram"], ["messaging"],
       ["contacts", "add", "candidate", "--enable"], ["contacts", "account", "Alice"],
       ["contacts", "mode", "Alice", "auto"], ["contacts", "enable"], ["jobs", "show", "../job"],
-    ]) await expect(f.run(args)).rejects.toBeInstanceOf(OwnerCliError);
+    ]) await rejectsOwnerFacing(f.run(args));
     expect(f.calls).toEqual([]);
   });
 
@@ -132,13 +139,13 @@ describe("owner CLI commands", () => {
       JSON.stringify({ ...DEFAULT_HABITAT_PLAN, personality: { tone: "intense", formality: "casual" } }),
       JSON.stringify({ ...DEFAULT_HABITAT_PLAN, personality: { tone: "warm", formality: "casual", account: "other" } }),
       JSON.stringify({ ...DEFAULT_HABITAT_PLAN, guidance: "x".repeat(8193) })]) {
-      await expect(f.run(["habitats", "configure", "Alice", "0", plan])).rejects.toBeInstanceOf(OwnerCliError);
+      await rejectsOwnerFacing(f.run(["habitats", "configure", "Alice", "0", plan]));
     }
     for (const revision of ["-1", "1.5", "01", "9007199254740992"]) {
-      await expect(f.run(["habitats", "configure", "Alice", revision, JSON.stringify(DEFAULT_HABITAT_PLAN)])).rejects.toBeInstanceOf(OwnerCliError);
-      await expect(f.run(["habitats", "memory-clear", "Alice", revision])).rejects.toBeInstanceOf(OwnerCliError);
+      await rejectsOwnerFacing(f.run(["habitats", "configure", "Alice", revision, JSON.stringify(DEFAULT_HABITAT_PLAN)]));
+      await rejectsOwnerFacing(f.run(["habitats", "memory-clear", "Alice", revision]));
     }
-    await expect(f.run(["habitats", "configure", "Alice", "0"])).rejects.toBeInstanceOf(OwnerCliError);
+    await rejectsOwnerFacing(f.run(["habitats", "configure", "Alice", "0"]));
     expect(f.calls).toEqual([]);
   });
 

@@ -3,7 +3,8 @@ import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configureIMessage, IMESSAGE_SETUP_BINDING, IMESSAGE_SETUP_CUSTODY, IMESSAGE_SETUP_RESULT, runIMessageSetup, type IMessageSetupPort } from "./imessage-setup.ts";
-import { runTextbutlerCli, CLI_USAGE } from "./cli.ts";
+import { runTextbutlerCli } from "./cli.ts";
+import { CliUsageError } from "./cli-style.ts";
 const ID = "synthetic-imessage", SUBJECT = "imessage:synthetic", READ = "messaging.automation.read", SEND = "messaging.automation.send.text", ATTACHMENT = "messaging.automation.send.attachment";
 const OPERATIONS = [READ, SEND, ATTACHMENT];
 const roots: string[] = [];
@@ -259,7 +260,7 @@ test("normal leader exit with a remaining group is stopped and cannot clear cust
   expect(() => process.kill(-descendant.group, 0)).toThrow();
 }, 10000);
 test("the app setup CLI accepts only its exact role with explicit data directory", async () => {
-  for (const args of [["app", "imessage-setup"], ["app", "imessage-setup", "--force"], ["app", "imessage-setup", "auth", "remove"]]) await expect(runTextbutlerCli(args, { write() {} })).rejects.toThrow(CLI_USAGE);
+  for (const args of [["app", "imessage-setup"], ["app", "imessage-setup", "--force"], ["app", "imessage-setup", "auth", "remove"]]) await expect(runTextbutlerCli(args, { write() {} })).rejects.toThrow(CliUsageError);
 });
 test("denied, unavailable and unverified native Automation states block before any connector child", async () => {
   for (const automationPermission of ["denied", "unavailable", "", "unexpected"]) {

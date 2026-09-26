@@ -79,3 +79,13 @@ test("rich-action review preserves complete target identifiers and escapes termi
   expect(output).toContain("3. attachment");
   expect(output).toContain("On message: new message");
 });
+test("a mistyped account in the connect step shows the fix, not an uncertain-operation warning", async () => {
+  const root = await mkdtemp(join(await realpath("/tmp"), "textbutler-tui-usage-"));
+  const output: string[] = [], answers = ["2", "/usr/bin/true", "", "imessage", "q"];
+  try {
+    await runTerminalSession(root, { write: value => output.push(value), ask: async () => answers.shift() ?? null },
+      async () => ({ protocol: CONTROL_PROTOCOL, ok: false, code: "unavailable", message: "Disconnected" }));
+    expect(output.join("")).toContain("Setup needs different options. See: textbutler help setup");
+    expect(output.join("")).not.toContain("could not be confirmed");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

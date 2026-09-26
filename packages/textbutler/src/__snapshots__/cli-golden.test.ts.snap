@@ -1,0 +1,308 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Textbutler CLI style contract bare invocation off a terminal is a short, runnable intro 1`] = `
+"Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats
+you choose.
+It runs on your Mac and answers as a clearly marked assistant.
+
+Start here
+  textbutler setup           Create private settings, paused
+  textbutler tui             Connect apps and choose chats, step by step
+  textbutler doctor          See what's ready and what to do next
+
+Everyday
+  textbutler status          See what Textbutler is doing
+  textbutler inbox           Find chats waiting for your reply
+  textbutler pause           Pause automatic replies
+
+All commands: textbutler --help · Topics: textbutler help <topic>
+textbutler 0.1.0-alpha.1
+"
+`;
+
+exports[`Textbutler CLI style contract root help is grouped, at most 60 lines, and hides internal commands 1`] = `
+"Textbutler is an AI butler for the iMessage, WhatsApp, and Beeper chats
+you choose.
+
+Usage: textbutler <command> [options]
+
+Start here
+  setup                      Create private settings; replies start paused
+  tui                        Guided terminal: connect apps, choose chats
+  doctor                     Check what's ready and what to do next
+
+Everyday
+  status                     Show what the background service is doing
+  pause | resume             Pause or resume automatic replies
+  inbox                      Find chats waiting for your reply
+  replies <command>          Suggest, review and send replies
+
+Chats and contacts
+  conversations list         List recent one-to-one chats you can add
+  contacts <command>         Add chats and choose how Textbutler answers
+  messaging list | start     Show or connect iMessage, WhatsApp or Beeper
+
+AI accounts
+  providers list             Show connected AI accounts
+  providers check <account>  Check that one account is ready
+
+Background service
+  daemon install | status    Start at login, or see whether it's running
+  menubar [start | install]  Show Textbutler in the menu bar
+
+Options
+  -h, --help                 Show help (also: textbutler help <topic>)
+  -V, --version              Show the version
+  --json                     Print machine-readable output
+  --data-dir <path>          Use another private data folder (absolute path)
+
+Topics: setup, contacts, replies, messaging, providers, daemon, menubar,
+advanced. Most commands print JSON so agents can read them.
+
+Optional support: textbutler support · Turn off: HRANESS_SUPPORT=off"
+`;
+
+exports[`Textbutler CLI style contract every command and topic has help that exits 0 and fits the terminal 1`] = `
+{
+  "advanced": 
+"Usage: textbutler <command>
+
+Commands for agents and for fixing unusual states.
+
+Commands
+  init                       Create private settings without the checklist
+  jobs show <job>            Read the result of a long operation
+  habitats <command>         A chat's reply style, memory and budget
+  messages <command>         JSON commands for agents (help messages)
+  daemon run                 Run the service in this terminal
+  support                    Optional ways to support Textbutler"
+,
+  "contacts": 
+"Usage: textbutler contacts <command>
+
+Choose which chats Textbutler answers and how. New chats start off.
+
+Commands
+  contacts list                          Show chats and their settings
+  contacts add <candidate> [--history]   Add a chat from conversations list;
+                                         --history imports recent messages
+  contacts enable <contact>              Turn on automatic replies
+  contacts disable <contact>             Turn them off and remove send access
+  contacts account <contact> <account>   Choose the AI account for a chat
+  contacts mode <contact> smart|keyword [--keyword <word>]
+                                         Answer everything, or only when a
+                                         message includes the keyword
+  contacts self <contact> on|off         Mark a chat with yourself, so your
+                                         own echoed texts aren't answered
+
+Choosing an account never turns a chat on, and resume never does either.
+
+Example
+  textbutler contacts mode Alex keyword --keyword butler"
+,
+  "conversations": 
+"Usage: textbutler conversations list
+
+List recent one-to-one chats from your connected apps. Add one with
+textbutler contacts add <candidate>. The list expires after five minutes."
+,
+  "daemon": 
+"Usage: textbutler daemon install | uninstall | status | run
+
+Manage the background service that watches your chats.
+
+Commands
+  daemon install             Start it now and at login
+  daemon uninstall           Stop it and remove it from login
+  daemon status              Show whether it's running
+  daemon run                 Run it in this terminal instead
+
+macOS shows a "Background Items Added" notice when you install it."
+,
+  "doctor": 
+"Usage: textbutler doctor [--json]
+
+Check each setup step and show the one thing to do next.
+Doctor only reads local settings; it never reads messages or spends credits.
+
+Options
+  --json                     Print the full readiness report as JSON"
+,
+  "habitats": 
+"Usage: textbutler habitats <command>
+
+A habitat is a chat's reply style, memory and daily budget.
+
+Commands
+  habitats show <contact>                     Show it as JSON
+  habitats configure <contact> <rev> <json>   Replace it (replies paused)
+  habitats rollback <contact> <rev>           Go back to revision <rev>
+  habitats memory-clear <contact> <rev>       Forget learned excerpts
+
+<rev> is the revision that habitats show prints."
+,
+  "help": 
+"Usage: textbutler help [<topic>]
+
+Show help for a command or topic."
+,
+  "inbox": 
+"Usage: textbutler inbox
+
+Check the chats you added and list the ones waiting for your reply."
+,
+  "init": 
+"Usage: textbutler init
+
+Create private settings, paused, without the readiness checklist."
+,
+  "jobs": 
+"Usage: textbutler jobs show <job>
+
+Read the result of a long operation that was still running. Don't repeat
+the original command: it may already have happened."
+,
+  "menubar": 
+"Usage: textbutler menubar [start | stop | status | install | uninstall]
+
+Show Textbutler in the menu bar. Quitting the menu doesn't stop replies.
+
+Commands
+  menubar start              Open the menu now
+  menubar install            Open it at login too
+  menubar stop | uninstall   Close it, or remove it from login
+  menubar status | doctor    Check the menu helper"
+,
+  "messages": 
+"Usage: textbutler messages <command>
+
+JSON commands for agents that read and draft in one chat.
+
+Commands
+  messages history <contact> [--limit 1..200]
+  messages summarize <contact> [--limit 1..200]
+  messages capabilities <contact>
+  messages compose <contact> --text <text>
+  messages compose <contact> --actions <absolute path to actions.json>
+  messages react <contact> <message> <emoji> [--remove]
+  messages attach <contact> <absolute path> [--caption <text>]
+  messages send <contact> --text <text>
+
+Compose, react and attach create drafts; send one with replies send.
+See docs/textbutler/agent-cli.md."
+,
+  "messaging": 
+"Usage: textbutler messaging list | start <app>
+
+Show configured messaging apps, or connect one: imessage, whatsapp
+or beeper. Sign-in and permissions for each app happen in Ghostget.
+
+Example
+  textbutler messaging start imessage"
+,
+  "pause": 
+"Usage: textbutler pause
+
+Pause automatic replies for every chat. Replies you send yourself still work."
+,
+  "providers": 
+"Usage: textbutler providers list | check <account>
+
+Show your AI accounts, or check that one is signed in and ready.
+Subscription accounts are native-claude-code, native-codex and native-devin.
+
+Example
+  textbutler providers check native-codex"
+,
+  "replies": 
+"Usage: textbutler replies <command>
+
+Suggest, review and send replies. Nothing is sent until you run send.
+
+Commands
+  replies suggest <contact>          Write a suggestion without sending it
+  replies show <draft>               Show every action in a suggestion
+  replies send <draft> <check>       Send exactly what you reviewed; <check>
+                                     is the digest that replies show prints
+  replies send <contact> <text...>   Send your own reply
+  replies discard <draft>            Throw a suggestion away
+  replies reconcile <contact> [--sent | --failed]
+                                     Record whether an uncertain send arrived
+
+A contact is an exact ID or a unique name from textbutler contacts list.
+
+Example
+  textbutler replies suggest Alex"
+,
+  "resume": 
+"Usage: textbutler resume
+
+Resume automatic replies. Chats that are off stay off."
+,
+  "setup": 
+"Usage: textbutler setup [options]
+
+Create your private settings, or add a messaging app or AI account.
+Automatic replies start paused. Setup never reads or sends messages.
+
+Options
+  --ghostget <path>          Ghostget executable that connects your apps
+  --runtime <path>           Bun, when Ghostget is a .ts file
+  --state-home <path>        Ghostget's private state folder
+  --account <app>:<id>       Account to use, e.g. imessage:messages (repeat)
+  --xcb <path>               xcb executable for your AI subscription
+  --xcb-state <path>         xcb's private state folder
+  --xcb-account <ai>:<id>    Signed-in xcb account: claude, codex or devin
+  --xcb-model <ai>/<model>[/<effort>]
+                             Model for that account
+
+Use absolute paths. Sign in with Ghostget and xcb first; Textbutler stores
+only references and pins the xcb file's checksum. Stop the service before
+adding a connection, then start it again.
+
+Example
+  textbutler setup --ghostget /Users/me/bin/ghostget --account imessage:messages"
+,
+  "status": 
+"Usage: textbutler status
+
+Print the background service's current state as JSON."
+,
+  "suggest": 
+"Usage: textbutler replies <command>
+
+Suggest, review and send replies. Nothing is sent until you run send.
+
+Commands
+  replies suggest <contact>          Write a suggestion without sending it
+  replies show <draft>               Show every action in a suggestion
+  replies send <draft> <check>       Send exactly what you reviewed; <check>
+                                     is the digest that replies show prints
+  replies send <contact> <text...>   Send your own reply
+  replies discard <draft>            Throw a suggestion away
+  replies reconcile <contact> [--sent | --failed]
+                                     Record whether an uncertain send arrived
+
+A contact is an exact ID or a unique name from textbutler contacts list.
+
+Example
+  textbutler replies suggest Alex"
+,
+  "support": 
+"Usage: textbutler support
+
+See optional ways to support Textbutler. Turn off: HRANESS_SUPPORT=off."
+,
+  "tui": 
+"Usage: textbutler tui
+
+Open the guided terminal. It walks through setup, connecting apps,
+adding chats and reviewing replies. Quitting leaves the service running."
+,
+  "version": 
+"Usage: textbutler --version
+
+Show the version."
+,
+}
+`;

@@ -7,6 +7,7 @@ import { requestDaemon } from "./daemon.ts";
 import { loadHostConfig } from "./host-config.ts";
 import { disclose } from "./config.ts";
 import { runSetup } from "./onboarding.ts";
+import { CliUsageError } from "./cli-style.ts";
 import { awaitOwnerJob, handleOwnerCommand, OwnerCliError, type OwnerControlClient } from "./owner-cli.ts";
 
 export interface TerminalSession {
@@ -92,7 +93,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
     if (choice === null || ["q", "quit", "exit"].includes(choice.trim().toLowerCase())) return 0;
     try {
       if (choice.trim() === "1") {
-        await runSetup([], dataDir, io);
+        await runSetup([], dataDir, io, { next: false });
         const configured = await loadHostConfig(dataDir);
         const hasMessaging = Boolean(configured.ghostget?.authId || configured.ghostget?.automationAccounts?.length);
         if (!snapshot && !hasMessaging) {
@@ -120,7 +121,7 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
           const args = ["--ghostget", executable.trim(), ...(runtime.trim() ? ["--runtime", runtime.trim()] : []),
             ...(config?.ghostget?.stateHome ? ["--state-home", config.ghostget.stateHome] : [])];
           for (const account of accounts.split(",")) args.push("--account", account.trim());
-          await runSetup(args, dataDir, io);
+          await runSetup(args, dataDir, io, { next: false });
           io.write("Connections saved. Choose Setup & readiness (1) to start the background service.\n");
           continue;
         }
@@ -191,6 +192,8 @@ export async function runTerminalSession(dataDir: string, io: TerminalSession, c
       } else io.write("Choose a number from 1 to 8, or q to quit.\n");
     } catch (error) {
       if (error instanceof OwnerCliError) { io.write(`${terminalText(error.message)}\n`); continue; }
+      // Input mistakes are not uncertain operations: show the one-line fix.
+      if (error instanceof CliUsageError) { io.write(`${terminalText(error.message)} See: ${terminalText(error.next)}\n`); continue; }
       io.write("This action could not be confirmed. Check Setup & readiness and Recent activity. Do not repeat a send with an uncertain result.\n");
     }
   }
