@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "reviewer": {
+    "kind": "independent-ai-source-review",
+    "agent": "devin-cli-subagent/explore-review",
+    "independence": "The reviewer did not implement or edit the change, tests, admission gate or validation receipts. It inspected the working tree and diff read-only and produced only the review verdict; findings were re-verified and patched by the integrating agent before this record."
+  },
+  "sourceState": {
+    "branch": "claude/intake-latency",
+    "baseCommit": "893e93e",
+    "headCommit": "claude/intake-latency tip",
+    "identity": "Source digests identify the reviewed bytes; commits alone do not."
+  },
+  "scope": "Run-intake latency: reply-loop.ts snapshot() reuses the set-poll enrollment recorded on ContactLoop.lastEnrollment instead of issuing a per-contact client.poll (the history call still re-reads and re-asserts the live enrollment row), lastEnrollment resets on every initialization/drain/tick failure path, and runtime.ts fetches the transport capability gate and the agent qualification gate concurrently after the reply decision while keeping the grant step sequential. The reply-loop contract test now also pins singlePolls === 0 after a submitted reply.",
+  "method": "Independent read-only inspection of the diff plus assertAutomationBinding/parseAutomationEnrollment (digest recompute on every assert), contactLoop state recreation on binding or settings revision change, ButlerRuntime.process gate ordering, the ghostget host history/pollEnrollments semantics in the deployed connector overlay, the tick single-flight serialization, and the fixture's poll counter. The integrating agent ran the focused suites and the full check.",
+  "result": "Ship. The reused enrollment is assert-only, binding digests are recomputed on parse, state recreation cannot leak a stale enrollment across a binding change, Promise.all preserves failure propagation and reason precedence, the qualification gate cannot run unless the capability check has already been dispatched (bounded waste on blocked outcomes only), and the new test genuinely proves the intake path no longer issues a single-contact provider poll.",
+  "findings": [
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "packages/textbutler/src/runtime.ts:74-80",
+      "finding": "Promise.all evaluates its arguments eagerly: a synchronous throw from a non-async qualified() implementation would detach the capabilities() promise unobserved, risking an unhandled rejection.",
+      "recommendation": "Defer the qualification call behind Promise.resolve().then() so both promises are always observed.",
+      "resolution": "Applied: qualification is now invoked inside Promise.resolve().then(), so a synchronous port throw cannot detach the capability read."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "file": "packages/textbutler/src/reply-loop.ts:75,193,247",
+      "finding": "lastEnrollment was cleared only on the per-contact poll-failure path; the settings-change, drain-failure and tick-catch reset paths left a stale value reachable until the next successful set-poll.",
+      "recommendation": "Clear lastEnrollment everywhere initialized is reset so a stale enrollment is structurally impossible while a contact is unhealthy.",
+      "resolution": "Applied: lastEnrollment is now cleared in changed(), the drain-failure catch, and the tick catch-all alongside initialized = false."
+    },
+    {
+      "severity": "low",
+      "status": "accepted",
+      "file": "packages/textbutler/src/reply-loop.ts:84-87, packages/textbutler/src/runtime.ts:115-123",
+      "finding": "Removing the per-intake client.poll widens the pre-dispatch freshness window: a contact message landing between the last set-poll ingest and prepare's atomic expectedRevision bind is not seen by the run in progress (previously the intake poll forced a synchronous ingest).",
+      "recommendation": "Accept the ~1-tick bound or poll inside prepare.",
+      "resolution": "Accepted: the window is bounded by the 1s tick cadence plus the ~9s shared pollSet session; transport.prepare still binds the journal revision atomically so the send cannot contradict recorded state, an unpinned in-flight run is cancelled by the drain's receive() when the new inbound lands, and the fresh message produces its own reply cycle."
+    },
+    {
+      "severity": "low",
+      "status": "accepted",
+      "file": "packages/textbutler/src/runtime.ts:78-80",
+      "finding": "qualified() now runs even when capabilities() resolves ok:false, and the blocked outcome waits for it since Promise.all awaits every fulfillment.",
+      "recommendation": "Early-return on capability failure while still observing the qualification promise.",
+      "resolution": "Accepted as bounded waste: qualification is an in-memory selection that at most triggers a deduped account check; no send authority is derived from it when the capability gate fails."
+    },
+    {
+      "severity": "low",
+      "status": "documented",
+      "file": "packages/textbutler/src/reply-loop.test.ts:241-243",
+      "finding": "The singlePolls === 0 assertion does not cover the intended fallback: a mid-run pollSet failure clears lastEnrollment and the next refresh legitimately issues one client.poll.",
+      "recommendation": "Note that the single-poll fallback remains the recovery path.",
+      "resolution": "The fallback is intentional (snapshot still polls when no set-poll enrollment exists); the assertion pins the steady-state contract only."
+    }
+  ]
+}
