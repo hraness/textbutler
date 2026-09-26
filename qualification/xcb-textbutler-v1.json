@@ -38,7 +38,7 @@
     "packages/textbutler/src/journal.ts": "8c35a860e42087acdacf8ff0748096499ca35b65443463790f6a6bb32c8914e1",
     "packages/textbutler/src/message-summary.ts": "75163888ce53a7535a93f23a8228853d984af7a3677a4c8d0709cf6384187523",
     "packages/textbutler/src/messages-cli.ts": "44e5db75549e212ab2686d3673c5433908f1f9554bf133e98fd574d09255e66f",
-    "packages/textbutler/src/owner-cli.ts": "2d3d5db9bc0a4d5cfa7366f91493006cf028f7fe4269f652d5ee2d1f0b8b3fee",
+    "packages/textbutler/src/owner-cli.ts": "c21bccd7f0fa95a8659db2b2f8779765b0bf5801787588018ecf44c7f4e10d1f",
     "packages/textbutler/src/owner-messages.ts": "337d9f057d20e2cf32dbf781d4143ecee3fbd16f2aa82d88380af99aa1c3177a",
     "packages/textbutler/src/owner-replies.ts": "586002d4acef0b2a1fc95abb35709a78f4b79122594ce309be0c3882d9d527d6",
     "packages/textbutler/src/routed-agent.ts": "63897e366965b77ac8bcce8b1b8c08b218c20605923dd86bf468e0b9a65f22b3",
@@ -47,8 +47,8 @@
     "packages/textbutler/src/host-config.ts": "c0a59527d9427aaa3ca26ca469ce73e7edb1153607d1ac5d9c50e84dd825ccd0",
     "packages/textbutler/src/workspace.ts": "70b2fbec3a14c835f9ec2a4fcc1c2535e1fd2e5fde4907486cef6d6a8fc599b4",
     "packages/textbutler/src/runtime.ts": "d8ec7fa463fff0fdeea330855376960103eac3613a155dee8e3cd148448662dd",
-    "packages/textbutler/src/runtime-entry.ts": "36b99bceac16e48c513d72bd904b785e9bb1fe8e1a706ea741310d40a9e9ad4e",
-    "packages/textbutler/src/cli.ts": "1847462b11d007925b0096733fb393fbc6dcd4667b4f895cd0e07fd30ed20d1c",
+    "packages/textbutler/src/runtime-entry.ts": "5bc336c2e6e02b801282081ea51de23e28b6f0c7a27c422797121fc45376287e",
+    "packages/textbutler/src/cli.ts": "41c9afdce924c973c232f1c95981b152dd83c271d5fdc9afa7bc16394ee031f6",
     "packages/textbutler/src/launch-agent.ts": "4dcae445ff4b0e684bb90dbde7b87d8e23175fe490b60ab98850c5bd142aead2",
     "packages/textbutler/src/macos-app.ts": "049a3b7e0144a7c67404226149525eb68f01918db0a4c24ee1814a351e6ad5ea",
     "packages/textbutler/src/imessage-setup.ts": "231d0d09c97f97ccce1dc4eb2746fd0ef71ccf90ea127e6f8b1cc8f4810d3360",
@@ -59,6 +59,6 @@
   },
   "validation": {
     "command": "bun run check",
-    "receiptSha256": "4e69cac790264f46067610bd482b25eb3fdec51fe834f189f52cebbf242321b4"
+    "receiptSha256": "d9d4178da6d685d09619dfa04a0f39d9e630a4c4f27d20d50b8c3bf0fa2e4eb4"
   }
 }
