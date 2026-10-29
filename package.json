@@ -96,21 +96,21 @@
     "@hraness/oh": "https://github.com/hraness/oh/releases/download/v0.10.8/hraness-oh-0.10.8.tgz"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.268",
-    "@anthropic-ai/sdk": "0.125.0",
+    "@anthropic-ai/claude-agent-sdk": "0.3.310",
+    "@anthropic-ai/sdk": "1.3.0",
     "@hraness/agentmixer": "https://github.com/hraness/xcb/releases/download/v0.3.0/hraness-agentmixer-0.3.0.tgz",
     "@hraness/algal": "https://codeload.github.com/hraness/algal/tar.gz/14915465c3d7c5ee2c55e2977e36ee03f6bcbff0",
     "@hraness/desktop-foundation": "https://github.com/hraness/desktop-foundation/releases/download/v0.9.0/hraness-desktop-foundation-0.9.0.tgz",
     "@hraness/local-custody": "github:hraness/local-custody#v0.4.0",
     "@hraness/support-foundation": "github:hraness/support-foundation#8bb514d24b79dc3f305390700ae312cab88e7ad2",
     "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
-    "@modelcontextprotocol/sdk": "1.32.1",
-    "@types/bun": "1.3.14",
-    "effect": "3.22.1",
-    "fast-check": "4.9.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@types/bun": "1.4.4",
+    "effect": "4.0.6",
+    "fast-check": "4.10.2",
     "quickjs-emscripten-core": "0.32.0",
-    "sigstore": "4.1.1",
-    "typescript": "6.0.3",
-    "zod": "4.6.2"
+    "sigstore": "5.0.0",
+    "typescript": "7.0.2",
+    "zod": "4.6.7"
   }
 }
