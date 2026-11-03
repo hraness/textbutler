@@ -1,5 +1,9 @@
 # TextButler
 
+**Retired.** TextButler is no longer maintained. The source, tagged releases,
+and release artifacts are preserved for historical reference. The setup and
+operating instructions below are historical and are no longer supported.
+
 > 💬 TextButler is an AI butler for your messages, running on your Mac. Turn it
 > on for the iMessage, WhatsApp, or Beeper chats you choose, and it drafts or
 > sends replies using your shared history and the notes you keep on each

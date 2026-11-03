@@ -1,10 +1,31 @@
+# Retirement status
+
+TextButler is retired. This status supersedes the redesign authorization below
+and the unattended setup, installation, daemon/app activation, maintenance,
+deployment, and release instructions in this repository. Those instructions are
+historical; they do not authorize new installations, service activation,
+messaging, or publication.
+
+Work is limited to the owner's retirement request and preservation or recovery
+work explicitly put in scope. Validation and protected delivery requirements
+still apply to those changes.
+
+Preserve private local work, message and Contacts sources and their sidecars,
+local identities and keys, journals, reservations, unresolved send intents,
+custody records, and upgrade rollback copies. Keep frozen public contracts,
+exports, dependency pins, releases, tags, and assets intact. Retirement does not
+authorize deleting or resetting user data, shared accounts, or credentials.
+
 <!-- browser-automation:start -->
 - Ordinary owned automated browser runs use versioned Chrome for Testing or the browser provisioned for the pinned Playwright version. Reject the installed auto-updating Chrome application, including explicit executable overrides and symlinks; never fall back to it when provisioning is missing. Report the resolved executable and browser version, and close owned contexts and browsers gracefully in cleanup. Attaching to an explicitly authorized user-owned browser is a separate operation: preserve its profile and lifetime. Keep regression checks for browser selection in the existing required checks; see [browser automation](https://github.com/hraness/.github/blob/main/BROWSER_AUTOMATION.md).
 - Never start the system Chrome app directly from an agent shell; use the repository's browser tooling and respect its scheduler and browser custody controls. For owned launches, pass `--mute-audio` and merge `PaintHolding,MacAppCodeSignClone` into any existing `--disable-features` value instead of adding a second switch. Finish owned process, context, and profile cleanup before releasing the browser lane. Never signal another holder or manipulate its lease to obtain a slot.
 - The sole native-runtime exception is Slopcamera’s documented signature-verified, version-bound, immutable task-owned Chrome snapshot, never a direct launch of the installed application. Its current integrity-bound launch contract must disable `MacAppCodeSignClone`; retain vendor identity verification, browser custody, graceful cleanup, and regression checks. Qualify the native fix with live clone-growth and cleanup evidence before activating this exception. It is not an executable override or fallback for ordinary automation; see [the native-runtime exception](https://github.com/hraness/.github/blob/main/BROWSER_AUTOMATION.md#slopcamera-native-runtime-exception).
 <!-- browser-automation:end -->
 
-# Textbutler redesign scope
+# Historical Textbutler redesign scope
+
+The authorization below records previous work. The retirement status above
+governs current work.
 
 The owner has authorized replacing the unused Message Like Me product with
 Textbutler, a headless macOS message-butler daemon at `textbutler.app`.
